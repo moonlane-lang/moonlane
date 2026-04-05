@@ -1,4 +1,6 @@
-use std::{env, fs, process};
+use std::{fs, process};
+
+use clap::Parser;
 
 mod ast;
 mod error;
@@ -10,27 +12,33 @@ mod types;
 
 use error::YolangError;
 
+#[derive(Parser)]
+#[command(name = "yolang")]
+#[command(version = "0.1.0")]
+#[command(about = "Yolang interpreter")]
+#[command(long_about = "A tree-walk interpreter for the Yolang programming language")]
+struct Args {
+    /// Path to the .yolo file to execute
+    #[arg(value_name = "FILE")]
+    file: String,
+
+    /// Print the AST and exit without executing
+    #[arg(long)]
+    debug_ast: bool,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let args = Args::parse();
 
-    let (debug_ast, path) = match args.as_slice() {
-        [_, flag, path] if flag == "--debug-ast" => (true, path.clone()),
-        [_, path] => (false, path.clone()),
-        _ => {
-            eprintln!("Usage: yolang [--debug-ast] <file.yolo>");
-            process::exit(1);
-        }
-    };
-
-    let source = match fs::read_to_string(&path) {
+    let source = match fs::read_to_string(&args.file) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Error reading '{}': {}", path, e);
+            eprintln!("Error reading '{}': {}", args.file, e);
             process::exit(1);
         }
     };
 
-    if let Err(e) = run(&source, &path, debug_ast) {
+    if let Err(e) = run(&source, &args.file, args.debug_ast) {
         eprintln!("{}", e);
         process::exit(1);
     }
