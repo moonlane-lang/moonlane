@@ -12,7 +12,7 @@ Build a complete type-checking system with an AST that carries type information 
 1. **Typed AST Representation** — Define AST nodes that carry type annotations from parsing through evaluation
 2. **Type Inference Engine** — Infer types where not explicitly annotated (following Hindley-Milner or similar)
 3. **Type Checker** — Validate programs before execution; catch type errors early
-4. **Basic Type Support** — Implement int, bool, string, list types with proper coercion rules
+4. **Basic Type Support** — Implement int, bool, string, and array types with proper coercion rules
 5. **Clear Type Error Messages** — Report type mismatches with context and suggestions
 
 ## Why This Epic?
@@ -49,9 +49,11 @@ The **Typed AST** is the centerpiece: parser builds it with initial types, type 
 - **Spec:** Language spec must define type system (basic types, coercion, subtyping rules)
 - **Error Handling:** Type errors need good error recovery
 
-## Out of Scope (for now)
+## Out of Scope (for Epic 001)
 
-- Generics and parametric polymorphism (Epic 002?)
+- **Generics and parametric polymorphism** (Epic 002)
+- **Monomorphization** (Epic 002)
+- **List<T>** — only base Array type for now
 - Type aliases or custom type definitions
 - Trait/interface systems
 - Variance and subtyping complexity
@@ -64,6 +66,8 @@ When this epic is done:
 - [ ] AST nodes carry type information
 - [ ] Type inference passes all test cases
 - [ ] Type checker catches invalid type operations
+- [ ] Basic types work: Int, Float, Bool, String, Array, Unit, Tuple
+- [ ] Array operations type-check correctly
 - [ ] Evaluator reads type info and validates operations
 - [ ] Type error messages are clear and actionable
 - [ ] No regressions in existing parser/evaluator tests
@@ -77,6 +81,8 @@ When this epic is done:
 
 ## Notes
 
-- Consider starting with a simple Hindley-Milner-style inference (let polymorphism)
+- Use simple, concrete type inference (no type variables yet)
 - Keep type checking separate from evaluation for clarity
 - Build test suite incrementally: type checking tests before implementation
+- Focus on correctness; generics and advanced features are Epic 002
+- Array is homogeneous: `Array<Int>` at runtime, but represented as single-element-type
