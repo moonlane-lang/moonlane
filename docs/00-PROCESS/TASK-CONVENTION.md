@@ -79,71 +79,6 @@ What needs doing and why.
 5. **Acceptance criteria are testable:** Not "improve error messages" but "error reports include X and Y"
 6. **Folder structure mirrors status:** File location reflects true status (move file when status changes)
 
-## Epics
-
-The three core epics form the complete interpreter:
-
-### Epic 001: Typechecker and Typed AST
-**Status:** open  
-**Depends On:** None (foundation)
-
-Build a complete type-checking system with an AST that carries type information throughout evaluation.
-
-**Goals:**
-- Implement a typed AST representation
-- Build a type inference engine
-- Create a type checker that validates programs before execution
-- Support basic types (int, float, bool, string, array, unit, tuple)
-
-**Tasks:** 4 tasks (0001-0004)
-- `0001` — Typed AST node design and implementation
-- `0002` — Type inference engine
-- `0003` — Type checker validation pass
-- `0004` — Basic type system implementation
-
----
-
-### Epic 002: Evaluator
-**Status:** open  
-**Depends On:** Epic 001 (Typechecker)
-
-Implement the runtime engine that executes fully typed programs, transforming TypedAST into running code.
-
-**Goals:**
-- Evaluate all expression types
-- Execute statements and control flow
-- Handle function definitions and calls
-- Support closures and first-class functions
-- Implement built-in functions
-
-**Tasks:** 4 tasks (0001-0004)
-- `0001` — Value representation and basic evaluation
-- `0002` — Expression evaluation (all 20 variants)
-- `0003` — Control flow and statement execution
-- `0004` — Function calls and closures
-
----
-
-### Epic 003: Generics and Monomorphization
-**Status:** open  
-**Depends On:** Epic 002 (Evaluator)
-
-Add generic type support and compile-time specialization through monomorphization.
-
-**Goals:**
-- Support type parameters on functions and types
-- Implement type variable unification
-- Handle generic instantiation (explicit and implicit)
-- Specialize generics at compile time
-- Support recursive and nested generics
-
-**Tasks:** 5 tasks (0005-0009)
-- `0005` — Type variables and constraint system
-- `0006` — Generic type instantiation
-- `0007` — Generic function type checking
-- `0008` — Generic struct and enum type checking
-- `0009` — Monomorphization engine
-
 ## Workflow
 
 ```
@@ -157,12 +92,6 @@ Add generic type support and compile-time specialization through monomorphizatio
    ↓
 5. Finish → check criteria, move to done/, update spec, set status "done"
 ```
-
-## Current Epics
-
-1. **Epic 001:** `docs/05-TASKS/epic-001-typechecker/EPIC.md`
-2. **Epic 002:** `docs/05-TASKS/epic-002-evaluator/EPIC.md`
-3. **Epic 003:** `docs/05-TASKS/epic-002-generics/EPIC.md` (folder naming note: still named epic-002-generics, but is conceptually Epic 003)
 
 ## See Also
 

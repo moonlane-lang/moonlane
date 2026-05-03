@@ -81,8 +81,8 @@ When this epic is done:
 
 ## Notes
 
-- Use simple, concrete type inference (no type variables yet)
+- Type inference uses full Hindley-Milner with let-polymorphism (8 phases, see task 0002)
 - Keep type checking separate from evaluation for clarity
-- Build test suite incrementally: type checking tests before implementation
-- Focus on correctness; generics and advanced features are Epic 002
-- Array is homogeneous: `Array<Int>` at runtime, but represented as single-element-type
+- Build test suite incrementally: each inference phase is tested before the next begins
+- Focus on correctness; user-facing generics (`<T>` syntax) and monomorphization are Epic 002
+- Array is homogeneous: `Array<Int>` at runtime, represented as a single element type
