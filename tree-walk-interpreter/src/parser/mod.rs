@@ -803,6 +803,11 @@ fn parse_match_arm(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
 fn parse_pattern(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Pattern, YolangError> {
     match pair.as_rule() {
         Rule::pattern => {
+            // The anonymous wildcard alternative (`"_" ~ !(...))`) produces a
+            // Rule::pattern pair with no children, so check for it first.
+            if pair.as_str().trim() == "_" {
+                return Ok(Pattern::Wildcard(Span::of(&pair, filename)));
+            }
             let inner = pair.into_inner().next()
                 .ok_or_else(|| YolangError::internal("pattern: missing inner rule"))?;
             parse_pattern(inner, filename)
