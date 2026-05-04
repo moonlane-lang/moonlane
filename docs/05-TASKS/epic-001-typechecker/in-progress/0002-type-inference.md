@@ -33,15 +33,15 @@ inference before a final `Type` is known.
 Core algorithm: given two `InferType`s, produce a `Substitution` that makes them
 equal, or error. Includes occurs check to prevent infinite types.
 
-### Phase 5 — Constraints
+### Phase 5 — Constraints ✓
 `Constraint { lhs, rhs, span }` and `solve_constraints(Vec<Constraint>)`.
 Batch-solving produces better error messages than eager unification.
 
-### Phase 6 — Type Schemes (let-polymorphism)
+### Phase 6 — Type Schemes (let-polymorphism) ✓
 `TypeScheme { quantified_vars, ty }` with `generalize` (identify which vars to
 quantify) and `instantiate` (fresh variables per use site).
 
-### Phase 7 — Inference Context
+### Phase 7 — Inference Context ✓
 `InferContext` — the state threaded through inference: `TypeVarGenerator`, mono
 and poly environments, constraint accumulator, current substitution.
 
@@ -78,27 +78,27 @@ constraints, solve, and produce a `TypedProgram`.
 - [x] Occurs check prevents `?t0 = Array(?t0)`
 - [x] `phase_4_unification` tests pass
 
-### Phase 5 — Constraints
-- [ ] `Constraint { lhs: InferType, rhs: InferType, span: Span }`
-- [ ] `solve_constraints(constraints) -> Result<Substitution, YolangError>`
-- [ ] Type errors include source location from `span`
-- [ ] `phase_5_constraints` tests pass
+### Phase 5 — Constraints ✓
+- [x] `Constraint { lhs: InferType, rhs: InferType, span: Span }`
+- [x] `solve_constraints(constraints) -> Result<Substitution, YolangError>`
+- [x] Type errors include source location from `span`
+- [x] `phase_5_constraints` tests pass
 
-### Phase 6 — Type Schemes
-- [ ] `TypeScheme { quantified_vars: Vec<TypeVar>, ty: InferType }`
-- [ ] `generalize(ty, free_env_vars) -> TypeScheme`
-- [ ] `instantiate(gen) -> InferType` (fresh vars for each use)
-- [ ] `Display` renders as `∀?t0. fun(?t0) -> ?t0`
-- [ ] `phase_6_type_schemes` tests pass
+### Phase 6 — Type Schemes ✓
+- [x] `TypeScheme { quantified_vars: Vec<TypeVar>, ty: InferType }`
+- [x] `generalize(ty, free_env_vars) -> TypeScheme`
+- [x] `instantiate(gen) -> InferType` (fresh vars for each use)
+- [x] `Display` renders as `∀?t0. fun(?t0) -> ?t0`
+- [x] `phase_6_type_schemes` tests pass
 
-### Phase 7 — Inference Context
-- [ ] `InferContext` struct
-- [ ] `fresh_var() -> InferType`
-- [ ] `bind_mono(name, ty)` and `lookup(name) -> Option<InferType>`
-- [ ] `bind_poly(name, scheme)` — auto-instantiates on lookup
-- [ ] `add_constraint(lhs, rhs, span)`
-- [ ] `solve() -> Result<Substitution, YolangError>`
-- [ ] `phase_7_infer_context` tests pass
+### Phase 7 — Inference Context ✓
+- [x] `InferContext` struct
+- [x] `fresh_var() -> InferType`
+- [x] `bind_mono(name, ty)` and `lookup(name) -> Option<InferType>`
+- [x] `bind_poly(name, scheme)` — auto-instantiates on lookup
+- [x] `add_constraint(lhs, rhs, span)`
+- [x] `solve() -> Result<Substitution, YolangError>`
+- [x] `phase_7_infer_context` tests pass
 
 ### Phase 8 — Integration
 - [ ] `typechecker::check()` uses `InferContext` for a full inference pass

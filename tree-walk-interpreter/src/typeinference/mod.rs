@@ -8,7 +8,7 @@
 use crate::ast::Span;
 use crate::types::Type;
 use crate::error::YolangError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ── Phase 1: Type Variables ───────────────────────────────────────────────────
 
@@ -272,5 +272,180 @@ pub fn unify(a: &InferType, b: &InferType) -> Result<Substitution, YolangError> 
             Ok(subst)
         }
         _ => Err(YolangError::internal(format!("cannot unify {} with {}", a, b))),
+    }
+}
+
+// ── Phase 5: Constraints ──────────────────────────────────────────────────────
+
+/// A deferred type equation: `lhs` and `rhs` must unify, recorded with the
+/// source `span` so that failures produce actionable error messages.
+#[derive(Debug, Clone)]
+pub struct Constraint {
+    pub lhs: InferType,
+    pub rhs: InferType,
+    pub span: Span,
+}
+
+impl Constraint {
+    pub fn new(lhs: InferType, rhs: InferType, span: Span) -> Self {
+        Self { lhs, rhs, span }
+    }
+}
+
+/// Solve a list of constraints by unifying each `lhs`/`rhs` pair in order.
+///
+/// The running substitution is applied to both sides before each unification
+/// so that earlier bindings propagate into later constraints. Errors are
+/// reported with the source span of the offending constraint.
+pub fn solve_constraints(constraints: Vec<Constraint>) -> Result<Substitution, YolangError> {
+    let mut subst = Substitution::new();
+    for c in constraints {
+        let lhs = subst.apply(&c.lhs);
+        let rhs = subst.apply(&c.rhs);
+        let s = unify(&lhs, &rhs).map_err(|_| {
+            YolangError::type_error(format!("cannot unify {} with {}", lhs, rhs), &c.span)
+        })?;
+        subst = subst.compose(&s);
+    }
+    Ok(subst)
+}
+
+// ── Phase 6: Type Schemes ─────────────────────────────────────────────────────
+
+/// Collect all type variables that appear free in `ty`.
+pub fn free_vars(ty: &InferType) -> HashSet<TypeVar> {
+    match ty {
+        InferType::Concrete(_) => HashSet::new(),
+        InferType::Var(v) => [*v].into(),
+        InferType::Fun(params, ret) => {
+            let mut vars = free_vars(ret);
+            for p in params { vars.extend(free_vars(p)); }
+            vars
+        }
+        InferType::Tuple(ts) => ts.iter().flat_map(free_vars).collect(),
+        InferType::Array(t) => free_vars(t),
+        InferType::Named(_, args) => args.iter().flat_map(free_vars).collect(),
+    }
+}
+
+/// A universally quantified type: `∀ quantified_vars. ty`.
+///
+/// Variables in `quantified_vars` are locally owned — each use site gets
+/// fresh copies via `instantiate`, enabling let-polymorphism.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeScheme {
+    pub quantified_vars: Vec<TypeVar>,
+    pub ty: InferType,
+}
+
+impl TypeScheme {
+    /// A monomorphic scheme — no quantified variables.
+    pub fn mono(ty: InferType) -> Self {
+        Self { quantified_vars: vec![], ty }
+    }
+}
+
+impl std::fmt::Display for TypeScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.quantified_vars.is_empty() {
+            write!(f, "{}", self.ty)
+        } else {
+            write!(f, "∀")?;
+            for (i, v) in self.quantified_vars.iter().enumerate() {
+                if i > 0 { write!(f, ", ")?; }
+                write!(f, "{}", v)?;
+            }
+            write!(f, ". {}", self.ty)
+        }
+    }
+}
+
+/// Generalize `ty` into a type scheme by quantifying over all type variables
+/// that appear free in `ty` but not in `env_free_vars`.
+///
+/// `env_free_vars` is the set of variables that are still being solved in the
+/// surrounding environment — those must not be captured.
+pub fn generalize(ty: InferType, env_free_vars: &HashSet<TypeVar>) -> TypeScheme {
+    let mut quantified: Vec<TypeVar> = free_vars(&ty)
+        .difference(env_free_vars)
+        .copied()
+        .collect();
+    quantified.sort();
+    TypeScheme { quantified_vars: quantified, ty }
+}
+
+/// Instantiate a type scheme by replacing each quantified variable with a
+/// fresh type variable from `gen`. Called once per use site.
+pub fn instantiate(scheme: &TypeScheme, gen: &mut TypeVarGenerator) -> InferType {
+    let mut subst = Substitution::new();
+    for &var in &scheme.quantified_vars {
+        subst.bind(var, InferType::Var(gen.fresh()));
+    }
+    subst.apply(&scheme.ty)
+}
+
+// ── Phase 7: Inference Context ────────────────────────────────────────────────
+
+/// State threaded through the entire AST walk during type inference.
+///
+/// Owns the variable generator, both environments, and the accumulated
+/// constraint list. Call `solve()` after the walk to get the final substitution.
+pub struct InferContext {
+    var_gen: TypeVarGenerator,
+    mono_env: HashMap<String, InferType>,
+    poly_env: HashMap<String, TypeScheme>,
+    constraints: Vec<Constraint>,
+}
+
+impl InferContext {
+    pub fn new() -> Self {
+        Self {
+            var_gen: TypeVarGenerator::new(),
+            mono_env: HashMap::new(),
+            poly_env: HashMap::new(),
+            constraints: Vec::new(),
+        }
+    }
+
+    /// Generate a fresh type variable.
+    pub fn fresh_var(&mut self) -> InferType {
+        InferType::Var(self.var_gen.fresh())
+    }
+
+    /// Bind a name to a monomorphic type (e.g. a function parameter).
+    pub fn bind_mono(&mut self, name: impl Into<String>, ty: InferType) {
+        self.mono_env.insert(name.into(), ty);
+    }
+
+    /// Bind a name to a polymorphic type scheme (e.g. a let-binding).
+    pub fn bind_poly(&mut self, name: impl Into<String>, scheme: TypeScheme) {
+        self.poly_env.insert(name.into(), scheme);
+    }
+
+    /// Look up a name. Polymorphic bindings are automatically instantiated with
+    /// fresh variables; monomorphic bindings are returned as-is.
+    /// Poly env takes precedence over mono env.
+    pub fn lookup(&mut self, name: &str) -> Option<InferType> {
+        if let Some(scheme) = self.poly_env.get(name).cloned() {
+            Some(instantiate(&scheme, &mut self.var_gen))
+        } else {
+            self.mono_env.get(name).cloned()
+        }
+    }
+
+    /// Record that `lhs` and `rhs` must unify, tagged with its source location.
+    pub fn add_constraint(&mut self, lhs: InferType, rhs: InferType, span: Span) {
+        self.constraints.push(Constraint::new(lhs, rhs, span));
+    }
+
+    /// Solve all accumulated constraints and return the resulting substitution.
+    pub fn solve(self) -> Result<Substitution, YolangError> {
+        solve_constraints(self.constraints)
+    }
+}
+
+impl Default for InferContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
