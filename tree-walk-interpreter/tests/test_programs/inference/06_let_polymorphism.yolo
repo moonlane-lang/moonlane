@@ -1,0 +1,23 @@
+// Test: let-polymorphism — unannotated function parameters
+//
+// When a function has no type annotation on its parameter, the typechecker
+// assigns a fresh type variable and generalizes it into a TypeScheme.
+// Each call site gets a fresh instantiation, so the same function can be
+// used at different types independently.
+//
+// identity has inferred type: ∀?t0. fun(?t0) -> ?t0
+//
+// At each call site:
+//   a = identity(42)    — instantiates to fun(Int) -> Int,  a : Int
+//   b = identity(true)  — instantiates to fun(Bool) -> Bool, b : Bool
+//   c = identity("hi")  — instantiates to fun(String) -> String, c : String
+//
+// The two calls do NOT interfere — they bind different fresh type variables.
+
+fun identity(x) {
+    x
+}
+
+let a = identity(42);
+let b = identity(true);
+let c = identity("hi");

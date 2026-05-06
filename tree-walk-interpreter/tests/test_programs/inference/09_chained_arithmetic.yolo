@@ -1,0 +1,21 @@
+// Test: transitive type constraint propagation through expressions
+//
+// Type variables can be resolved transitively — if ?t0 = ?t1 and ?t1 = Int,
+// then ?t0 resolves to Int. This test exercises that path through real
+// expressions rather than manually constructed constraints.
+//
+// In `compute`, the body `(a + b) * c` emits constraints:
+//   ?ta = ?tb  (both operands of + must match)
+//   ?tb = Int  (literal c = 3 is Int, * requires matching types)
+//   return type = Int (declared) must unify with ?ta
+// Solving transitively gives ?ta = ?tb = Int.
+//
+// Expected inferred types:
+//   compute(Int, Int, Int) -> Int
+//   result : Int
+
+fun compute(a: Int, b: Int, c: Int) -> Int {
+    (a + b) * c
+}
+
+let result = compute(2, 3, 4);

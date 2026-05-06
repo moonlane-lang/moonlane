@@ -1,0 +1,24 @@
+// Test: forward references between top-level functions
+//
+// The pre-pass registers all top-level function names before inference begins,
+// so a function can call another declared later in the file.
+//
+// Inference order:
+//   1. Pre-pass: register both `even` and `odd` with fresh type variables
+//   2. Infer `is_nonzero` body: n > 0 gives Bool, matches return type Bool ✓
+//   3. Infer `classify` body: calls is_nonzero(n), which returns Bool ✓
+//
+// Expected inferred types:
+//   is_nonzero(Int) -> Bool
+//   classify(Int) -> Bool
+//   result : Bool
+
+fun classify(n: Int) -> Bool {
+    is_nonzero(n)
+}
+
+fun is_nonzero(n: Int) -> Bool {
+    n > 0
+}
+
+let result = classify(5);

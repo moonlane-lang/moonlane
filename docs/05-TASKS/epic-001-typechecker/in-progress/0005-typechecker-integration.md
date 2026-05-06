@@ -9,7 +9,13 @@
 ## What
 
 Wire `InferContext` (from task 0002) into `typechecker::check()` to produce a
-real `TypedProgram` from an untyped `Program`.
+real `TypedProgram` from an untyped `Program`, and connect that output to the
+evaluator so the full pipeline runs end-to-end.
+
+This covers both *inference* (determining types) and *validation* (rejecting
+ill-typed programs). In a constraint-based system these are not separate passes —
+constraints both determine and validate simultaneously. A separate validation pass
+is therefore not needed.
 
 This is a multi-stage implementation: not all AST node types will be handled
 immediately. Each stage adds coverage for more nodes and is tested with `.yolo`
@@ -132,6 +138,11 @@ silently producing wrong types.
 ### Stage 2–4
 - [ ] (to be filled in as stages begin)
 
+### Final — Evaluator integration
+- [ ] `typechecker::check()` output passes into `evaluator::evaluate()` without error
+- [ ] Full pipeline `parse() → check() → evaluate()` works on a non-trivial program
+- [ ] All previous tests still pass
+
 ## Testing
 
 Tests are `.yolo` source files in `tests/test_programs/` run through the full
@@ -204,8 +215,15 @@ compound assignment (`x += 1`), we also need the BinOp rules to apply. Does
 assignment generate a constraint against `x`'s existing `InferType` in the
 environment, or does it require a separate mutable binding tracker?
 
+### Multiple error reporting
+`solve_constraints` currently stops at the first unification failure. A better
+user experience would collect all errors and report them together. This requires
+a different solving strategy (continue past errors, collect them, return
+`Vec<YolangError>` instead of `Result`). Decide when to tackle this — it is a
+cross-cutting change that affects the error type and all call sites.
+
 ## Notes
 
 - Run stage 1 tests: `cargo test --test programs_tests stage1`
 - Unsupported nodes intentionally error — this is tracked, not hidden
-- Task 0003 (validation pass) follows this task; inference and validation are separate
+- Inference and validation are unified in the constraint-based approach; no separate validation pass is needed (absorbed from task 0003)

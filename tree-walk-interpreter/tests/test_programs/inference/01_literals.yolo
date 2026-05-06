@@ -1,0 +1,17 @@
+// Test: literal type inference
+//
+// Each let binding has no type annotation. The typechecker must infer the type
+// from the literal on the right-hand side alone.
+//
+// Expected inferred types:
+//   a : Int
+//   b : Float
+//   c : Bool
+//   d : String
+//   e : ()
+
+let a = 42;
+let b = 3.14;
+let c = true;
+let d = "hello";
+let e = ();

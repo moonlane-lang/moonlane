@@ -1,0 +1,30 @@
+// Test: function declaration and call type inference
+//
+// Functions with fully annotated parameters and return types. The typechecker
+// must:
+//   1. Register the function's type as fun(param_types...) -> return_type
+//   2. Infer the body and unify it against the declared return type
+//   3. At each call site, unify the argument types with the parameter types
+//      and use the return type as the call expression's type
+//
+// Expected inferred types:
+//   add(Int, Int) -> Int
+//   negate(Bool) -> Bool
+//   to_string(Int) -> String  (uses a built-in)
+//   a : Int    (call to add)
+//   b : Bool   (call to negate)
+//
+// The body of each function is also type-checked:
+//   add body:    x + y  infers Int — must unify with declared return Int ✓
+//   negate body: !b     infers Bool — must unify with declared return Bool ✓
+
+fun add(x: Int, y: Int) -> Int {
+    x + y
+}
+
+fun negate(b: Bool) -> Bool {
+    !b
+}
+
+let a = add(10, 32);
+let b = negate(false);

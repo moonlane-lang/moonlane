@@ -842,4 +842,117 @@ mod phase_7_infer_context {
         // ret_ty should resolve to Int
         assert_eq!(subst.apply(&ret_ty), InferType::int());
     }
+
+    // ── Scoping tests (task 0003) ─────────────────────────────────────────────
+
+    #[test]
+    fn test_scope_isolation() {
+        let mut ctx = InferContext::new();
+        ctx.push_scope();
+        ctx.bind_mono("x", InferType::int());
+        assert_eq!(ctx.lookup("x"), Some(InferType::int()));
+        ctx.pop_scope();
+        assert_eq!(ctx.lookup("x"), None);
+    }
+
+    #[test]
+    fn test_inner_scope_shadows_outer() {
+        let mut ctx = InferContext::new();
+        ctx.bind_mono("x", InferType::int());
+        ctx.push_scope();
+        ctx.bind_mono("x", InferType::bool());
+        assert_eq!(ctx.lookup("x"), Some(InferType::bool()));
+        ctx.pop_scope();
+        assert_eq!(ctx.lookup("x"), Some(InferType::int()));
+    }
+
+    #[test]
+    fn test_outer_scope_visible_in_inner() {
+        let mut ctx = InferContext::new();
+        ctx.bind_mono("x", InferType::int());
+        ctx.push_scope();
+        assert_eq!(ctx.lookup("x"), Some(InferType::int()));
+        ctx.pop_scope();
+    }
+
+    #[test]
+    fn test_nested_scopes() {
+        let mut ctx = InferContext::new();
+        ctx.bind_mono("a", InferType::int());
+        ctx.push_scope();
+        ctx.bind_mono("b", InferType::bool());
+        ctx.push_scope();
+        ctx.bind_mono("c", InferType::str());
+        assert_eq!(ctx.lookup("a"), Some(InferType::int()));
+        assert_eq!(ctx.lookup("b"), Some(InferType::bool()));
+        assert_eq!(ctx.lookup("c"), Some(InferType::str()));
+        ctx.pop_scope();
+        assert_eq!(ctx.lookup("c"), None);
+        assert_eq!(ctx.lookup("b"), Some(InferType::bool()));
+        ctx.pop_scope();
+        assert_eq!(ctx.lookup("b"), None);
+        assert_eq!(ctx.lookup("a"), Some(InferType::int()));
+    }
+
+    #[test]
+    fn test_root_scope_bind_mono_works_without_push() {
+        // The root scope is pre-pushed — bind_mono should work immediately.
+        let mut ctx = InferContext::new();
+        ctx.bind_mono("x", InferType::int());
+        assert_eq!(ctx.lookup("x"), Some(InferType::int()));
+    }
+
+    #[test]
+    fn test_env_free_vars_empty() {
+        let ctx = InferContext::new();
+        assert!(ctx.env_free_vars().is_empty());
+    }
+
+    #[test]
+    fn test_env_free_vars_concrete_binding() {
+        let mut ctx = InferContext::new();
+        ctx.bind_mono("x", InferType::int());
+        assert!(ctx.env_free_vars().is_empty());
+    }
+
+    #[test]
+    fn test_env_free_vars_var_binding() {
+        let mut ctx = InferContext::new();
+        let v = ctx.fresh_var(); // ?t0
+        ctx.bind_mono("x", v);
+        assert_eq!(ctx.env_free_vars(), [TypeVar(0)].into());
+    }
+
+    #[test]
+    fn test_env_free_vars_across_scopes() {
+        let mut ctx = InferContext::new();
+        let v0 = ctx.fresh_var(); // ?t0
+        ctx.bind_mono("x", v0);
+        ctx.push_scope();
+        let v1 = ctx.fresh_var(); // ?t1
+        ctx.bind_mono("y", v1);
+        // Both ?t0 and ?t1 should appear
+        let fvs = ctx.env_free_vars();
+        assert!(fvs.contains(&TypeVar(0)));
+        assert!(fvs.contains(&TypeVar(1)));
+    }
+
+    #[test]
+    fn test_env_free_vars_used_in_generalize() {
+        // ?t0 is free in env — generalize should not capture it
+        let mut ctx = InferContext::new();
+        let _v0 = ctx.fresh_var(); // ?t0 — bound in env
+        let _v1 = ctx.fresh_var(); // ?t1 — free in ty only
+        ctx.bind_mono("x", InferType::Var(TypeVar(0)));
+
+        // fun(?t0, ?t1) -> ?t1 — only ?t1 should be quantified
+        let ty = InferType::Fun(
+            vec![InferType::Var(TypeVar(0)), InferType::Var(TypeVar(1))],
+            Box::new(InferType::Var(TypeVar(1))),
+        );
+        let env_fvs = ctx.env_free_vars();
+        let scheme = generalize(ty, &env_fvs);
+        assert_eq!(scheme.quantified_vars, vec![TypeVar(1)]);
+        assert!(!scheme.quantified_vars.contains(&TypeVar(0)));
+    }
 }

@@ -4,7 +4,7 @@
 use yolang::{evaluator, parser, typechecker};
 
 fn run(filename: &str) {
-    let path = format!("tests/test_programs/{}", filename);
+    let path = format!("tests/test_programs/parsing/{}", filename);
     let source = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("could not read {}: {}", path, e));
     let ast = parser::parse(&source, &path)

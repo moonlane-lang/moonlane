@@ -1,0 +1,29 @@
+// Test: nested function calls and chained inference
+//
+// Type inference must propagate correctly through call chains. The return type
+// of an inner call becomes the argument type for the outer call, generating
+// constraints that must all be satisfiable simultaneously.
+//
+// Expected inferred types:
+//   double(Int) -> Int
+//   square(Int) -> Int
+//   is_positive(Int) -> Bool
+//   a : Int   (double(3) -> Int)
+//   b : Int   (square(double(2)) — inner returns Int, outer takes Int -> Int)
+//   c : Bool  (is_positive(square(3)) — inner Int fed to Bool-returning fun)
+
+fun double(x: Int) -> Int {
+    x + x
+}
+
+fun square(x: Int) -> Int {
+    x * x
+}
+
+fun is_positive(x: Int) -> Bool {
+    x > 0
+}
+
+let a = double(3);
+let b = square(double(2));
+let c = is_positive(square(3));

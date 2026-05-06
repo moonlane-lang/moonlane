@@ -1,8 +1,0 @@
-// 01_1 — Simple program for typed ast testing
-fun main() {
-    // --- integer literals ---
-    let a = 42;
-    let b: Int = 1_000_000;
-    println(int_to_string(a));          // 42
-    println(int_to_string(b));          // 1000000
-}

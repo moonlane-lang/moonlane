@@ -390,9 +390,13 @@ pub fn instantiate(scheme: &TypeScheme, gen: &mut TypeVarGenerator) -> InferType
 ///
 /// Owns the variable generator, both environments, and the accumulated
 /// constraint list. Call `solve()` after the walk to get the final substitution.
+///
+/// `mono_env` is a scope stack: call `push_scope`/`pop_scope` in matched pairs
+/// when entering and leaving lexical scopes (function bodies, blocks).
+/// `poly_env` is flat — polymorphic bindings are top-level only.
 pub struct InferContext {
     var_gen: TypeVarGenerator,
-    mono_env: HashMap<String, InferType>,
+    mono_env: Vec<HashMap<String, InferType>>,
     poly_env: HashMap<String, TypeScheme>,
     constraints: Vec<Constraint>,
 }
@@ -401,10 +405,23 @@ impl InferContext {
     pub fn new() -> Self {
         Self {
             var_gen: TypeVarGenerator::new(),
-            mono_env: HashMap::new(),
+            mono_env: vec![HashMap::new()],  // root scope pre-pushed
             poly_env: HashMap::new(),
             constraints: Vec::new(),
         }
+    }
+
+    /// Enter a new lexical scope (e.g. a function body or block).
+    /// Must be matched with a call to `pop_scope`.
+    pub fn push_scope(&mut self) {
+        self.mono_env.push(HashMap::new());
+    }
+
+    /// Exit the current lexical scope, discarding all bindings introduced in it.
+    /// Panics if called with no inner scope (i.e. at the root).
+    pub fn pop_scope(&mut self) {
+        assert!(self.mono_env.len() > 1, "pop_scope called at root scope");
+        self.mono_env.pop();
     }
 
     /// Generate a fresh type variable.
@@ -412,9 +429,9 @@ impl InferContext {
         InferType::Var(self.var_gen.fresh())
     }
 
-    /// Bind a name to a monomorphic type (e.g. a function parameter).
+    /// Bind a name to a monomorphic type in the current scope (e.g. a function parameter).
     pub fn bind_mono(&mut self, name: impl Into<String>, ty: InferType) {
-        self.mono_env.insert(name.into(), ty);
+        self.mono_env.last_mut().unwrap().insert(name.into(), ty);
     }
 
     /// Bind a name to a polymorphic type scheme (e.g. a let-binding).
@@ -423,14 +440,25 @@ impl InferContext {
     }
 
     /// Look up a name. Polymorphic bindings are automatically instantiated with
-    /// fresh variables; monomorphic bindings are returned as-is.
+    /// fresh variables; monomorphic bindings are searched innermost-scope-first.
     /// Poly env takes precedence over mono env.
     pub fn lookup(&mut self, name: &str) -> Option<InferType> {
         if let Some(scheme) = self.poly_env.get(name).cloned() {
             Some(instantiate(&scheme, &mut self.var_gen))
         } else {
-            self.mono_env.get(name).cloned()
+            self.mono_env.iter().rev()
+                .find_map(|scope| scope.get(name))
+                .cloned()
         }
+    }
+
+    /// Collect all type variables that appear free across all current mono scopes.
+    /// Pass this to `generalize()` to avoid capturing variables still being solved.
+    pub fn env_free_vars(&self) -> HashSet<TypeVar> {
+        self.mono_env.iter()
+            .flat_map(|scope| scope.values())
+            .flat_map(free_vars)
+            .collect()
     }
 
     /// Record that `lhs` and `rhs` must unify, tagged with its source location.

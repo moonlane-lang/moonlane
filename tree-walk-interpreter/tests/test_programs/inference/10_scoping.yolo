@@ -1,0 +1,31 @@
+// Test: lexical scoping — parameters are local to their function
+//
+// Each function introduces its own scope for parameters. A parameter named `x`
+// in `foo` must not interfere with a parameter named `x` in `bar`, even though
+// both are in the environment at the same time during top-level inference.
+//
+// The typechecker must:
+//   1. push_scope() when entering a function body
+//   2. bind each parameter in that scope
+//   3. infer the body
+//   4. pop_scope() on exit — parameters no longer visible
+//
+// After both functions are inferred, the name `x` should not resolve to anything
+// at the top level.
+//
+// Expected inferred types:
+//   foo(Int) -> Int    (x is Int inside foo)
+//   bar(Bool) -> Bool  (x is Bool inside bar — different x, different scope)
+//   a : Int
+//   b : Bool
+
+fun foo(x: Int) -> Int {
+    x + 1
+}
+
+fun bar(x: Bool) -> Bool {
+    !x
+}
+
+let a = foo(10);
+let b = bar(true);
