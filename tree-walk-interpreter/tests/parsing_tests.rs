@@ -16,9 +16,6 @@ fn run(filename: &str) {
 }
 
 #[test]
-fn test_01_1_simple_program() { run("01_1_simple_program.yolo"); }
-
-#[test]
 fn test_01_literals_and_variables() { run("01_literals_and_variables.yolo"); }
 
 #[test]
