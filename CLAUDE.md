@@ -26,8 +26,11 @@ cargo run -- --debug path/to/program.yolo
 # Run all tests
 cargo test
 
-# Run type inference tests specifically
+# Run type inference tests
 cargo test --test typeinference_tests
+
+# Run typechecking tests
+cargo test --test typechecking_tests
 
 # Run specific test phase with output
 cargo test --test typeinference_tests phase_2 -- --nocapture
@@ -72,83 +75,65 @@ cd tree-walk-interpreter
 # Then run cargo commands
 ```
 
-## Documentation Structure
+## Agent Guide
 
-The project follows a strict documentation hierarchy in `docs/`:
+See **[AGENTS.md](./AGENTS.md)** for the full agent workflow: task lifecycle, spec discipline, when to stop and ask, and decision record conventions. AGENTS.md is the authoritative guide for how to work in this repo.
 
-- **00-PROCESS/**: Development workflow and task management conventions
-- **01-SPEC/**: Language specification (authoritative) and feature backlog
-- **02-ARCHITECTURE/**: System overview and per-component implementation guides
-- **03-PLANNING/**: Strategic roadmaps and medium-term plans
-- **04-TASKS/**: Epic-based task organization with status tracking
-- **05-DECISIONS/**: Architecture decision records (ADRs) — why non-obvious choices were made
+## Documentation and Task Management
 
-### Key Files
+All docs, tasks, milestones, and decision records are managed by the **Backlog.md MCP server**. The data lives under `docs/backlog/`.
 
-- `docs/01-SPEC/LANGUAGE-SPEC.md`: Complete language specification (source of truth)
-- `docs/01-SPEC/BACKLOG.md`: Features not yet implemented
-- `docs/02-ARCHITECTURE/OVERVIEW.md`: Pipeline, crate structure, component boundaries
-- `docs/02-ARCHITECTURE/typeinference/`: Type inference implementation guide
-- `docs/05-DECISIONS/`: Architecture decision records (ADR-0001 onwards)
-- `docs/00-PROCESS/TASK-CONVENTION.md`: Task management workflow
+Use the Backlog.md MCP tools (or read `backlog://workflow/overview`) to browse and update tasks. Do **not** edit files under `docs/backlog/` directly.
+
+### Key Docs (via Backlog.md MCP)
+
+| Doc ID | Purpose |
+|---|---|
+| `doc-2` | Language Specification — single source of truth |
+| `doc-3` | Spec Backlog — open design questions and deferred features |
+| `doc-4` | Architecture Overview — pipeline diagram, component boundaries |
+| `doc-5`, `doc-6`, `doc-7` | Type Inference — concepts, implementation guide, roadmap |
+
+Decision records live in `docs/backlog/decisions/`. Milestones (epics and phases) are in `docs/backlog/milestones/`.
 
 ## Development Principles
 
 ### Spec-First Development
-- The language specification in `docs/01-SPEC/LANGUAGE-SPEC.md` is authoritative
-- Implementation reveals spec ambiguities - resolve in spec first, then implement
+- The language specification (`doc-2` in Backlog.md MCP) is authoritative
+- Implementation reveals spec ambiguities — resolve in the spec first, then implement
 - Never implement behavior not specified in the spec
 - Tag spec sections when interpreter-validated: `> ✓ Interpreter-validated (v0.1)`
 
 ### Task Management
-- Use epic-based organization under `docs/04-TASKS/`
-- Tasks have clear status: `open`, `in-progress`, `done`, `blocked`
-- Every task links to relevant spec section or backlog item
-- Move task files between status folders to reflect current state
+- All tasks are managed via the **Backlog.md MCP server** — use its tools to create, update, and close tasks
+- Read `backlog://workflow/overview` (or call `backlog.get_backlog_instructions()`) before creating tasks to avoid duplicates and follow the correct workflow
+- Task statuses: `open`, `in-progress`, `done`, `blocked`
+- Every task should link to the relevant spec doc or backlog item
 
 ### Three-Stage Validation
 1. **Designed**: Written in spec, not yet implemented
 2. **Interpreter-validated**: Implemented and tested in tree-walk interpreter
 3. **Compiler-validated**: Future compiler implementation (not current focus)
 
-## Type Inference Implementation
+## Key Source Files
 
-The type inference system is built incrementally with comprehensive test coverage:
-
-### Test-Driven Development
-```bash
-# Check current phase status
-cargo test --test typeinference_tests phase_1
-
-# Work on specific phase
-cargo test --test typeinference_tests phase_2 -- --nocapture
-```
-
-### Key Files
-- `src/typeinference/mod.rs`: Core inference engine
+- `src/typeinference/mod.rs`: Core type inference engine
+- `src/typechecker/mod.rs`: Type checker validation pass
 - `src/types/mod.rs`: Type representation
-- `tests/typeinference_tests.rs`: Phase-based test suite
-- `docs/02-ARCHITECTURE/typeinference/ROADMAP.md`: Implementation roadmap
+- `src/typed_ast/`: AST nodes with type annotations
+- `src/evaluator/`: Tree-walking interpreter
+- `tests/typeinference_tests.rs`: Phase-based type inference test suite
+- `tests/typechecking/typechecking_tests.rs`: Typechecking integration tests
 
 ## Current Development Focus
 
-### Epic 001: Typechecker (Foundation)
-- Typed AST representation
-- Type inference engine with let-polymorphism
-- Type checker validation pass
-- Basic type system (int, float, bool, string, array, unit, tuple)
+Check the Backlog.md MCP for the current open tasks and milestone status. The active epics are:
 
-### Epic 002: Evaluator (Runtime)
-- Expression evaluation for all 20+ expression types
-- Statement execution and control flow
-- Function calls and closures
-- Built-in function support
-
-### Epic 003: Generics (Advanced Features)
-- Type variables and constraints
-- Generic instantiation
-- Monomorphization at compile-time
-- Recursive and nested generics
+- **Epic 001** (Typechecker and Typed AST) — largely done; stage 6 typechecking tasks in progress
+- **Epic 002** (Evaluator) — expression and statement evaluation
+- **Epic 003** (Generics and Monomorphization)
+- **Epic 004** (Traits and Method Dispatch)
+- **Epic 005** (Typechecker Integration)
 
 ## Error Handling
 
@@ -163,7 +148,7 @@ Uses miette for rich error reporting with source context. Error types are define
 
 ## Testing Strategy
 
-- Phase-based test development for type inference
-- Integration tests in `tests/test_programs/` with `.yolo` files
+- Phase-based test development for type inference (`tests/typeinference_tests.rs`)
+- Stage-based typechecking tests in `tests/typechecking/` with `.yolo` source files
+- Integration tests in `tests/parsing/` for parsing validation
 - Unit tests within component modules
-- Test program examples covering language features 01-10
