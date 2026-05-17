@@ -339,6 +339,65 @@ fn infer_stmt(
             infer_block(&ws.body, ctx, fun_generalizations)?;
             Ok(InferType::unit())
         }
+        Stmt::For(fs) => {
+            // Init scope wraps condition, step, and body.
+            ctx.push_scope();
+            if let Some(init) = &fs.init {
+                match init {
+                    ForInit::Mut(md) => {
+                        let val_ty = infer_expr(&md.value, ctx, fun_generalizations)?;
+                        if let Some(ann) = &md.type_ann {
+                            ctx.add_constraint(val_ty.clone(), type_expr_to_infer(ann), md.span.clone());
+                        }
+                        ctx.bind_mono(&md.name, val_ty, true);
+                    }
+                    ForInit::Expr(e) => { infer_expr(e, ctx, fun_generalizations)?; }
+                }
+            }
+            if let Some(cond) = &fs.condition {
+                let cond_ty = infer_expr(cond, ctx, fun_generalizations)?;
+                ctx.add_constraint(cond_ty, InferType::bool(), fs.span.clone());
+            }
+            if let Some(step) = &fs.step {
+                infer_expr(step, ctx, fun_generalizations)?;
+            }
+            infer_block(&fs.body, ctx, fun_generalizations)?;
+            ctx.pop_scope();
+            Ok(InferType::unit())
+        }
+        Stmt::ForIn(fi) => {
+            let iter_ty = infer_expr(&fi.iterable, ctx, fun_generalizations)?;
+            let elem_ty = ctx.fresh_var();
+            let iter_var = ctx.fresh_var();
+            let partial = ctx.solve()?;
+            let resolved_iter = partial.apply(&iter_ty);
+            match &resolved_iter {
+                InferType::Array(elem) => {
+                    ctx.add_constraint(elem_ty.clone(), *elem.clone(), fi.span.clone());
+                }
+                InferType::Named(name, args) if name == "Range" && args.len() == 1 => {
+                    ctx.add_constraint(elem_ty.clone(), InferType::int(), fi.span.clone());
+                }
+                InferType::Var(_) => {
+                    ctx.add_constraint(iter_ty, InferType::Array(Box::new(elem_ty.clone())), fi.span.clone());
+                }
+                _ => {
+                    return Err(YoloscriptError::type_error(
+                        ErrorCode::E0001,
+                        format!("expected array or range in for-in, got `{resolved_iter}`"),
+                        &fi.span,
+                    ));
+                }
+            }
+            let iter_var_span = fi.span.clone();
+            let _ = iter_var;
+            ctx.push_scope();
+            ctx.bind_mono(&fi.binding, elem_ty, false);
+            infer_block(&fi.body, ctx, fun_generalizations)?;
+            ctx.pop_scope();
+            let _ = iter_var_span;
+            Ok(InferType::unit())
+        }
         _ => Err(YoloscriptError::internal("statement not yet supported")),
     }
 }
@@ -902,6 +961,51 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Yolo
             let condition = construct_expr(&ws.condition, None, ctx)?;
             let body = construct_block(&ws.body, ctx)?;
             Ok(TypedStmt::While(TypedWhileStmt { condition, body, span: ws.span.clone() }))
+        }
+        Stmt::For(fs) => {
+            ctx.push_scope();
+            let init = match &fs.init {
+                Some(ForInit::Mut(md)) => {
+                    let value = construct_expr(&md.value, None, ctx)?;
+                    let ty = value.ty().clone();
+                    ctx.bind(&md.name, ty);
+                    let typed_md = TypedMutDecl {
+                        name: md.name.clone(), type_ann: md.type_ann.clone(),
+                        value, span: md.span.clone(),
+                    };
+                    Some(TypedForInit::Mut(typed_md))
+                }
+                Some(ForInit::Expr(e)) => {
+                    Some(TypedForInit::Expr(construct_expr(e, None, ctx)?))
+                }
+                None => None,
+            };
+            let condition = match &fs.condition {
+                Some(c) => Some(construct_expr(c, None, ctx)?),
+                None    => None,
+            };
+            let step = match &fs.step {
+                Some(s) => Some(construct_expr(s, None, ctx)?),
+                None    => None,
+            };
+            let body = construct_block(&fs.body, ctx)?;
+            ctx.pop_scope();
+            Ok(TypedStmt::For(TypedForStmt { init, condition, step, body, span: fs.span.clone() }))
+        }
+        Stmt::ForIn(fi) => {
+            let iterable = construct_expr(&fi.iterable, None, ctx)?;
+            let elem_ty = match iterable.ty() {
+                Type::Array(elem) => *elem.clone(),
+                Type::Named(name, args) if name == "Range" && args.len() == 1 => Type::Int,
+                _ => return Err(YoloscriptError::internal("for-in over non-iterable type")),
+            };
+            ctx.push_scope();
+            ctx.bind(&fi.binding, elem_ty);
+            let body = construct_block(&fi.body, ctx)?;
+            ctx.pop_scope();
+            Ok(TypedStmt::ForIn(TypedForInStmt {
+                binding: fi.binding.clone(), iterable, body, span: fi.span.clone(),
+            }))
         }
         _ => Err(YoloscriptError::internal("statement not yet supported in construct")),
     }

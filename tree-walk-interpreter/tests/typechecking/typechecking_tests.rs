@@ -277,4 +277,18 @@ mod tests {
     fn stage5_neg_method_arg_type_mismatch() {
         check_file(&format!("{}/stage5_neg_03_method_arg_type_mismatch.yolo", test_dir()));
     }
+
+    // ── Stage 6 tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn stage6_for_loops() {
+        check_file(&format!("{}/stage6_02_for_loops.yolo", test_dir()));
+    }
+
+    // ── Stage 6 negative tests ────────────────────────────────────────────────
+
+    #[test]
+    fn stage6_neg_for_in_non_iterable() {
+        check_file(&format!("{}/stage6_neg_01_for_in_non_iterable.yolo", test_dir()));
+    }
 }

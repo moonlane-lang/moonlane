@@ -1,0 +1,40 @@
+// Stage 6: for and for-in loops.
+
+// C-style for loop
+mut sum: Int = 0;
+for (mut i = 0; i < 10; i += 1) {
+    sum += i;
+}
+
+// for-in over an array
+let arr: Int[] = [1, 2, 3];
+mut total: Int = 0;
+for (let x in arr) {
+    total += x;
+}
+
+// for-in over a range
+mut count: Int = 0;
+for (let i in 0..5) {
+    count += i;
+}
+
+// for-in over a range inclusive
+mut count2: Int = 0;
+for (let i in 0..=4) {
+    count2 += i;
+}
+
+// nested for loops
+mut matrix_sum: Int = 0;
+for (mut r = 0; r < 3; r += 1) {
+    for (mut c = 0; c < 3; c += 1) {
+        matrix_sum += r + c;
+    }
+}
+
+// for with no init or step
+mut x: Int = 0;
+for (; x < 5; ) {
+    x += 1;
+}
