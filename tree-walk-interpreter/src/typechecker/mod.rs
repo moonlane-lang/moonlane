@@ -750,6 +750,15 @@ fn infer_expr(
                     let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
                     ctx.add_constraint(expr_ty, decl_ty, span.clone());
                 }
+                for (decl_name, _) in &expected_fields {
+                    if !fields.iter().any(|(n, _)| n == decl_name) {
+                        return Err(YoloscriptError::type_error(
+                            ErrorCode::E0003,
+                            format!("missing field `{decl_name}` in `{struct_name}`"),
+                            span,
+                        ));
+                    }
+                }
                 Ok(InferType::Named(struct_name, vec![]))
             }
         }

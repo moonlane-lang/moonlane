@@ -288,6 +288,21 @@ mod tests {
         check_file(&format!("{}/stage5_neg_04_unknown_method.yolo", test_dir()));
     }
 
+    #[test]
+    fn stage5_neg_field_access_non_struct() {
+        check_file(&format!("{}/stage5_neg_05_field_access_non_struct.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage5_neg_field_access_unknown_field() {
+        check_file(&format!("{}/stage5_neg_06_field_access_unknown_field.yolo", test_dir()));
+    }
+
+    #[test]
+    fn stage5_neg_struct_literal_missing_field() {
+        check_file(&format!("{}/stage5_neg_07_struct_literal_missing_field.yolo", test_dir()));
+    }
+
     // ── Stage 6 tests ─────────────────────────────────────────────────────────
 
     #[test]

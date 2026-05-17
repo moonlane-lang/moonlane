@@ -1,0 +1,8 @@
+// Negative: struct literal with a missing required field.
+
+struct Point {
+    x: Float,
+    y: Float,
+}
+
+let p = Point { x: 1.0 }; // ERROR[E0003]
