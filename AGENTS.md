@@ -2,7 +2,7 @@
 
 ## Project
 
-Yoloscript is a statically-typed, expression-oriented scripting language. This repository contains its interpreter (Phase 01 PoC). Tasks are tracked as GitHub Issues; spec docs and decision records live in `backlog/` (to be reorganised into `docs/` — see issue #19).
+Yoloscript is a statically-typed, expression-oriented scripting language. This repository contains its interpreter (Phase 01 PoC). Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `backlog/` (to be reorganised into `docs/` — see issue #19).
 
 ---
 
@@ -15,7 +15,8 @@ Yoloscript is a statically-typed, expression-oriented scripting language. This r
 | `backlog/docs/doc-4` | **Architecture Overview** — pipeline diagram, component boundaries |
 | `backlog/docs/doc-5,6,7` | **Type Inference docs** — concepts, implementation guide, roadmap |
 | `backlog/decisions/` | **Decision records** — why a non-obvious choice was made |
-| GitHub Issues | **Tasks** — all work items (`gh issue list`) |
+| GitHub Projects v2 | **Task board** — canonical status view (https://github.com/users/Vladastos/projects/1) |
+| GitHub Issues | **Tasks** — unit of work; use `gh issue list` for CLI access |
 | GitHub Milestones | **Milestones** — Epic 001–005 and Phase 01–03 |
 
 ---
@@ -30,7 +31,7 @@ Yoloscript is a statically-typed, expression-oriented scripting language. This r
 3. **Check existing decisions** — `grep` or `ls` in `backlog/decisions/` for any ADR that governs the area being changed. Read it before writing any code.
 4. **Check dependencies** — verify every linked issue is closed and its implementation matches what this task expects.
 5. **If no clear path forward exists** — STOP. Ask for guidance before beginning implementation. Do not make a significant architectural decision unilaterally.
-6. **Mark in-progress**: `gh issue edit <number> --add-label "status:in-progress"`
+6. **Mark in-progress**: `gh issue edit <number> --add-label "status:in-progress"` and set the project Status field to **In Progress**
 
 ### During implementation
 
@@ -46,7 +47,7 @@ Yoloscript is a statically-typed, expression-oriented scripting language. This r
 3. If any non-obvious decisions were made during implementation → create a decision record.
 4. If the implementation revealed spec gaps that you fixed → verify the spec edit is committed.
 5. If a spec section is now interpreter-validated, tag it: `> ✓ Interpreter-validated (v0.1)`
-6. **Close the issue**: `gh issue close <number>` (or include `Closes #<number>` in the commit body to auto-close on push)
+6. **Close the issue**: `gh issue close <number>` (or include `Closes #<number>` in the commit body to auto-close on push). The project Status field updates to **Done** automatically, and the `status:in-progress` label is removed by CI.
 
 ### Opening a new issue
 
@@ -148,7 +149,7 @@ Accepted decisions are never modified. To reverse one, create a new decision rec
 - Do not implement behaviour that is not in the spec.
 - Do not let implementation diverge from the spec and fix the docs later.
 - Do not add rationale or history to the spec — that belongs in a decision record.
-- Do not create new tracking documents — all open work goes into GitHub Issues.
+- Do not create new tracking documents — all open work goes into GitHub Issues and is tracked on the project board.
 - Do not start implementation if the task description has unresolved questions.
 - Do not mark a task done with unchecked acceptance criteria.
 - Do not make significant architectural decisions alone — ask first.

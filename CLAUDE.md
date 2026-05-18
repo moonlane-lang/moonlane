@@ -81,9 +81,18 @@ See **[AGENTS.md](./AGENTS.md)** for the full agent workflow: task lifecycle, sp
 
 ## Documentation and Task Management
 
-### Task Management — GitHub Issues
+### Task Management — GitHub Projects v2
 
-All tasks are tracked as **GitHub Issues** at https://github.com/Vladastos/yoloscript/issues. Use the `gh` CLI:
+All tasks are tracked in **GitHub Projects v2** at https://github.com/users/Vladastos/projects/1. The project board is the canonical view for task status and planning.
+
+Each issue has a **Status** field in the project:
+- **Todo** — not yet started (`status:backlog`)
+- **In Progress** — actively being worked (`status:in-progress`)
+- **Done** — closed
+
+The `status:*` labels mirror the project Status field and are kept in sync for CLI visibility. When an issue is closed, the `status:in-progress` label is removed automatically by a GitHub Actions workflow.
+
+Use the `gh` CLI to manage issues:
 
 ```bash
 gh issue list                                          # list open tasks
@@ -93,7 +102,7 @@ gh issue view <number>                                 # read a task
 gh issue create --title "..." --label "..." --milestone "..."  # create a task
 gh issue close <number>                                # mark done
 gh issue comment <number> --body "..."                 # add a note
-gh issue edit <number> --add-label "status:in-progress"        # update labels
+gh issue edit <number> --add-label "status:in-progress"        # mark in-progress
 ```
 
 **Labels:** `evaluator`, `generics`, `traits`, `integration`, `tooling`, `dx`, `migration`, `docs`, `typechecker`, `type-inference`, `architecture`, `priority:low/medium/high`, `status:backlog`, `status:in-progress`, `archived`
@@ -121,11 +130,12 @@ Spec documents and decision records live in `backlog/` (to be reorganised into `
 - Tag spec sections when interpreter-validated: `> ✓ Interpreter-validated (v0.1)`
 
 ### Task Management
-- All tasks are tracked as **GitHub Issues** — use `gh issue create/view/list/close` to manage them
+- **GitHub Projects v2** (https://github.com/users/Vladastos/projects/1) is the source of truth for task status and planning
+- Issues are the unit of work; the project board is the canonical status view
 - Before creating a task, search first: `gh issue list --search "keyword"` to avoid duplicates
 - Apply labels and a milestone when creating: `--label "evaluator" --milestone "Epic 002 - Evaluator"`
-- Use `gh issue edit <number> --add-label "status:in-progress"` when starting a task
-- **Task state changes require no commit** — GitHub Issues are the source of truth, not files in the repo
+- Use `gh issue edit <number> --add-label "status:in-progress"` when starting a task — update the project Status field to **In Progress** as well
+- **Task state changes require no commit** — the project board is the source of truth, not files in the repo
 - **The main repo only gets a commit when actual code is written**
 
 ### Commit Message Convention
