@@ -160,6 +160,14 @@ Spec documents and decision records live in `backlog/` (to be reorganised into `
 2. **Interpreter-validated**: Implemented and tested in tree-walk interpreter
 3. **Compiler-validated**: Future compiler implementation (not current focus)
 
+### Type System Stability
+`src/typeinference/mod.rs` and `src/typechecker/mod.rs` are the most sensitive files in the codebase. Bugs here produce silent mis-compilations, not crashes, and are hard to detect through tests alone.
+
+**Before committing any change to these files:**
+- Run `/review-typechecker` and work through the full checklist
+- Run `cargo test` — every test must pass, including unrelated ones
+- See **AGENTS.md § Type System Stability** for invariants and patterns to preserve
+
 ## Key Source Files
 
 - `src/typeinference/mod.rs`: Core type inference engine

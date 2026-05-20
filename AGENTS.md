@@ -144,6 +144,43 @@ Accepted decisions are never modified. To reverse one, create a new decision rec
 
 ---
 
+## Type System Stability
+
+The type inference (`src/typeinference/mod.rs`) and typechecker (`src/typechecker/mod.rs`) are the most sensitive components in the codebase. Bugs here produce silent mis-compilations — not crashes — and are hard to detect through tests alone. Treat changes to these files with more care than anything else.
+
+### Two-pass architecture invariants
+
+The typechecker runs in two passes that must remain strictly separated:
+
+- **Pass 1 (inference)**: Walks the AST, pushes constraints, solves into `ctx.subst`. Side-effects only on `ctx`.
+- **Pass 2 (construct)**: Walks the AST again, reads `ctx.subst`, builds `TypedAST`. Must not infer or constrain — only resolve.
+
+Do not infer types in Pass 2. Do not build TypedAST nodes in Pass 1. If you find yourself doing either, stop and ask.
+
+### Key invariants to preserve
+
+- **`Substitution::compose` is ordered**: `a.compose(b)` means "apply `b` to `a`'s values, then merge" — equivalent to `a ∘ b` (b first). Reversing the arguments changes the semantics. Always check which direction is correct at each call site.
+- **`Never` is a bottom type**: `unify(Never, T)` always succeeds. This means typechecking tests cannot distinguish a `Never`-typed expression from a correctly typed one. Use evaluator tests (once available) to verify runtime correctness.
+- **`type_to_infer` normalises `Perhaps`/`Result`**: These are distinct `Type` variants but normalise to `InferType::Named`. Code that pattern-matches on `Type::Named` will miss them unless routed through `type_to_infer` first.
+- **`TypeVar` vs `InferType::Var`**: Formal type parameters in `EnumInfo`/`StructInfo` are stored as `TypeVar`. Fresh variables at a usage site are `InferType::Var(TypeVar)`. Do not confuse the two — passing a formal `TypeVar` where a fresh `InferType::Var` is expected silently produces wrong substitutions.
+- **`instantiate_scheme_for_call` is the canonical pattern** for generic instantiation: create fresh `InferType::Var` per type param, build `init_subst`, unify instantiated types against actuals, then extract concrete types from the composed substitution. Replicate this pattern; do not invent alternatives.
+
+### Before committing changes to these files
+
+1. Run the **full test suite**: `cargo test` from `tree-walk-interpreter/`. Every test must pass — regressions in unrelated tests are a signal that a shared invariant was broken.
+2. Run `/review-typechecker` and work through the checklist before finalising.
+3. If you added a new `unify` call: verify the argument order is `(expected, actual)` and that substitution composition is in the correct direction.
+4. If you added a new `infer_type_to_type` call: verify the call site has access to a `Span` and that all `InferType::Var` cases are resolved before the call.
+5. If you changed `construct_block`'s signature or the threading of `expected_ty`: verify every call site passes the correct expected type (function return type, annotation type, or `None`) — a `None` where a type is expected causes annotation-dependent failures.
+
+### When to STOP on type system changes
+
+- A change requires touching both `mod.rs` files simultaneously — this is a sign the boundary between passes is being violated.
+- You cannot find an existing pattern (in `instantiate_scheme_for_call`, `construct_expr`, etc.) that covers the new case — ask before inventing.
+- A test that was passing begins failing after a substitution composition change — the ordering bug may affect other cases not covered by tests.
+
+---
+
 ## What Not to Do
 
 - Do not implement behaviour that is not in the spec.

@@ -1,3 +1,6 @@
+// PoC evaluator — this implementation will almost certainly be rewritten.
+// Implement the simplest correct thing; do not over-engineer.
+
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
