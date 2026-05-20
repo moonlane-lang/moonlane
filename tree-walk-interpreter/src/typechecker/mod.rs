@@ -11,13 +11,14 @@ type SchemeEnv = HashMap<String, TypeScheme>;
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
 pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
-    let mut ctx = InferContext::new();
+    // Pre-pass: build the type registry, then create the inference context.
+    let mut gen = TypeVarGenerator::new();
+    let registry = build_registry(&program, &mut gen);
+    let mut ctx = InferContext::new(registry, gen);
 
-    // Pre-pass: register built-ins and enums, then hoist names so forward references work.
+    // Pre-pass: register built-in value bindings and hoist function names.
     register_builtins(&mut ctx);
-    register_builtin_enums(&mut ctx);
     hoist_fun_decls(&program.decls, &mut ctx);
-    hoist_struct_and_impl_decls(&program.decls, &mut ctx);
 
     // Pass 1: walk AST, emit constraints, collect function generalizations.
     let mut fun_generalizations: Vec<FunGeneralization> = vec![];
@@ -36,11 +37,12 @@ pub fn check(program: Program) -> Result<TypedProgram, YoloscriptError> {
     register_builtin_poly_schemes(&mut scheme_env, &mut gen);
 
     // Build concrete environments for Pass 2.
-    let concrete_struct_env = build_concrete_struct_env(&ctx.struct_env, &subst)?;
-    let concrete_method_env = build_concrete_method_env(&ctx.method_env, &subst)?;
+    let concrete_struct_env = build_concrete_struct_env(ctx.registry().raw_struct_env(), &subst)?;
+    let concrete_method_env = build_concrete_method_env(ctx.registry().raw_method_env(), &subst)?;
+    let enum_env = ctx.registry().raw_enum_env();
 
     // Pass 2: re-derive concrete types and build TypedAST.
-    construct_program(&program, &subst, &scheme_env, concrete_struct_env, concrete_method_env, &ctx.enum_env, gen)
+    construct_program(&program, &subst, &scheme_env, concrete_struct_env, concrete_method_env, enum_env, gen)
 }
 
 fn register_builtins(ctx: &mut InferContext) {
@@ -102,25 +104,85 @@ fn register_builtin_poly_schemes(scheme_env: &mut SchemeEnv, gen: &mut TypeVarGe
     });
 }
 
-fn register_builtin_enums(ctx: &mut InferContext) {
-    let t = ctx.fresh_type_var_raw();
-    ctx.register_enum("Perhaps".into(), EnumInfo {
+/// Build the `TypeRegistry` from the program's declarations and built-in types.
+/// Allocates TypeVars from `gen`; the caller must pass the same `gen` to
+/// `InferContext::new` so that all TypeVar IDs are globally unique.
+fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> TypeRegistry {
+    let mut registry = TypeRegistry::new();
+
+    // Register built-in generic enums.
+    let t = gen.fresh();
+    registry.register_enum("Perhaps".into(), EnumInfo {
         type_params: vec![t],
         variants: vec![
             VariantInfo { name: "Some".into(), fields: vec![("value".into(), InferType::Var(t))] },
             VariantInfo { name: "Nope".into(), fields: vec![] },
         ],
     });
-
-    let t = ctx.fresh_type_var_raw();
-    let e = ctx.fresh_type_var_raw();
-    ctx.register_enum("Result".into(), EnumInfo {
+    let t = gen.fresh();
+    let e = gen.fresh();
+    registry.register_enum("Result".into(), EnumInfo {
         type_params: vec![t, e],
         variants: vec![
             VariantInfo { name: "Ok".into(),  fields: vec![("value".into(), InferType::Var(t))] },
             VariantInfo { name: "Err".into(), fields: vec![("error".into(), InferType::Var(e))] },
         ],
     });
+
+    // Hoist user-defined structs, enums, and impl method signatures.
+    for decl in &program.decls {
+        match decl {
+            Decl::Struct(sd) => {
+                let fields = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                    .collect();
+                registry.register_struct_fields(sd.name.clone(), fields);
+            }
+            Decl::Enum(ed) => {
+                // v0.1: user-defined enums have no generic type params.
+                let variants = ed.variants.iter().map(|v| VariantInfo {
+                    name: v.name.clone(),
+                    fields: v.fields.iter()
+                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                        .collect(),
+                }).collect();
+                registry.register_enum(ed.name.clone(), EnumInfo {
+                    type_params: vec![],
+                    variants,
+                });
+            }
+            Decl::Impl(ib) if ib.trait_name.is_none() => {
+                let target_name = match &ib.target_type {
+                    TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
+                    _ => continue,
+                };
+                for method in &ib.methods {
+                    let mut param_types = vec![];
+                    for p in &method.params {
+                        let pt = if p.name == "self" {
+                            InferType::Named(target_name.clone(), vec![])
+                        } else if let Some(ann) = &p.type_ann {
+                            type_expr_to_infer(ann)
+                        } else {
+                            InferType::Var(gen.fresh())
+                        };
+                        param_types.push(pt);
+                    }
+                    let ret_ty = method.return_type.as_ref()
+                        .map(type_expr_to_infer)
+                        .unwrap_or_else(InferType::unit);
+                    registry.register_method(
+                        target_name.clone(),
+                        method.name.clone(),
+                        InferType::Fun(param_types, Box::new(ret_ty)),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
+    registry
 }
 
 // ── Function generalisation record ────────────────────────────────────────────
@@ -146,59 +208,6 @@ fn hoist_fun_decls(decls: &[Decl], ctx: &mut InferContext) {
     }
 }
 
-fn hoist_struct_and_impl_decls(decls: &[Decl], ctx: &mut InferContext) {
-    for decl in decls {
-        match decl {
-            Decl::Struct(sd) => {
-                let fields = sd.fields.iter()
-                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
-                    .collect();
-                ctx.register_struct_fields(sd.name.clone(), fields);
-            }
-            Decl::Enum(ed) => {
-                // v0.1: user-defined enums have no generic type params.
-                let variants = ed.variants.iter().map(|v| VariantInfo {
-                    name: v.name.clone(),
-                    fields: v.fields.iter()
-                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
-                        .collect(),
-                }).collect();
-                ctx.register_enum(ed.name.clone(), EnumInfo {
-                    type_params: vec![],
-                    variants,
-                });
-            }
-            Decl::Impl(ib) if ib.trait_name.is_none() => {
-                let target_name = match &ib.target_type {
-                    TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
-                    _ => continue,
-                };
-                for method in &ib.methods {
-                    let mut param_types = vec![];
-                    for p in &method.params {
-                        let pt = if p.name == "self" {
-                            InferType::Named(target_name.clone(), vec![])
-                        } else if let Some(ann) = &p.type_ann {
-                            type_expr_to_infer(ann)
-                        } else {
-                            ctx.fresh_var()
-                        };
-                        param_types.push(pt);
-                    }
-                    let ret_ty = method.return_type.as_ref()
-                        .map(type_expr_to_infer)
-                        .unwrap_or_else(InferType::unit);
-                    ctx.register_method(
-                        target_name.clone(),
-                        method.name.clone(),
-                        InferType::Fun(param_types, Box::new(ret_ty)),
-                    );
-                }
-            }
-            _ => {}
-        }
-    }
-}
 
 fn build_concrete_struct_env(
     struct_env: &HashMap<String, Vec<(String, InferType)>>,

@@ -424,6 +424,66 @@ pub struct EnumInfo {
     pub variants:    Vec<VariantInfo>,
 }
 
+// ── Type Registry ─────────────────────────────────────────────────────────────
+
+/// Immutable store of type definitions built during the pre-pass.
+/// Created by `build_registry` and injected into `InferContext` before inference begins.
+pub struct TypeRegistry {
+    struct_env: HashMap<String, Vec<(String, InferType)>>,
+    method_env: HashMap<String, HashMap<String, InferType>>,
+    enum_env:   HashMap<String, EnumInfo>,
+}
+
+impl TypeRegistry {
+    pub fn new() -> Self {
+        Self {
+            struct_env: HashMap::new(),
+            method_env: HashMap::new(),
+            enum_env:   HashMap::new(),
+        }
+    }
+
+    pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
+        self.struct_env.insert(name, fields);
+    }
+
+    pub fn register_method(&mut self, type_name: String, method_name: String, fun_ty: InferType) {
+        self.method_env.entry(type_name).or_default().insert(method_name, fun_ty);
+    }
+
+    pub fn register_enum(&mut self, name: String, info: EnumInfo) {
+        self.enum_env.insert(name, info);
+    }
+
+    pub fn struct_fields(&self, name: &str) -> Option<&Vec<(String, InferType)>> {
+        self.struct_env.get(name)
+    }
+
+    pub fn method_type(&self, type_name: &str, method_name: &str) -> Option<&InferType> {
+        self.method_env.get(type_name)?.get(method_name)
+    }
+
+    pub fn enum_info(&self, name: &str) -> Option<&EnumInfo> {
+        self.enum_env.get(name)
+    }
+
+    pub(crate) fn raw_struct_env(&self) -> &HashMap<String, Vec<(String, InferType)>> {
+        &self.struct_env
+    }
+
+    pub(crate) fn raw_method_env(&self) -> &HashMap<String, HashMap<String, InferType>> {
+        &self.method_env
+    }
+
+    pub(crate) fn raw_enum_env(&self) -> &HashMap<String, EnumInfo> {
+        &self.enum_env
+    }
+}
+
+impl Default for TypeRegistry {
+    fn default() -> Self { Self::new() }
+}
+
 // ── Phase 7: Inference Context ────────────────────────────────────────────────
 
 /// State threaded through the entire AST walk during type inference.
@@ -441,48 +501,51 @@ pub struct InferContext {
     constraints: Vec<Constraint>,
     current_return_type: Option<InferType>,
     current_break_type:  Option<InferType>,
-    pub struct_env: HashMap<String, Vec<(String, InferType)>>,
-    pub method_env: HashMap<String, HashMap<String, InferType>>,
-    pub enum_env:   HashMap<String, EnumInfo>,
+    registry: TypeRegistry,
 }
 
 impl InferContext {
-    pub fn new() -> Self {
+    /// Create a new inference context with a pre-built registry and a generator
+    /// that has already been advanced past all TypeVars allocated during registry
+    /// construction, ensuring global TypeVar uniqueness.
+    pub fn new(registry: TypeRegistry, gen: TypeVarGenerator) -> Self {
         Self {
-            var_gen: TypeVarGenerator::new(),
+            var_gen: gen,
             mono_env: vec![HashMap::new()],  // root scope pre-pushed
             poly_env: HashMap::new(),
             constraints: Vec::new(),
             current_return_type: None,
             current_break_type:  None,
-            struct_env: HashMap::new(),
-            method_env: HashMap::new(),
-            enum_env:   HashMap::new(),
+            registry,
         }
     }
 
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
-        self.struct_env.insert(name, fields);
+        self.registry.register_struct_fields(name, fields);
     }
 
     pub fn register_method(&mut self, type_name: String, method_name: String, fun_ty: InferType) {
-        self.method_env.entry(type_name).or_default().insert(method_name, fun_ty);
+        self.registry.register_method(type_name, method_name, fun_ty);
     }
 
     pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, InferType)>> {
-        self.struct_env.get(name)
+        self.registry.struct_fields(name)
     }
 
     pub fn get_method_type(&self, type_name: &str, method_name: &str) -> Option<&InferType> {
-        self.method_env.get(type_name)?.get(method_name)
+        self.registry.method_type(type_name, method_name)
     }
 
     pub fn register_enum(&mut self, name: String, info: EnumInfo) {
-        self.enum_env.insert(name, info);
+        self.registry.register_enum(name, info);
     }
 
     pub fn get_enum(&self, name: &str) -> Option<&EnumInfo> {
-        self.enum_env.get(name)
+        self.registry.enum_info(name)
+    }
+
+    pub fn registry(&self) -> &TypeRegistry {
+        &self.registry
     }
 
     pub fn fresh_type_var_raw(&mut self) -> TypeVar {
@@ -609,6 +672,6 @@ impl InferContext {
 
 impl Default for InferContext {
     fn default() -> Self {
-        Self::new()
+        Self::new(TypeRegistry::new(), TypeVarGenerator::new())
     }
 }

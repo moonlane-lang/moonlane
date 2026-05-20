@@ -728,7 +728,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_fresh_var_sequential() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let a = ctx.fresh_var();
         let b = ctx.fresh_var();
         let c = ctx.fresh_var();
@@ -739,20 +739,20 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_bind_mono_and_lookup() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.bind_mono("x", InferType::int(), false);
         assert_eq!(ctx.lookup("x"), Some(InferType::int()));
     }
 
     #[test]
     fn test_lookup_unknown_is_none() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         assert_eq!(ctx.lookup("unknown"), None);
     }
 
     #[test]
     fn test_bind_poly_auto_instantiates() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         // Manually build ∀?t0. fun(?t0) -> ?t0
         // Use fresh_var so the generator counter is ahead of the quantified var
         let v = ctx.fresh_var(); // TypeVar(0)
@@ -770,7 +770,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_poly_lookup_produces_infer_type() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let v = ctx.fresh_var(); // TypeVar(0)
         let scheme = TypeScheme {
             quantified_vars: vec![TypeVar(0)],
@@ -785,7 +785,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_poly_takes_precedence_over_mono() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let v = ctx.fresh_var(); // TypeVar(0)
         ctx.bind_mono("f", InferType::int(), false);
         ctx.bind_poly("f", TypeScheme {
@@ -799,7 +799,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_add_constraint_and_solve() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let v = ctx.fresh_var(); // ?t0
         ctx.add_constraint(v, InferType::int(), span());
 
@@ -809,7 +809,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_solve_conflicting_constraints_errors() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let v = ctx.fresh_var(); // ?t0
         ctx.add_constraint(v.clone(), InferType::int(), span());
         ctx.add_constraint(v, InferType::bool(), span());
@@ -820,7 +820,7 @@ mod phase_7_infer_context {
     fn test_full_inference_scenario() {
         // Simulates: let id = fun(x) { x }; id(42)
         // Step 1: infer fun(x) { x } — give x a fresh var ?t0, body is also ?t0
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let x_ty = ctx.fresh_var();           // ?t0
         ctx.bind_mono("x", x_ty.clone(), false);
         let body_ty = ctx.lookup("x").unwrap(); // ?t0
@@ -847,7 +847,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_scope_isolation() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.push_scope();
         ctx.bind_mono("x", InferType::int(), false);
         assert_eq!(ctx.lookup("x"), Some(InferType::int()));
@@ -857,7 +857,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_inner_scope_shadows_outer() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.bind_mono("x", InferType::int(), false);
         ctx.push_scope();
         ctx.bind_mono("x", InferType::bool(), false);
@@ -868,7 +868,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_outer_scope_visible_in_inner() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.bind_mono("x", InferType::int(), false);
         ctx.push_scope();
         assert_eq!(ctx.lookup("x"), Some(InferType::int()));
@@ -877,7 +877,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_nested_scopes() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.bind_mono("a", InferType::int(), false);
         ctx.push_scope();
         ctx.bind_mono("b", InferType::bool(), false);
@@ -897,27 +897,27 @@ mod phase_7_infer_context {
     #[test]
     fn test_root_scope_bind_mono_works_without_push() {
         // The root scope is pre-pushed — bind_mono should work immediately.
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.bind_mono("x", InferType::int(), false);
         assert_eq!(ctx.lookup("x"), Some(InferType::int()));
     }
 
     #[test]
     fn test_env_free_vars_empty() {
-        let ctx = InferContext::new();
+        let ctx = InferContext::default();
         assert!(ctx.env_free_vars().is_empty());
     }
 
     #[test]
     fn test_env_free_vars_concrete_binding() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         ctx.bind_mono("x", InferType::int(), false);
         assert!(ctx.env_free_vars().is_empty());
     }
 
     #[test]
     fn test_env_free_vars_var_binding() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let v = ctx.fresh_var(); // ?t0
         ctx.bind_mono("x", v, false);
         assert_eq!(ctx.env_free_vars(), [TypeVar(0)].into());
@@ -925,7 +925,7 @@ mod phase_7_infer_context {
 
     #[test]
     fn test_env_free_vars_across_scopes() {
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let v0 = ctx.fresh_var(); // ?t0
         ctx.bind_mono("x", v0, false);
         ctx.push_scope();
@@ -940,7 +940,7 @@ mod phase_7_infer_context {
     #[test]
     fn test_env_free_vars_used_in_generalize() {
         // ?t0 is free in env — generalize should not capture it
-        let mut ctx = InferContext::new();
+        let mut ctx = InferContext::default();
         let _v0 = ctx.fresh_var(); // ?t0 — bound in env
         let _v1 = ctx.fresh_var(); // ?t1 — free in ty only
         ctx.bind_mono("x", InferType::Var(TypeVar(0)), false);
