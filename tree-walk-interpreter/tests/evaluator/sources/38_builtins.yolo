@@ -1,0 +1,41 @@
+fun main() {
+    // int_to_string
+    let _ok1 = match (int_to_string(0)   == "0")   { true => 0, };
+    let _ok2 = match (int_to_string(42)  == "42")  { true => 0, };
+    let _ok3 = match (int_to_string(-7)  == "-7")  { true => 0, };
+    // float_to_string
+    let _ok4 = match (float_to_string(1.5) == "1.5") { true => 0, };
+    let _ok5 = match (float_to_string(0.0) == "0")   { true => 0, };
+    // bool_to_string
+    let _ok6 = match (bool_to_string(true)  == "true")  { true => 0, };
+    let _ok7 = match (bool_to_string(false) == "false") { true => 0, };
+    // string_len
+    let _ok8  = match (string_len("")        == 0) { true => 0, };
+    let _ok9  = match (string_len("hello")   == 5) { true => 0, };
+    let _ok10 = match (string_len("abc")     == 3) { true => 0, };
+    // string_concat
+    let _ok11 = match (string_concat("foo", "bar") == "foobar") { true => 0, };
+    let _ok12 = match (string_concat("", "xyz")    == "xyz")    { true => 0, };
+    let _ok13 = match (string_concat("abc", "")    == "abc")    { true => 0, };
+    // array_len and array_push
+    mut arr = [10, 20, 30];
+    let _ok14 = match (array_len(arr) == 3) { true => 0, };
+    array_push(arr, 40);
+    let _ok15 = match (array_len(arr) == 4)  { true => 0, };
+    let _ok16 = match (arr[3] == 40)          { true => 0, };
+    // array_push is in-place — subsequent reads see the added elements.
+    array_push(arr, 50);
+    array_push(arr, 60);
+    let _ok17 = match (array_len(arr) == 6) { true => 0, };
+    let _ok18 = match (arr[5] == 60)         { true => 0, };
+    // Building an array from scratch with push.
+    mut built: Int[] = [];
+    mut i = 1;
+    while (i <= 5) {
+        array_push(built, i * i);
+        i += 1;
+    }
+    let _ok19 = match (array_len(built) == 5) { true => 0, };
+    let _ok20 = match (built[0] == 1)          { true => 0, };
+    let _ok21 = match (built[4] == 25)         { true => 0, };
+}

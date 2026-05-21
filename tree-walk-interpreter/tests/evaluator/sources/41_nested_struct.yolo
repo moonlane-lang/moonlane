@@ -1,0 +1,45 @@
+struct Point { x: Int, y: Int }
+struct Rect  { top_left: Point, bottom_right: Point }
+
+fun area(r: Rect) -> Int {
+    let w = r.bottom_right.x - r.top_left.x;
+    let h = r.bottom_right.y - r.top_left.y;
+    w * h
+}
+
+fun translate_rect(r: Rect, dx: Int, dy: Int) -> Rect {
+    Rect {
+        top_left:     Point { x: r.top_left.x     + dx, y: r.top_left.y     + dy },
+        bottom_right: Point { x: r.bottom_right.x + dx, y: r.bottom_right.y + dy },
+    }
+}
+
+fun main() {
+    let tl = Point { x: 1, y: 2 };
+    let br = Point { x: 5, y: 6 };
+    let r = Rect { top_left: tl, bottom_right: br };
+    // Nested field access: two levels deep.
+    let _ok1 = match (r.top_left.x     == 1) { true => 0, };
+    let _ok2 = match (r.top_left.y     == 2) { true => 0, };
+    let _ok3 = match (r.bottom_right.x == 5) { true => 0, };
+    let _ok4 = match (r.bottom_right.y == 6) { true => 0, };
+    // Intermediate binding of a nested struct.
+    let corner = r.top_left;
+    let _ok5 = match (corner.x == 1) { true => 0, };
+    // Struct as function argument.
+    let a = area(r);
+    let _ok6 = match (a == 16) { true => 0, };  // (5-1)*(6-2)=4*4=16
+    // Struct returned from function.
+    let r2 = translate_rect(r, 10, 20);
+    let _ok7 = match (r2.top_left.x     == 11) { true => 0, };
+    let _ok8 = match (r2.top_left.y     == 22) { true => 0, };
+    let _ok9 = match (r2.bottom_right.x == 15) { true => 0, };
+    // Original rect is unchanged (value semantics).
+    let _ok10 = match (r.top_left.x == 1) { true => 0, };
+    // Inline nested struct construction.
+    let r3 = Rect {
+        top_left:     Point { x: 0, y: 0 },
+        bottom_right: Point { x: 3, y: 4 },
+    };
+    let _ok11 = match (area(r3) == 12) { true => 0, };
+}

@@ -193,6 +193,21 @@ mod tests {
     #[test]
     fn closure_edge() { check("37_closure_edge.yolo"); }
 
+    #[test]
+    fn builtins() { check("38_builtins.yolo"); }
+
+    #[test]
+    fn perhaps() { check("39_perhaps.yolo"); }
+
+    #[test]
+    fn method_chain() { check("40_method_chain.yolo"); }
+
+    #[test]
+    fn nested_struct() { check("41_nested_struct.yolo"); }
+
+    #[test]
+    fn closures_advanced() { check("42_closures_advanced.yolo"); }
+
     // ── Negative tests ────────────────────────────────────────────────────────
 
     #[test]
