@@ -1,0 +1,6 @@
+// TYPECHECK_ERROR[E0003]
+struct Point { x: Int, y: Int }
+fun main() {
+    let p = Point { x: 1, y: 2 };
+    let _z = p.z;
+}

@@ -1,0 +1,14 @@
+struct Point { x: Int, y: Int }
+struct Color { r: Int, g: Int, b: Int }
+
+fun main() {
+    // Basic struct construction.
+    let p = Point { x: 3, y: 4 };
+    let _ok1 = match (p.x == 3) { true => 0, };
+    let _ok2 = match (p.y == 4) { true => 0, };
+    // Multiple fields, different types.
+    let c = Color { r: 255, g: 128, b: 0 };
+    let _ok3 = match (c.r == 255) { true => 0, };
+    let _ok4 = match (c.g == 128) { true => 0, };
+    let _ok5 = match (c.b == 0)   { true => 0, };
+}

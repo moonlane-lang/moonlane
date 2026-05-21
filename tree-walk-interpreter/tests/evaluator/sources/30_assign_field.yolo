@@ -1,0 +1,19 @@
+struct Counter { value: Int, step: Int }
+
+fun main() {
+    // Plain field assignment.
+    mut c = Counter { value: 0, step: 1 };
+    c.value = 42;
+    let _ok1 = match (c.value == 42) { true => 0, };
+    // Compound field assignment operators.
+    c.value += 8;
+    let _ok2 = match (c.value == 50) { true => 0, };
+    c.value -= 10;
+    let _ok3 = match (c.value == 40) { true => 0, };
+    c.value *= 2;
+    let _ok4 = match (c.value == 80) { true => 0, };
+    c.value /= 4;
+    let _ok5 = match (c.value == 20) { true => 0, };
+    c.step += 9;
+    let _ok6 = match (c.step == 10) { true => 0, };
+}

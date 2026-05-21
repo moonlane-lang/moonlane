@@ -128,20 +128,39 @@ pub fn evaluate(program: TypedProgram) -> Result<(), YoloscriptError> {
     let mut env = Environment::new();
     register_builtins(&mut env);
 
-    // Pass 1: hoist function declarations so forward references work.
+    // Pass 1: hoist function declarations and impl block methods so forward
+    // references work regardless of declaration order.
     for decl in &program {
-        if let TypedDecl::Fun(f) = decl {
-            env.define(&f.name, Value::Function {
-                name:   f.name.clone(),
-                params: f.params.clone(),
-                body:   f.body.clone(),
-            });
+        match decl {
+            TypedDecl::Fun(f) => {
+                env.define(&f.name, Value::Function {
+                    name:   f.name.clone(),
+                    params: f.params.clone(),
+                    body:   f.body.clone(),
+                });
+            }
+            TypedDecl::Impl(impl_block) => {
+                // Register each method under "TypeName::method_name" so method
+                // dispatch in eval_expr can look them up without a separate table.
+                if let crate::ast::TypeExpr::Named(type_name, _) = &impl_block.target_type {
+                    for method in &impl_block.methods {
+                        let key = format!("{}::{}", type_name, method.name);
+                        env.define(&key, Value::Function {
+                            name:   method.name.clone(),
+                            params: method.params.clone(),
+                            body:   method.body.clone(),
+                        });
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
     // Pass 2: evaluate top-level let/mut bindings and statements in order.
+    // Fun and Impl are already handled in Pass 1.
     for decl in &program {
-        if !matches!(decl, TypedDecl::Fun(_)) {
+        if !matches!(decl, TypedDecl::Fun(_) | TypedDecl::Impl(_)) {
             eval_decl(decl, &mut env)?;
         }
     }
@@ -569,7 +588,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
         }
 
         TypedExpr::Assign { target, op, value, span, .. } => {
-            use crate::ast::{AssignOp, AssignTarget};
+            use crate::ast::{AssignOp, AssignTarget, Expr};
             let rhs = eval_expr(value, env)?.into_value();
             match target {
                 AssignTarget::Ident(name, _) => {
@@ -588,20 +607,148 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Yolo
                     }
                     Ok(Signal::Value(Value::Unit))
                 }
-                // Field and index assignment handled in #54.
-                other_target => Err(YoloscriptError::panic(
-                    format!("assign: field/index targets not yet implemented"),
-                    match other_target {
-                        AssignTarget::FieldAccess { span, .. } => span,
-                        AssignTarget::Index { span, .. } => span,
-                        AssignTarget::Ident(_, span) => span,
-                    },
-                )),
+
+                AssignTarget::Index { object, index, span: tspan } => {
+                    let arr_name = match object.as_ref() {
+                        Expr::Ident(n, _) => n,
+                        _ => return Err(YoloscriptError::panic(
+                            "index assign: only `ident[...]` supported in PoC", tspan,
+                        )),
+                    };
+                    let i = eval_untyped_index(index, env, tspan)?;
+                    let arr_val = env.get(arr_name).ok_or_else(|| {
+                        YoloscriptError::panic(format!("assign: `{arr_name}` not found"), tspan)
+                    })?;
+                    match arr_val {
+                        Value::Array(rc) => {
+                            let len = rc.borrow().len() as i64;
+                            if i < 0 || i >= len {
+                                return Err(YoloscriptError::panic(
+                                    format!("index {i} out of bounds (len {len})"), span,
+                                ));
+                            }
+                            let new_val = if matches!(op, AssignOp::Assign) {
+                                rhs
+                            } else {
+                                let cur = rc.borrow()[i as usize].clone();
+                                apply_assign_op(op, cur, rhs, span)?
+                            };
+                            rc.borrow_mut()[i as usize] = new_val;
+                            Ok(Signal::Value(Value::Unit))
+                        }
+                        _ => Err(YoloscriptError::panic(
+                            format!("index assign: `{arr_name}` is not an Array"), tspan,
+                        )),
+                    }
+                }
+
+                AssignTarget::FieldAccess { object, field, span: tspan } => {
+                    let obj_name = match object.as_ref() {
+                        Expr::Ident(n, _) => n,
+                        _ => return Err(YoloscriptError::panic(
+                            "field assign: only `ident.field` supported in PoC", tspan,
+                        )),
+                    };
+                    let rc = env.get_rc(obj_name).ok_or_else(|| {
+                        YoloscriptError::panic(format!("assign: `{obj_name}` not found"), tspan)
+                    })?;
+                    let mut borrowed = rc.borrow_mut();
+                    let fields = match &mut *borrowed {
+                        Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
+                        _ => return Err(YoloscriptError::panic(
+                            format!("field assign: `{obj_name}` is not a struct/enum"), tspan,
+                        )),
+                    };
+                    let new_val = if matches!(op, AssignOp::Assign) {
+                        rhs
+                    } else {
+                        let cur = fields.get(field).cloned().ok_or_else(|| {
+                            YoloscriptError::panic(
+                                format!("field assign: no field `{field}`"), tspan,
+                            )
+                        })?;
+                        apply_assign_op(op, cur, rhs, span)?
+                    };
+                    fields.insert(field.clone(), new_val);
+                    Ok(Signal::Value(Value::Unit))
+                }
             }
         }
 
-        // Variants handled by other issues (#54 for StructLiteral/FieldAccess/MethodCall,
-        // #4 for Call/Closure, PropagateError for error handling).
+        TypedExpr::StructLiteral { path, fields, span, .. } => {
+            let mut field_vals: HashMap<String, Value> = HashMap::new();
+            for (name, expr) in fields {
+                field_vals.insert(name.clone(), eval_expr(expr, env)?.into_value());
+            }
+            if path.len() == 2 {
+                // Enum variant with named fields: `Enum::Variant { field: val, .. }`
+                Ok(Signal::Value(Value::Enum {
+                    name:    path[0].clone(),
+                    variant: path[1].clone(),
+                    fields:  field_vals,
+                }))
+            } else {
+                let name = path.last().ok_or_else(|| {
+                    YoloscriptError::panic("struct literal: empty path", span)
+                })?.clone();
+                Ok(Signal::Value(Value::Struct { name, fields: field_vals }))
+            }
+        }
+
+        TypedExpr::FieldAccess { object, field, span, .. } => {
+            let val = eval_expr(object, env)?.into_value();
+            let fields = match &val {
+                Value::Struct { fields, .. } | Value::Enum { fields, .. } => fields,
+                _ => return Err(YoloscriptError::panic("field access on non-struct/enum", span)),
+            };
+            fields.get(field).cloned().map(Signal::Value).ok_or_else(|| {
+                YoloscriptError::panic(format!("no field `{field}` on value"), span)
+            })
+        }
+
+        TypedExpr::MethodCall { receiver, method, args, span, .. } => {
+            let recv_val = eval_expr(receiver, env)?.into_value();
+            let arg_vals: Vec<Value> = args.iter()
+                .map(|a| eval_expr(a, env).map(Signal::into_value))
+                .collect::<Result<_, _>>()?;
+
+            // Built-in type methods.
+            if let (Value::Str(s), "len") = (&recv_val, method.as_str()) {
+                return Ok(Signal::Value(Value::Int(s.chars().count() as i64)));
+            }
+
+            // User-defined struct/enum methods — looked up by "TypeName::method".
+            let type_name = match &recv_val {
+                Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
+                _ => return Err(YoloscriptError::panic(
+                    format!("method `{method}` not found on this value"), span,
+                )),
+            };
+            let key = format!("{type_name}::{method}");
+            let func = env.get(&key).ok_or_else(|| {
+                YoloscriptError::panic(format!("no method `{method}` on `{type_name}`"), span)
+            })?;
+            let (params, body) = match func {
+                Value::Function { params, body: FunBody::Typed(b), .. } => (params, b),
+                _ => return Err(YoloscriptError::panic(
+                    format!("method `{method}` is not a typed function"), span,
+                )),
+            };
+            // PoC inline dispatch: bind self + args, eval body, pop scope.
+            // Full call machinery (stack frames, recursion, closures) comes in #4.
+            env.push_scope();
+            if let Some(self_param) = params.first() {
+                env.define(&self_param.name, recv_val);
+            }
+            for (param, val) in params.iter().skip(1).zip(arg_vals.iter()) {
+                env.define(&param.name, val.clone());
+            }
+            let result = eval_block(&body, env);
+            env.pop_scope();
+            result
+        }
+
+        // Variants for #4 (Call/Closure) and error propagation.
         other => Err(YoloscriptError::panic(
             format!("eval_expr: unimplemented variant"),
             other.span(),
@@ -663,6 +810,27 @@ fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Val
 }
 
 // ── Assignment and binary operators ──────────────────────────────────────────
+
+/// Evaluate a simple index expression (Ident or Int literal) from an untyped Expr.
+/// The typechecker validates these, so only the most common forms appear in practice.
+fn eval_untyped_index(
+    expr: &crate::ast::Expr,
+    env: &Environment,
+    span: &Span,
+) -> Result<i64, YoloscriptError> {
+    use crate::ast::Expr;
+    match expr {
+        Expr::Literal(Literal::Int(n), _) => Ok(*n),
+        Expr::Ident(name, _) => match env.get(name) {
+            Some(Value::Int(n)) => Ok(n),
+            Some(_) => Err(YoloscriptError::panic(format!("`{name}` is not an Int"), span)),
+            None    => Err(YoloscriptError::panic(format!("undefined `{name}`"), span)),
+        },
+        _ => Err(YoloscriptError::panic(
+            "index expression too complex for PoC; assign the index to a variable first", span,
+        )),
+    }
+}
 
 fn apply_assign_op(
     op: &crate::ast::AssignOp,

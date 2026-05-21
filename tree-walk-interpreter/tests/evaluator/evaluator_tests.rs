@@ -151,6 +151,27 @@ mod tests {
     #[test]
     fn forward_reference() { check("23_forward_reference.yolo"); }
 
+    #[test]
+    fn struct_literal() { check("24_struct_literal.yolo"); }
+
+    #[test]
+    fn enum_with_fields() { check("25_enum_with_fields.yolo"); }
+
+    #[test]
+    fn field_access() { check("26_field_access.yolo"); }
+
+    #[test]
+    fn method_call_builtin() { check("27_method_call_builtin.yolo"); }
+
+    #[test]
+    fn method_call_user() { check("28_method_call_user.yolo"); }
+
+    #[test]
+    fn assign_index() { check("29_assign_index.yolo"); }
+
+    #[test]
+    fn assign_field() { check("30_assign_field.yolo"); }
+
     // ── Negative tests ────────────────────────────────────────────────────────
 
     #[test]
@@ -185,4 +206,7 @@ mod tests {
 
     #[test]
     fn neg_or_rhs_evaluated() { check("neg_11_or_rhs_evaluated.yolo"); }
+
+    #[test]
+    fn neg_missing_field() { check("neg_12_missing_field.yolo"); }
 }

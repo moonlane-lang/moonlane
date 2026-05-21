@@ -1,0 +1,21 @@
+struct Point { x: Int, y: Int }
+
+impl Point {
+    fun magnitude_sq(self) -> Int {
+        self.x * self.x + self.y * self.y
+    }
+    fun translate(self, dx: Int, dy: Int) -> Point {
+        Point { x: self.x + dx, y: self.y + dy }
+    }
+}
+
+fun main() {
+    // Zero-arg (besides self) method.
+    let p = Point { x: 3, y: 4 };
+    let ms = p.magnitude_sq();
+    let _ok1 = match (ms == 25) { true => 0, };
+    // Method with additional arguments that returns a new struct.
+    let q = p.translate(1, 2);
+    let _ok2 = match (q.x == 4) { true => 0, };
+    let _ok3 = match (q.y == 6) { true => 0, };
+}
