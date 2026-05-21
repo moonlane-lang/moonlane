@@ -1,12 +1,12 @@
 # /sprint-end
 
-Close a sprint: create the review issue summarising outcomes, carry over incomplete issues, and update the board.
+Close a sprint: run tests, carry over incomplete issues, open the sprint review issue and PR, then hand off to the user.
 
 **Arguments:** `$ARGUMENTS` — sprint number, e.g. `3`
 
 ## Steps
 
-1. **Fetch the sprint kickoff issue** to retrieve the sprint goal and planned issue list:
+1. **Fetch the sprint kickoff issue** to retrieve the sprint goal, planned issues, and kickoff issue number:
 ```bash
 wsl gh issue list --repo Vladastos/Yoloscript \
   --label "sprint:kickoff" \
@@ -48,7 +48,7 @@ wsl gh issue create \
 $(for each closed issue: - [x] #N Title)
 
 ## Carried Over
-$(for each open issue: - [ ] #N Title)
+$(for each open issue: - [ ] #N Title — reason if known)
 
 ## Epic Progress
 <!-- How does this sprint advance the milestone? -->
@@ -59,6 +59,7 @@ $(for each open issue: - [ ] #N Title)
 ## Next Sprint Seeds
 <!-- Issues or ideas for the next sprint -->"
 ```
+Note the issue number returned — it is needed for the PR body.
 
 6. **Open a pull request** from `sprint/<N>` → `main`:
 ```bash
@@ -70,22 +71,25 @@ gh pr create \
   --body "$(cat <<'EOF'
 Sprint review: #<review-issue-number>
 
+Closes #<review-issue-number>
 Closes #<kickoff-issue-number>
 EOF
 )"
 ```
-The PR body must link the sprint review issue. The PR diff is the authoritative record of all sprint changes.
+Both `Closes` lines are required. On merge, GitHub automatically closes the sprint review issue and the kickoff issue.
 
-7. **Close the kickoff issue** for this sprint:
-```bash
-gh issue close <kickoff-issue-number> --repo Vladastos/Yoloscript
-```
+7. **Leave a note for the user:**
 
-8. **Report** the PR URL, the review issue URL, and a one-line summary of completed vs carried-over.
+> **Sprint <N> is ready for review.**
+>
+> - Fill in the review issue: #<review-issue-number>
+> - Review the PR diff and approve it on GitHub
+> - **Merge the PR** — this automatically closes the review issue (#<review-issue-number>) and the kickoff issue (#<kickoff-issue-number>)
+> - After merging, delete the `sprint/<N>` branch on GitHub
 
 ## Notes
-- The review issue stays open for the user to fill in Epic Progress and Spec Notes.
 - A sprint with 0 completed issues should still produce a review issue — record why.
+- Do not close the kickoff issue manually — the PR merge closes it via `Closes #N`.
+- Do not close the review issue manually — the PR merge closes it via `Closes #N`.
 - If spec ambiguities surfaced during the sprint, prompt the user to open a `/new-rfc`.
-- The sprint branch is deleted after the PR is merged — not before.
-- Remind the user: merge the PR on GitHub, then delete the `sprint/<N>` branch.
+- The sprint branch must not be deleted until after the PR is merged.
