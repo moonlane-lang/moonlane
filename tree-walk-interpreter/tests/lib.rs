@@ -9,3 +9,6 @@ mod typechecking_tests;
 
 #[path = "parsing/parsing_tests.rs"]
 mod parsing_tests;
+
+#[path = "evaluator/evaluator_tests.rs"]
+mod evaluator_tests;
