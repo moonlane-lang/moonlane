@@ -374,30 +374,7 @@ fn infer_expr(
                     elem_var
                 }
                 AssignTarget::FieldAccess { object, field, span: target_span } => {
-                    let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
-                    let obj_ty = ctx.solve()?.apply(&obj_ty);
-                    let struct_name = named_type_name(&obj_ty).ok_or_else(|| {
-                        YoloscriptError::type_error(
-                            ErrorCode::E0002,
-                            "cannot infer struct type for field assignment; add a type annotation",
-                            target_span,
-                        )
-                    })?;
-                    let fields = ctx.get_struct_fields(&struct_name)
-                        .ok_or_else(|| YoloscriptError::type_error(
-                            ErrorCode::E0003,
-                            format!("unknown type `{struct_name}`"),
-                            target_span,
-                        ))?
-                        .clone();
-                    fields.iter()
-                        .find(|(n, _)| n == field)
-                        .map(|(_, ty)| ty.clone())
-                        .ok_or_else(|| YoloscriptError::type_error(
-                            ErrorCode::E0003,
-                            format!("no field `{field}` on `{struct_name}`"),
-                            target_span,
-                        ))?
+                    infer_field_assign_type(object, field, target_span, ctx, fun_generalizations)?
                 }
             };
             let value_ty = infer_expr(value, ctx, fun_generalizations)?;
@@ -465,82 +442,12 @@ fn infer_expr(
         }
         Expr::StructLiteral { path, fields, span } => {
             if path.len() == 2 {
-                let enum_name    = &path[0];
-                let variant_name = &path[1];
-                let enum_info = ctx.get_enum(enum_name)
-                    .ok_or_else(|| YoloscriptError::type_error(
-                        ErrorCode::E0003,
-                        format!("unknown enum `{enum_name}`"),
-                        span,
-                    ))?
-                    .clone();
-                let variant = enum_info.variants.iter()
-                    .find(|v| v.name == *variant_name)
-                    .ok_or_else(|| YoloscriptError::type_error(
-                        ErrorCode::E0003,
-                        format!("no variant `{variant_name}` on enum `{enum_name}`"),
-                        span,
-                    ))?
-                    .clone();
-                let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
-                for &tp in &enum_info.type_params {
-                    remap.insert(tp, ctx.fresh_var());
-                }
-                let instantiate_ty = |ty: &InferType, remap: &HashMap<TypeVar, InferType>| -> InferType {
-                    match ty {
-                        InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| ty.clone()),
-                        other => other.clone(),
-                    }
-                };
-                for (fname, expr) in fields {
-                    let decl_ty = variant.fields.iter()
-                        .find(|(n, _)| n == fname)
-                        .map(|(_, ty)| instantiate_ty(ty, &remap))
-                        .ok_or_else(|| YoloscriptError::type_error(
-                            ErrorCode::E0003,
-                            format!("no field `{fname}` on `{enum_name}::{variant_name}`"),
-                            span,
-                        ))?;
-                    let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
-                    ctx.add_constraint(expr_ty, decl_ty, span.clone());
-                }
-                let type_args: Vec<InferType> = enum_info.type_params.iter()
-                    .map(|tp| remap[tp].clone())
-                    .collect();
-                Ok(InferType::Named(enum_name.clone(), type_args))
+                infer_enum_variant_literal(&path[0], &path[1], fields, span, ctx, fun_generalizations)
             } else {
                 let struct_name = path.last()
                     .ok_or_else(|| YoloscriptError::internal("empty path in struct literal"))?
                     .clone();
-                let expected_fields = ctx.get_struct_fields(&struct_name)
-                    .ok_or_else(|| YoloscriptError::type_error(
-                        ErrorCode::E0003,
-                        format!("unknown struct `{struct_name}`"),
-                        span,
-                    ))?
-                    .clone();
-                for (name, expr) in fields {
-                    let decl_ty = expected_fields.iter()
-                        .find(|(n, _)| n == name)
-                        .map(|(_, ty)| ty.clone())
-                        .ok_or_else(|| YoloscriptError::type_error(
-                            ErrorCode::E0003,
-                            format!("no field `{name}` on `{struct_name}`"),
-                            span,
-                        ))?;
-                    let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
-                    ctx.add_constraint(expr_ty, decl_ty, span.clone());
-                }
-                for (decl_name, _) in &expected_fields {
-                    if !fields.iter().any(|(n, _)| n == decl_name) {
-                        return Err(YoloscriptError::type_error(
-                            ErrorCode::E0003,
-                            format!("missing field `{decl_name}` in `{struct_name}`"),
-                            span,
-                        ));
-                    }
-                }
-                Ok(InferType::Named(struct_name, vec![]))
+                infer_struct_literal(struct_name, fields, span, ctx, fun_generalizations)
             }
         }
         Expr::Cast { expr, target_type, span } => {
@@ -721,50 +628,7 @@ fn infer_pattern(
                     pat_span,
                 ));
             };
-            let enum_info = ctx.get_enum(enum_name)
-                .ok_or_else(|| YoloscriptError::type_error(
-                    ErrorCode::E0003,
-                    format!("unknown enum `{enum_name}` in pattern"),
-                    pat_span,
-                ))?
-                .clone();
-            let variant = enum_info.variants.iter()
-                .find(|v| v.name == *variant_name)
-                .ok_or_else(|| YoloscriptError::type_error(
-                    ErrorCode::E0003,
-                    format!("no variant `{variant_name}` on `{enum_name}`"),
-                    pat_span,
-                ))?
-                .clone();
-            let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
-            for &tp in &enum_info.type_params {
-                remap.insert(tp, ctx.fresh_var());
-            }
-            let instantiate_ty = |ty: &InferType| -> InferType {
-                match ty {
-                    InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| ty.clone()),
-                    other => other.clone(),
-                }
-            };
-            let type_args: Vec<InferType> = enum_info.type_params.iter()
-                .map(|tp| remap[tp].clone())
-                .collect();
-            ctx.add_constraint(
-                scrutinee_ty.clone(),
-                InferType::Named(enum_name.clone(), type_args),
-                pat_span.clone(),
-            );
-            for field_name in fields {
-                let field_ty = variant.fields.iter()
-                    .find(|(n, _)| n == field_name)
-                    .map(|(_, ty)| instantiate_ty(ty))
-                    .ok_or_else(|| YoloscriptError::type_error(
-                        ErrorCode::E0003,
-                        format!("no field `{field_name}` on `{enum_name}::{variant_name}`"),
-                        pat_span,
-                    ))?;
-                ctx.bind_mono(field_name, field_ty, false);
-            }
+            infer_enum_variant_pattern(enum_name, variant_name, fields, scrutinee_ty, pat_span, ctx)?;
         }
     }
     Ok(())
@@ -849,4 +713,177 @@ fn infer_unaryop(
             Ok(InferType::bool())
         }
     }
+}
+
+fn infer_enum_variant_literal(
+    enum_name: &str,
+    variant_name: &str,
+    fields: &[(String, Expr)],
+    span: &Span,
+    ctx: &mut InferContext,
+    fun_generalizations: &mut Vec<FunGeneralization>,
+) -> Result<InferType, YoloscriptError> {
+    let enum_info = ctx.get_enum(enum_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("unknown enum `{enum_name}`"),
+            span,
+        ))?
+        .clone();
+    let variant = enum_info.variants.iter()
+        .find(|v| v.name == variant_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("no variant `{variant_name}` on enum `{enum_name}`"),
+            span,
+        ))?
+        .clone();
+    let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
+    for &tp in &enum_info.type_params {
+        remap.insert(tp, ctx.fresh_var());
+    }
+    for (fname, expr) in fields {
+        let raw_ty = variant.fields.iter()
+            .find(|(n, _)| n == fname)
+            .map(|(_, ty)| ty)
+            .ok_or_else(|| YoloscriptError::type_error(
+                ErrorCode::E0003,
+                format!("no field `{fname}` on `{enum_name}::{variant_name}`"),
+                span,
+            ))?;
+        let decl_ty = match raw_ty {
+            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| raw_ty.clone()),
+            other => other.clone(),
+        };
+        let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
+        ctx.add_constraint(expr_ty, decl_ty, span.clone());
+    }
+    let type_args: Vec<InferType> = enum_info.type_params.iter()
+        .map(|tp| remap[tp].clone())
+        .collect();
+    Ok(InferType::Named(enum_name.to_string(), type_args))
+}
+
+fn infer_struct_literal(
+    struct_name: String,
+    fields: &[(String, Expr)],
+    span: &Span,
+    ctx: &mut InferContext,
+    fun_generalizations: &mut Vec<FunGeneralization>,
+) -> Result<InferType, YoloscriptError> {
+    let expected_fields = ctx.get_struct_fields(&struct_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("unknown struct `{struct_name}`"),
+            span,
+        ))?
+        .clone();
+    for (name, expr) in fields {
+        let decl_ty = expected_fields.iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, ty)| ty.clone())
+            .ok_or_else(|| YoloscriptError::type_error(
+                ErrorCode::E0003,
+                format!("no field `{name}` on `{struct_name}`"),
+                span,
+            ))?;
+        let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
+        ctx.add_constraint(expr_ty, decl_ty, span.clone());
+    }
+    for (decl_name, _) in &expected_fields {
+        if !fields.iter().any(|(n, _)| n == decl_name) {
+            return Err(YoloscriptError::type_error(
+                ErrorCode::E0003,
+                format!("missing field `{decl_name}` in `{struct_name}`"),
+                span,
+            ));
+        }
+    }
+    Ok(InferType::Named(struct_name, vec![]))
+}
+
+fn infer_field_assign_type(
+    object: &Expr,
+    field: &str,
+    target_span: &Span,
+    ctx: &mut InferContext,
+    fun_generalizations: &mut Vec<FunGeneralization>,
+) -> Result<InferType, YoloscriptError> {
+    let obj_ty = infer_expr(object, ctx, fun_generalizations)?;
+    let obj_ty = ctx.solve()?.apply(&obj_ty);
+    let struct_name = named_type_name(&obj_ty).ok_or_else(|| {
+        YoloscriptError::type_error(
+            ErrorCode::E0002,
+            "cannot infer struct type for field assignment; add a type annotation",
+            target_span,
+        )
+    })?;
+    let fields = ctx.get_struct_fields(&struct_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("unknown type `{struct_name}`"),
+            target_span,
+        ))?
+        .clone();
+    fields.iter()
+        .find(|(n, _)| n == field)
+        .map(|(_, ty)| ty.clone())
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("no field `{field}` on `{struct_name}`"),
+            target_span,
+        ))
+}
+
+fn infer_enum_variant_pattern(
+    enum_name: &str,
+    variant_name: &str,
+    fields: &[String],
+    scrutinee_ty: &InferType,
+    pat_span: &Span,
+    ctx: &mut InferContext,
+) -> Result<(), YoloscriptError> {
+    let enum_info = ctx.get_enum(enum_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("unknown enum `{enum_name}` in pattern"),
+            pat_span,
+        ))?
+        .clone();
+    let variant = enum_info.variants.iter()
+        .find(|v| v.name == variant_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("no variant `{variant_name}` on `{enum_name}`"),
+            pat_span,
+        ))?
+        .clone();
+    let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
+    for &tp in &enum_info.type_params {
+        remap.insert(tp, ctx.fresh_var());
+    }
+    let type_args: Vec<InferType> = enum_info.type_params.iter()
+        .map(|tp| remap[tp].clone())
+        .collect();
+    ctx.add_constraint(
+        scrutinee_ty.clone(),
+        InferType::Named(enum_name.to_string(), type_args),
+        pat_span.clone(),
+    );
+    for field_name in fields {
+        let raw_ty = variant.fields.iter()
+            .find(|(n, _)| n == field_name)
+            .map(|(_, ty)| ty)
+            .ok_or_else(|| YoloscriptError::type_error(
+                ErrorCode::E0003,
+                format!("no field `{field_name}` on `{enum_name}::{variant_name}`"),
+                pat_span,
+            ))?;
+        let field_ty = match raw_ty {
+            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| raw_ty.clone()),
+            other => other.clone(),
+        };
+        ctx.bind_mono(field_name, field_ty, false);
+    }
+    Ok(())
 }

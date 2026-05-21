@@ -470,92 +470,7 @@ fn construct_expr(
                 .collect::<Result<_, _>>()?;
 
             let ty = if path.len() == 2 {
-                // Enum variant: resolve concrete type arguments using the same
-                // instantiate-then-unify pattern as instantiate_scheme_for_call.
-                let enum_name    = &path[0];
-                let variant_name = &path[1];
-                let enum_info = ctx.enum_env.get(enum_name)
-                    .ok_or_else(|| YoloscriptError::type_error(
-                        ErrorCode::E0003,
-                        format!("unknown enum `{enum_name}`"),
-                        span,
-                    ))?;
-                let variant = enum_info.variants.iter()
-                    .find(|v| v.name == *variant_name)
-                    .ok_or_else(|| YoloscriptError::type_error(
-                        ErrorCode::E0003,
-                        format!("no variant `{variant_name}` on enum `{enum_name}`"),
-                        span,
-                    ))?;
-
-                // Assign a fresh type variable to each formal type parameter and
-                // build an instantiation substitution for this particular usage site.
-                let mut init_subst = Substitution::new();
-                let fresh_vars: Vec<InferType> = enum_info.type_params.iter()
-                    .map(|&tp| {
-                        let fresh = InferType::Var(ctx.gen.fresh());
-                        init_subst.bind(tp, fresh.clone());
-                        fresh
-                    })
-                    .collect();
-
-                // Unify each instantiated field type against the actual expression type
-                // to solve for the fresh variables.
-                let mut local_subst = Substitution::new();
-                for (field_name, typed_expr) in &typed_fields {
-                    if let Some((_, field_decl_ty)) = variant.fields.iter()
-                        .find(|(n, _)| n == field_name)
-                    {
-                        let instantiated = init_subst.apply(field_decl_ty);
-                        let actual = type_to_infer(typed_expr.ty());
-                        if let Ok(s) = unify(&local_subst.apply(&instantiated), &local_subst.apply(&actual)) {
-                            local_subst = local_subst.compose(&s);
-                        }
-                    }
-                }
-
-                // Apply the local substitution to recover concrete type arguments.
-                // If a type param remains unresolved (fieldless variants like
-                // `Perhaps::Nope`), fall back to the annotation's args.
-                // type_to_infer normalises Perhaps/Result into Named for uniform handling.
-                let hint_args: Vec<Type> = expected_ty
-                    .map(|ty| {
-                        if let InferType::Named(n, args) = type_to_infer(ty) {
-                            if n == *enum_name {
-                                args.iter()
-                                    .map(|a| infer_type_to_type(a, span))
-                                    .collect::<Result<Vec<_>, _>>()
-                                    .unwrap_or_default()
-                            } else {
-                                vec![]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    })
-                    .unwrap_or_default();
-                let concrete_args: Vec<Type> = fresh_vars.iter()
-                    .enumerate()
-                    .map(|(i, fv)| {
-                        let resolved = local_subst.apply(fv);
-                        if matches!(resolved, InferType::Var(_)) {
-                            hint_args.get(i).cloned()
-                                .ok_or_else(|| YoloscriptError::type_error(
-                                    ErrorCode::E0002,
-                                    "cannot infer type; add a type annotation",
-                                    span,
-                                ))
-                        } else {
-                            infer_type_to_type(&resolved, span)
-                        }
-                    })
-                    .collect::<Result<_, _>>()?;
-
-                // Route through infer_type_to_type so "Perhaps"/"Result" become
-                // Type::Perhaps/Type::Result rather than Type::Named — infer_type_to_type
-                // is the single normalisation point for this conversion.
-                let infer_args: Vec<InferType> = concrete_args.iter().map(type_to_infer).collect();
-                infer_type_to_type(&InferType::Named(enum_name.clone(), infer_args), span)?
+                construct_enum_literal_ty(&path[0], &path[1], &typed_fields, expected_ty, span, ctx)?
             } else {
                 let type_name = path.last().unwrap();
                 Type::Named(type_name.clone(), vec![])
@@ -826,30 +741,8 @@ fn construct_pattern_bindings(
             let [enum_name, variant_name] = path.as_slice() else {
                 return Err(YoloscriptError::internal("invalid pattern path"));
             };
-            let enum_info = ctx.enum_env.get(enum_name.as_str())
-                .ok_or_else(|| YoloscriptError::internal(format!("unknown enum `{enum_name}`")))?
-                .clone();
-            let variant = enum_info.variants.iter()
-                .find(|v| v.name == *variant_name)
-                .ok_or_else(|| YoloscriptError::internal(format!("unknown variant `{variant_name}`")))?
-                .clone();
-            let type_args = extract_type_args_from_type(scrutinee_ty);
-            let mut remap = Substitution::new();
-            for (&tp, arg_ty) in enum_info.type_params.iter().zip(type_args.iter()) {
-                remap.bind(tp, InferType::Concrete(arg_ty.clone()));
-            }
-            let dummy = Span::new(0, 0, "");
-            for field_name in fields {
-                let template_ty = variant.fields.iter()
-                    .find(|(n, _)| n == field_name)
-                    .map(|(_, ty)| ty.clone())
-                    .ok_or_else(|| YoloscriptError::internal(
-                        format!("no field `{field_name}` on variant `{variant_name}`")
-                    ))?;
-                let concrete = infer_type_to_type(&remap.apply(&template_ty), &dummy)?;
-                ctx.bind(field_name, concrete);
-            }
             let _ = span;
+            bind_enum_variant_fields(enum_name, variant_name, fields, scrutinee_ty, ctx)?;
         }
     }
     Ok(())
@@ -862,6 +755,133 @@ fn extract_type_args_from_type(ty: &Type) -> Vec<Type> {
         Type::Named(_, args) => args.clone(),
         _ => vec![],
     }
+}
+
+fn construct_enum_literal_ty(
+    enum_name: &str,
+    variant_name: &str,
+    typed_fields: &[(String, TypedExpr)],
+    expected_ty: Option<&Type>,
+    span: &Span,
+    ctx: &mut ConstructCtx,
+) -> Result<Type, YoloscriptError> {
+    // Resolve concrete type arguments using the same instantiate-then-unify
+    // pattern as instantiate_scheme_for_call.
+    let enum_info = ctx.enum_env.get(enum_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("unknown enum `{enum_name}`"),
+            span,
+        ))?;
+    let variant = enum_info.variants.iter()
+        .find(|v| v.name == variant_name)
+        .ok_or_else(|| YoloscriptError::type_error(
+            ErrorCode::E0003,
+            format!("no variant `{variant_name}` on enum `{enum_name}`"),
+            span,
+        ))?;
+
+    // Assign a fresh type variable to each formal type parameter and
+    // build an instantiation substitution for this particular usage site.
+    let mut init_subst = Substitution::new();
+    let fresh_vars: Vec<InferType> = enum_info.type_params.iter()
+        .map(|&tp| {
+            let fresh = InferType::Var(ctx.gen.fresh());
+            init_subst.bind(tp, fresh.clone());
+            fresh
+        })
+        .collect();
+
+    // Unify each instantiated field type against the actual expression type
+    // to solve for the fresh variables.
+    let mut local_subst = Substitution::new();
+    for (field_name, typed_expr) in typed_fields {
+        if let Some((_, field_decl_ty)) = variant.fields.iter()
+            .find(|(n, _)| n == field_name)
+        {
+            let instantiated = init_subst.apply(field_decl_ty);
+            let actual = type_to_infer(typed_expr.ty());
+            if let Ok(s) = unify(&local_subst.apply(&instantiated), &local_subst.apply(&actual)) {
+                local_subst = local_subst.compose(&s);
+            }
+        }
+    }
+
+    // Apply the local substitution to recover concrete type arguments.
+    // If a type param remains unresolved (fieldless variants like `Perhaps::Nope`),
+    // fall back to the annotation's args.
+    // type_to_infer normalises Perhaps/Result into Named for uniform handling.
+    let hint_args: Vec<Type> = expected_ty
+        .map(|ty| {
+            if let InferType::Named(n, args) = type_to_infer(ty) {
+                if n == enum_name {
+                    args.iter()
+                        .map(|a| infer_type_to_type(a, span))
+                        .collect::<Result<Vec<_>, _>>()
+                        .unwrap_or_default()
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![]
+            }
+        })
+        .unwrap_or_default();
+    let concrete_args: Vec<Type> = fresh_vars.iter()
+        .enumerate()
+        .map(|(i, fv)| {
+            let resolved = local_subst.apply(fv);
+            if matches!(resolved, InferType::Var(_)) {
+                hint_args.get(i).cloned()
+                    .ok_or_else(|| YoloscriptError::type_error(
+                        ErrorCode::E0002,
+                        "cannot infer type; add a type annotation",
+                        span,
+                    ))
+            } else {
+                infer_type_to_type(&resolved, span)
+            }
+        })
+        .collect::<Result<_, _>>()?;
+
+    // Route through infer_type_to_type so "Perhaps"/"Result" become
+    // Type::Perhaps/Type::Result rather than Type::Named — infer_type_to_type
+    // is the single normalisation point for this conversion.
+    let infer_args: Vec<InferType> = concrete_args.iter().map(type_to_infer).collect();
+    infer_type_to_type(&InferType::Named(enum_name.to_string(), infer_args), span)
+}
+
+fn bind_enum_variant_fields(
+    enum_name: &str,
+    variant_name: &str,
+    fields: &[String],
+    scrutinee_ty: &Type,
+    ctx: &mut ConstructCtx,
+) -> Result<(), YoloscriptError> {
+    let enum_info = ctx.enum_env.get(enum_name)
+        .ok_or_else(|| YoloscriptError::internal(format!("unknown enum `{enum_name}`")))?
+        .clone();
+    let variant = enum_info.variants.iter()
+        .find(|v| v.name == variant_name)
+        .ok_or_else(|| YoloscriptError::internal(format!("unknown variant `{variant_name}`")))?
+        .clone();
+    let type_args = extract_type_args_from_type(scrutinee_ty);
+    let mut remap = Substitution::new();
+    for (&tp, arg_ty) in enum_info.type_params.iter().zip(type_args.iter()) {
+        remap.bind(tp, InferType::Concrete(arg_ty.clone()));
+    }
+    let dummy = Span::new(0, 0, "");
+    for field_name in fields {
+        let template_ty = variant.fields.iter()
+            .find(|(n, _)| n == field_name)
+            .map(|(_, ty)| ty.clone())
+            .ok_or_else(|| YoloscriptError::internal(
+                format!("no field `{field_name}` on variant `{variant_name}`")
+            ))?;
+        let concrete = infer_type_to_type(&remap.apply(&template_ty), &dummy)?;
+        ctx.bind(field_name, concrete);
+    }
+    Ok(())
 }
 
 /// Build a typed Call expression.
