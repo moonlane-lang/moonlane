@@ -94,8 +94,7 @@ Sprints are the unit of shipping. All sprint work must live on a dedicated branc
 2. All tests must pass, including tests from earlier tasks.
 3. If any non-obvious decisions were made during implementation → create a decision record.
 4. If the implementation revealed spec gaps that you fixed → verify the spec edit is committed.
-5. If a spec section is now interpreter-validated, tag it: `> ✓ Interpreter-validated (vX.Y)` where X.Y is the current interpreter version.
-6. **Close the issue**: `gh issue close <number>` (or include `Closes #<number>` in the commit body to auto-close on push). The project Status field updates to **Done** automatically, and the `status:in-progress` label is removed by CI.
+5. **Close the issue**: `gh issue close <number>` (or include `Closes #<number>` in the commit body to auto-close on push). The project Status field updates to **Done** automatically, and the `status:in-progress` label is removed by CI.
 
 ### Opening a new issue
 

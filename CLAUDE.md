@@ -129,7 +129,7 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly �
 - The language specification (`docs/public/spec.md`) is authoritative
 - Implementation reveals spec ambiguities — resolve in the spec first, then implement
 - Never implement behavior not specified in the spec
-- Tag spec sections when interpreter-validated: `> ✓ Interpreter-validated (vX.Y)` where X.Y is the current interpreter version
+- The spec describes the language, not the interpreter's current state — implementation status is tracked by GitHub issues and the version milestone
 
 ### Task Management
 - **GitHub Projects v2** (https://github.com/users/Vladastos/projects/1) is the source of truth for task status and planning
