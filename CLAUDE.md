@@ -107,27 +107,29 @@ gh issue edit <number> --add-label "status:in-progress"        # mark in-progres
 
 **Labels:** `evaluator`, `generics`, `traits`, `integration`, `tooling`, `dx`, `migration`, `docs`, `typechecker`, `type-inference`, `architecture`, `priority:low/medium/high`, `status:backlog`, `status:in-progress`, `archived`
 
-**Milestones:** Epic 001–005 and Phase 01–03, matching the original backlog milestone structure.
+**Milestones:** Epic 001–005 (implementation groupings) and version milestones (`v0.2`, `v0.3`, …). See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the full model.
 
-### Docs and Decisions — backlog/ submodule
+### Docs and Decisions
 
-Spec documents and decision records live in `backlog/` (to be reorganised into `docs/` in #19). Read them directly — no MCP tooling needed.
+Spec documents, decision records, and RFCs live in `docs/`. Read them directly — no MCP tooling needed.
 
 | Path | Purpose |
 |---|---|
-| `backlog/docs/doc-2` | **Language Specification** — single source of truth |
-| `backlog/docs/doc-3` | **Spec Backlog** — open design questions and deferred features |
-| `backlog/docs/doc-4` | **Architecture Overview** — pipeline diagram, component boundaries |
-| `backlog/docs/doc-5`, `doc-6`, `doc-7` | **Type Inference** — concepts, implementation guide, roadmap |
-| `backlog/decisions/` | **Decision records** — why a non-obvious choice was made |
+| `docs/public/spec.md` | **Language Specification** — single source of truth |
+| `docs/internal/spec-backlog.md` | **Spec Backlog** — open design questions and deferred features |
+| `docs/public/architecture.md` | **Architecture Overview** — pipeline diagram, component boundaries |
+| `docs/internal/type-inference/` | **Type Inference** — concepts, implementation guide, roadmap |
+| `docs/internal/decisions/` | **Decision records** — why a non-obvious choice was made |
+| `docs/internal/rfcs/` | **RFCs** — language change proposals |
+| `docs/internal/versioning.md` | **Versioning model** — version numbering, RFC lifecycle, doc conventions |
 
 ## Development Principles
 
 ### Spec-First Development
-- The language specification (`backlog/docs/doc-2`) is authoritative
+- The language specification (`docs/public/spec.md`) is authoritative
 - Implementation reveals spec ambiguities — resolve in the spec first, then implement
 - Never implement behavior not specified in the spec
-- Tag spec sections when interpreter-validated: `> ✓ Interpreter-validated (v0.1)`
+- Tag spec sections when interpreter-validated: `> ✓ Interpreter-validated (vX.Y)` where X.Y is the current interpreter version
 
 ### Task Management
 - **GitHub Projects v2** (https://github.com/users/Vladastos/projects/1) is the source of truth for task status and planning
@@ -180,13 +182,18 @@ Spec documents and decision records live in `backlog/` (to be reorganised into `
 
 ## Current Development Focus
 
-Check GitHub Issues for open tasks: `gh issue list --milestone "Epic 002 - Evaluator"`. The active epics are:
+The language is at **v0.1** (tree-walk interpreter complete). The next release is **v0.2**, which adds generics and traits.
 
+Check open tasks: `gh issue list --milestone "v0.2"`.
+
+**Epic status:**
 - **Epic 001** (Typechecker and Typed AST) — complete
-- **Epic 002** (Evaluator) — next up; issues #1–#4
-- **Epic 003** (Generics and Monomorphization) — issues #5–#10
-- **Epic 004** (Traits and Method Dispatch) — issues #11–#13
-- **Epic 005** (Typechecker Integration) — issue #14
+- **Epic 002** (Evaluator) — complete
+- **Epic 003** (Generics and Monomorphization) — issues #5–#10 → v0.2
+- **Epic 004** (Traits and Method Dispatch) — issues #11–#13 → v0.2
+- **Epic 005** (Typechecker Integration) — issue #14 → v0.2
+
+See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the versioning model.
 
 ## Error Handling
 

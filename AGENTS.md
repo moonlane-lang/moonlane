@@ -2,7 +2,7 @@
 
 ## Project
 
-Yoloscript is a statically-typed, expression-oriented scripting language. This repository contains its interpreter (Phase 01 PoC). Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `backlog/` (to be reorganised into `docs/` — see issue #19).
+Yoloscript is a statically-typed, expression-oriented language. This repository contains its tree-walk interpreter. Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `docs/`. The versioning model (language versions, RFC lifecycle, doc conventions) is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
 
 ---
 
@@ -17,7 +17,7 @@ Yoloscript is a statically-typed, expression-oriented scripting language. This r
 | `backlog/decisions/` | **Decision records** — why a non-obvious choice was made |
 | GitHub Projects v2 | **Task board** — canonical status view (https://github.com/users/Vladastos/projects/1) |
 | GitHub Issues | **Tasks** — unit of work; use `gh issue list` for CLI access |
-| GitHub Milestones | **Milestones** — Epic 001–005 and Phase 01–03 |
+| GitHub Milestones | **Version milestones** (`v0.2`, `v0.3`, …) and **Epic milestones** (implementation groupings) |
 
 ---
 
@@ -75,8 +75,8 @@ Sprints are the unit of shipping. All sprint work must live on a dedicated branc
 
 1. **Read the full issue** including all acceptance criteria: `gh issue view <number>`
 2. **Check the spec** — read every spec section the task touches. Identify anything ambiguous or missing.
-   - If a spec gap exists: **STOP**. Fix the spec first (`backlog/docs/doc-2`). If the fix requires a non-obvious decision, write a decision record first.
-3. **Check existing decisions** — `grep` or `ls` in `backlog/decisions/` for any ADR that governs the area being changed. Read it before writing any code.
+   - If a spec gap exists: **STOP**. Fix the spec first (`docs/public/spec.md`). If the fix requires a non-obvious decision, write a decision record first.
+3. **Check existing decisions** — `grep` or `ls` in `docs/internal/decisions/` for any ADR that governs the area being changed. Read it before writing any code.
 4. **Check dependencies** — verify every linked issue is closed and its implementation matches what this task expects.
 5. **If no clear path forward exists** — STOP. Ask for guidance before beginning implementation. Do not make a significant architectural decision unilaterally.
 6. **Mark in-progress**: `gh issue edit <number> --add-label "status:in-progress"` and set the project Status field to **In Progress**
@@ -94,7 +94,7 @@ Sprints are the unit of shipping. All sprint work must live on a dedicated branc
 2. All tests must pass, including tests from earlier tasks.
 3. If any non-obvious decisions were made during implementation → create a decision record.
 4. If the implementation revealed spec gaps that you fixed → verify the spec edit is committed.
-5. If a spec section is now interpreter-validated, tag it: `> ✓ Interpreter-validated (v0.1)`
+5. If a spec section is now interpreter-validated, tag it: `> ✓ Interpreter-validated (vX.Y)` where X.Y is the current interpreter version.
 6. **Close the issue**: `gh issue close <number>` (or include `Closes #<number>` in the commit body to auto-close on push). The project Status field updates to **Done** automatically, and the `status:in-progress` label is removed by CI.
 
 ### Opening a new issue
@@ -102,8 +102,8 @@ Sprints are the unit of shipping. All sprint work must live on a dedicated branc
 ```bash
 gh issue create \
   --title "Brief imperative title" \
-  --label "evaluator" \
-  --milestone "Epic 002 - Evaluator" \
+  --label "generics" \
+  --milestone "v0.2" \
   --body "## Description\n...\n\n## Acceptance Criteria\n- [ ] ..."
 ```
 
@@ -166,7 +166,7 @@ When you stop, explain clearly: what you found, what the options are, and what y
 
 ## Decision Records
 
-Create a decision record (a new `.md` file in `backlog/decisions/`, following the naming and format of existing records) when:
+Create a decision record (a new `.md` file in `docs/internal/decisions/`, following the naming and format of existing records) when:
 
 - Multiple reasonable implementation options existed and the choice was non-trivial.
 - The rationale will matter when revisiting this area later.
@@ -226,6 +226,25 @@ Do not infer types in Pass 2. Do not build TypedAST nodes in Pass 1. If you find
 - A change requires touching both `mod.rs` files simultaneously — this is a sign the boundary between passes is being violated.
 - You cannot find an existing pattern (in `instantiate_scheme_for_call`, `construct_expr`, etc.) that covers the new case — ask before inventing.
 - A test that was passing begins failing after a substitution composition change — the ordering bug may affect other cases not covered by tests.
+
+---
+
+## RFC Workflow
+
+RFCs are design proposals for language changes. The full lifecycle is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
+
+### When to read an RFC
+
+Before implementing any feature that has an associated RFC, read it. If the RFC `status` is `accepted`, implementation may proceed against its `## Proposal`. If `status` is `under-review` or `draft`, **stop** — the design is not settled; ask before implementing.
+
+### During implementation of an accepted RFC
+
+- Treat the RFC's `## Proposal` section as specification — the same discipline applies as with `docs/public/spec.md`.
+- Any deviation from the proposal requires updating the RFC and writing a decision record explaining why.
+
+### After the target version ships
+
+Set `status: incorporated` in the RFC frontmatter.
 
 ---
 
