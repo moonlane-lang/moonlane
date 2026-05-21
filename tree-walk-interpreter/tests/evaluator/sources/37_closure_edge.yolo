@@ -12,24 +12,24 @@ fun main() {
     // Each call to the closure advances the same captured counter.
     let next = make_counter(0);
     let r1 = next();
-    let _ok1 = match (r1 == 1) { true => 0, };
+    let _ok1 = match (r1 == 1) { true => 0, _ => 0 / 0, };
     let r2 = next();
-    let _ok2 = match (r2 == 2) { true => 0, };
+    let _ok2 = match (r2 == 2) { true => 0, _ => 0 / 0, };
     // Two independent counters do not share state.
     let a = make_counter(10);
     let b = make_counter(10);
-    let _ok3 = match (a() == 11) { true => 0, };
-    let _ok4 = match (a() == 12) { true => 0, };
-    let _ok5 = match (b() == 11) { true => 0, };
+    let _ok3 = match (a() == 11) { true => 0, _ => 0 / 0, };
+    let _ok4 = match (a() == 12) { true => 0, _ => 0 / 0, };
+    let _ok5 = match (b() == 11) { true => 0, _ => 0 / 0, };
     // Closure capturing two variables.
     let in_range = make_between(1, 10);
-    let _ok6 = match (in_range(5))  { true => 0, };
-    let _ok7 = match (in_range(1))  { true => 0, };
-    let _ok8 = match (in_range(10)) { true => 0, };
+    let _ok6 = match (in_range(5))  { true => 0, _ => 0 / 0, };
+    let _ok7 = match (in_range(1))  { true => 0, _ => 0 / 0, };
+    let _ok8 = match (in_range(10)) { true => 0, _ => 0 / 0, };
     let out = in_range(11);
-    let _ok9 = match (out == false) { true => 0, };
+    let _ok9 = match (out == false) { true => 0, _ => 0 / 0, };
     // Inline closure passed directly without binding.
     let results = [1, 2, 3];
     let sum_fn = fun(a: Int, b: Int) -> Int { a + b };
-    let _ok10 = match (sum_fn(results[0], results[2]) == 4) { true => 0, };
+    let _ok10 = match (sum_fn(results[0], results[2]) == 4) { true => 0, _ => 0 / 0, };
 }

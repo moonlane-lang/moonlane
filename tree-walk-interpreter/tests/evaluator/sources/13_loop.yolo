@@ -1,7 +1,7 @@
 fun main() {
     // Break with a value.
     let x = loop { break 42; };
-    let _ok1 = match (x == 42) { true => 0, };
+    let _ok1 = match (x == 42) { true => 0, _ => 0 / 0, };
     // Continue skips the current iteration.
     mut count = 0;
     mut i = 0;
@@ -11,7 +11,7 @@ fun main() {
         if (i == 3) { continue; }
         count = count + 1;
     }
-    let _ok2 = match (count == 4) { true => 0, };
+    let _ok2 = match (count == 4) { true => 0, _ => 0 / 0, };
     // Assignments inside the loop are visible in subsequent iterations.
     mut acc = 0;
     mut j = 1;
@@ -20,5 +20,5 @@ fun main() {
         acc += j;
         j += 1;
     }
-    let _ok3 = match (acc == 15) { true => 0, };
+    let _ok3 = match (acc == 15) { true => 0, _ => 0 / 0, };
 }

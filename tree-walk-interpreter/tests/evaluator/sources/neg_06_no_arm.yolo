@@ -1,4 +1,4 @@
-// RUNTIME_ERROR[no arm matched]
+// TYPECHECK_ERROR[exhaustive]
 enum Coin { Heads, Tails }
 fun main() {
     let c = Coin::Tails;

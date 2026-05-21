@@ -2,29 +2,29 @@ fun main() {
     // Basic exclusive range.
     mut sum = 0;
     for (let i in 1..5) { sum += i; }
-    let _ok1 = match (sum == 10) { true => 0, };
+    let _ok1 = match (sum == 10) { true => 0, _ => 0 / 0, };
     // Basic inclusive range.
     mut sum2 = 0;
     for (let i in 1..=4) { sum2 += i; }
-    let _ok2 = match (sum2 == 10) { true => 0, };
+    let _ok2 = match (sum2 == 10) { true => 0, _ => 0 / 0, };
     // Empty exclusive range (start == end).
     mut c1 = 0;
     for (let _i in 0..0) { c1 += 1; }
-    let _ok3 = match (c1 == 0) { true => 0, };
+    let _ok3 = match (c1 == 0) { true => 0, _ => 0 / 0, };
     // Reverse range produces no iterations.
     mut c2 = 0;
     for (let _i in 5..1) { c2 += 1; }
-    let _ok4 = match (c2 == 0) { true => 0, };
+    let _ok4 = match (c2 == 0) { true => 0, _ => 0 / 0, };
     // Single-element exclusive range.
     mut single = 0;
     for (let i in 7..8) { single += i; }
-    let _ok5 = match (single == 7) { true => 0, };
+    let _ok5 = match (single == 7) { true => 0, _ => 0 / 0, };
     // Single-element inclusive range.
     mut single2 = 0;
     for (let i in 5..=5) { single2 += i; }
-    let _ok6 = match (single2 == 5) { true => 0, };
+    let _ok6 = match (single2 == 5) { true => 0, _ => 0 / 0, };
     // Inclusive empty (start > end).
     mut c3 = 0;
     for (let _i in 5..=4) { c3 += 1; }
-    let _ok7 = match (c3 == 0) { true => 0, };
+    let _ok7 = match (c3 == 0) { true => 0, _ => 0 / 0, };
 }

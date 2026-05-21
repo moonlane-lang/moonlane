@@ -2,25 +2,25 @@ fun main() {
     // Plain assignment overwrites.
     mut x = 1;
     x = 99;
-    let _ok1 = match (x == 99) { true => 0, };
+    let _ok1 = match (x == 99) { true => 0, _ => 0 / 0, };
     // Compound integer operators.
     mut n = 20;
     n -= 5;
-    let _ok2 = match (n == 15) { true => 0, };
+    let _ok2 = match (n == 15) { true => 0, _ => 0 / 0, };
     n *= 2;
-    let _ok3 = match (n == 30) { true => 0, };
+    let _ok3 = match (n == 30) { true => 0, _ => 0 / 0, };
     n /= 3;
-    let _ok4 = match (n == 10) { true => 0, };
+    let _ok4 = match (n == 10) { true => 0, _ => 0 / 0, };
     n %= 3;
-    let _ok5 = match (n == 1)  { true => 0, };
+    let _ok5 = match (n == 1)  { true => 0, _ => 0 / 0, };
     // Compound float operators.
     mut f = 10.0;
     f += 5.0;
-    let _ok6 = match (f == 15.0) { true => 0, };
+    let _ok6 = match (f == 15.0) { true => 0, _ => 0 / 0, };
     f -= 3.0;
-    let _ok7 = match (f == 12.0) { true => 0, };
+    let _ok7 = match (f == 12.0) { true => 0, _ => 0 / 0, };
     f *= 2.0;
-    let _ok8 = match (f == 24.0) { true => 0, };
+    let _ok8 = match (f == 24.0) { true => 0, _ => 0 / 0, };
     f /= 4.0;
-    let _ok9 = match (f == 6.0)  { true => 0, };
+    let _ok9 = match (f == 6.0)  { true => 0, _ => 0 / 0, };
 }

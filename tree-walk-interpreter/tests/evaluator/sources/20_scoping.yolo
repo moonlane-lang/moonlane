@@ -2,6 +2,6 @@ fun main() {
     // Inner binding shadows outer; outer is unchanged after the if.
     let x = 1;
     let inner_x = if (true) { let x = 99; x } else { 0 };
-    let _ok1 = match (inner_x == 99) { true => 0, };
-    let _ok2 = match (x == 1)        { true => 0, };
+    let _ok1 = match (inner_x == 99) { true => 0, _ => 0 / 0, };
+    let _ok2 = match (x == 1)        { true => 0, _ => 0 / 0, };
 }

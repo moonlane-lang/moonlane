@@ -1,25 +1,25 @@
 fun main() {
     // Break inside an if with no else evaluates to the break value.
     let r1 = loop { if (true) { break 42; } };
-    let _ok1 = match (r1 == 42) { true => 0, };
+    let _ok1 = match (r1 == 42) { true => 0, _ => 0 / 0, };
     // Break inside if-else: the taken branch determines the value.
     let r2 = loop { if (true) { break 42; } else { break 0; } };
-    let _ok2 = match (r2 == 42) { true => 0, };
+    let _ok2 = match (r2 == 42) { true => 0, _ => 0 / 0, };
     let r3 = loop { if (false) { break 42; } else { break 0; } };
-    let _ok3 = match (r3 == 0) { true => 0, };
+    let _ok3 = match (r3 == 0) { true => 0, _ => 0 / 0, };
     // Result is typed Int, not Never — arithmetic on it must work.
     let x = loop { if (true) { break 42; } };
     let r4 = x + 1;
-    let _ok4 = match (r4 == 43) { true => 0, };
+    let _ok4 = match (r4 == 43) { true => 0, _ => 0 / 0, };
     // Break inside the inner loop does not escape the outer loop.
     let r5 = loop {
         loop { break; }
         break 99;
     };
-    let _ok5 = match (r5 == 99) { true => 0, };
+    let _ok5 = match (r5 == 99) { true => 0, _ => 0 / 0, };
     // Condition evaluated at runtime (not constant-folded).
     mut flag = false;
     flag = true;
     let r6 = loop { if (flag) { break 7; } };
-    let _ok6 = match (r6 == 7) { true => 0, };
+    let _ok6 = match (r6 == 7) { true => 0, _ => 0 / 0, };
 }

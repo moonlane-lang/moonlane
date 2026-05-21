@@ -6,7 +6,7 @@ fun main() {
         outer_ran = 1;
         break;
     }
-    let _ok1 = match (outer_ran == 1) { true => 0, };
+    let _ok1 = match (outer_ran == 1) { true => 0, _ => 0 / 0, };
     // Each outer iteration starts with a fresh inner scope.
     mut total = 0;
     mut k = 0;
@@ -20,7 +20,7 @@ fun main() {
         }
         total += j;
     }
-    let _ok2 = match (total == 6) { true => 0, };
+    let _ok2 = match (total == 6) { true => 0, _ => 0 / 0, };
     // Return propagates through nested loops — must be the last statement.
     loop {
         loop { return; }

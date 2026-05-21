@@ -1832,6 +1832,7 @@ fn construct_match(m: &MatchExpr, ctx: &mut ConstructCtx) -> Result<TypedExpr, Y
         ctx.pop_scope();
         let _ = arm_ty;
     }
+    check_match_exhaustiveness(&typed_arms, &scrutinee_ty, ctx.enum_env, &m.span)?;
     let expr_type = typed_arms.first()
         .map(|a| a.body.ty().clone())
         .unwrap_or(Type::Unit);
@@ -1841,6 +1842,80 @@ fn construct_match(m: &MatchExpr, ctx: &mut ConstructCtx) -> Result<TypedExpr, Y
         expr_type,
         span: m.span.clone(),
     }))
+}
+
+fn check_match_exhaustiveness(
+    arms: &[TypedMatchArm],
+    scrutinee_ty: &Type,
+    enum_env: &HashMap<String, EnumInfo>,
+    span: &Span,
+) -> Result<(), YoloscriptError> {
+    // An unguarded wildcard or bare binding catches everything.
+    if arms.iter().any(|a| a.guard.is_none() && is_catch_all_pattern(&a.pattern)) {
+        return Ok(());
+    }
+    let exhaustive = match scrutinee_ty {
+        Type::Bool => {
+            let has_true  = arms.iter().any(|a| a.guard.is_none() && is_bool_literal_pattern(&a.pattern, true));
+            let has_false = arms.iter().any(|a| a.guard.is_none() && is_bool_literal_pattern(&a.pattern, false));
+            has_true && has_false
+        }
+        Type::Perhaps(_) => {
+            let has_some = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "Some"));
+            let has_nope = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "Nope"));
+            has_some && has_nope
+        }
+        Type::Result(_, _) => {
+            let has_ok  = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Result", "Ok"));
+            let has_err = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Result", "Err"));
+            has_ok && has_err
+        }
+        Type::Named(name, _) => {
+            if let Some(enum_info) = enum_env.get(name.as_str()) {
+                enum_info.variants.iter().all(|v| {
+                    arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, name, &v.name))
+                })
+            } else {
+                false
+            }
+        }
+        // Int, Float, Str, Tuple, Array, Fun — value-infinite; only a catch-all suffices.
+        _ => false,
+    };
+    if !exhaustive {
+        return Err(YoloscriptError::type_error(
+            ErrorCode::E0003,
+            "non-exhaustive match: not all cases are covered".to_string(),
+            span,
+        ));
+    }
+    Ok(())
+}
+
+fn is_catch_all_pattern(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::Wildcard(_) | Pattern::Binding(_, _) => true,
+        // A tuple pattern is irrefutable when every element is also irrefutable.
+        Pattern::Tuple(pats, _) => pats.iter().all(is_catch_all_pattern),
+        _ => false,
+    }
+}
+
+fn is_bool_literal_pattern(pattern: &Pattern, expected: bool) -> bool {
+    matches!(pattern, Pattern::Literal(Literal::Bool(b), _) if *b == expected)
+}
+
+/// Returns true if `pattern` (unguarded) covers variant `variant_name` of enum `enum_name`.
+fn pattern_covers_variant(pattern: &Pattern, enum_name: &str, variant_name: &str) -> bool {
+    match pattern {
+        // `nope` covers the "Nope" variant of "Perhaps".
+        Pattern::Nope(_) => enum_name == "Perhaps" && variant_name == "Nope",
+        Pattern::EnumVariant { path, .. } => {
+            path.first().map(String::as_str) == Some(enum_name)
+                && path.get(1).map(String::as_str) == Some(variant_name)
+        }
+        _ => false,
+    }
 }
 
 fn construct_pattern_bindings(

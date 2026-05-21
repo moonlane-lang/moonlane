@@ -16,11 +16,13 @@ fun main() {
     // ? on Ok: unwraps, continues, returns Ok(6).
     let r1 = try_div(10, 2);
     let _ok1 = match r1 {
-        Result::Ok { value } => match (value == 6) { true => 0, },
+        Result::Ok  { value } => match (value == 6) { true => 0, _ => 0 / 0, },
+        Result::Err { error } => 0 / 0,
     };
     // ? on Err: propagates, try_div returns Err(-1).
     let r2 = try_div(10, 0);
     let _ok2 = match r2 {
-        Result::Err { error } => match (error == -1) { true => 0, },
+        Result::Ok  { value } => 0 / 0,
+        Result::Err { error } => match (error == -1) { true => 0, _ => 0 / 0, },
     };
 }

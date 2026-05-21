@@ -245,4 +245,7 @@ mod tests {
 
     #[test]
     fn neg_missing_field() { check("neg_12_missing_field.yolo"); }
+
+    #[test]
+    fn neg_nonexhaustive_match() { check("neg_13_nonexhaustive_match.yolo"); }
 }

@@ -3,33 +3,33 @@ fun main() {
     let arr = [10, 20, 30];
     mut sum = 0;
     for (let x in arr) { sum += x; }
-    let _ok1 = match (sum == 60) { true => 0, };
+    let _ok1 = match (sum == 60) { true => 0, _ => 0 / 0, };
     // Exclusive range.
     mut sum2 = 0;
     for (let i in 0..5) { sum2 += i; }
-    let _ok2 = match (sum2 == 10) { true => 0, };
+    let _ok2 = match (sum2 == 10) { true => 0, _ => 0 / 0, };
     // Inclusive range.
     mut sum3 = 0;
     for (let i in 1..=4) { sum3 += i; }
-    let _ok3 = match (sum3 == 10) { true => 0, };
+    let _ok3 = match (sum3 == 10) { true => 0, _ => 0 / 0, };
     // Break stops early.
     mut sum4 = 0;
     for (let x in [1, 2, 3, 4, 5]) {
         if (x == 3) { break; }
         sum4 += x;
     }
-    let _ok4 = match (sum4 == 3) { true => 0, };
+    let _ok4 = match (sum4 == 3) { true => 0, _ => 0 / 0, };
     // Continue skips the current element.
     mut sum5 = 0;
     for (let x in [1, 2, 3, 4, 5]) {
         if (x == 3) { continue; }
         sum5 += x;
     }
-    let _ok5 = match (sum5 == 12) { true => 0, };
+    let _ok5 = match (sum5 == 12) { true => 0, _ => 0 / 0, };
     // Binding does not leak into the outer scope.
     let x = 42;
     mut inner = 0;
     for (let x in [1, 2, 3]) { inner += x; }
-    let _ok6 = match (inner == 6)  { true => 0, };
-    let _ok7 = match (x   == 42)   { true => 0, };
+    let _ok6 = match (inner == 6)  { true => 0, _ => 0 / 0, };
+    let _ok7 = match (x   == 42)   { true => 0, _ => 0 / 0, };
 }

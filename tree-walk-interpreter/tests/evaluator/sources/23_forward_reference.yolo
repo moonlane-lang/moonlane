@@ -1,6 +1,6 @@
 fun main() {
     // main() is defined before helper(), but hoisting makes it available.
     let x = 1 + 1;
-    let _ok = match (x == 2) { true => 0, };
+    let _ok = match (x == 2) { true => 0, _ => 0 / 0, };
 }
 fun helper() { }

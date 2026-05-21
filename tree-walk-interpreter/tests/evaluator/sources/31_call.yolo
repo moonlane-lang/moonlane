@@ -9,16 +9,16 @@ fun identity(x: Int) -> Int {
 }
 fun main() {
     let r1 = add(3, 4);
-    let _ok1 = match (r1 == 7) { true => 0, };
+    let _ok1 = match (r1 == 7) { true => 0, _ => 0 / 0, };
     let r2 = square(5);
-    let _ok2 = match (r2 == 25) { true => 0, };
+    let _ok2 = match (r2 == 25) { true => 0, _ => 0 / 0, };
     // Nested calls.
     let r3 = add(square(3), square(4));
-    let _ok3 = match (r3 == 25) { true => 0, };
+    let _ok3 = match (r3 == 25) { true => 0, _ => 0 / 0, };
     // Identity.
     let r4 = identity(42);
-    let _ok4 = match (r4 == 42) { true => 0, };
+    let _ok4 = match (r4 == 42) { true => 0, _ => 0 / 0, };
     // Calling a builtin from another function.
     let r5 = add(0, 0);
-    let _ok5 = match (r5 == 0) { true => 0, };
+    let _ok5 = match (r5 == 0) { true => 0, _ => 0 / 0, };
 }

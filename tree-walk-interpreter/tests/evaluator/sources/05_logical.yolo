@@ -1,14 +1,14 @@
 fun main() {
     // Truth table.
-    let _ok1 = match (true  && true)  { true  => 0, };
-    let _ok2 = match (true  && false) { false => 0, };
-    let _ok3 = match (false && true)  { false => 0, };
-    let _ok4 = match (true  || false) { true  => 0, };
-    let _ok5 = match (false || false) { false => 0, };
-    let _ok6 = match (false || true)  { true  => 0, };
+    let _ok1 = match (true  && true)  { true => 0, _ => 0 / 0, };
+    let _ok2 = match (true  && false) { false => 0, _ => 0 / 0, };
+    let _ok3 = match (false && true)  { false => 0, _ => 0 / 0, };
+    let _ok4 = match (true  || false) { true => 0, _ => 0 / 0, };
+    let _ok5 = match (false || false) { false => 0, _ => 0 / 0, };
+    let _ok6 = match (false || true)  { true => 0, _ => 0 / 0, };
     // Short-circuit: RHS is skipped when the result is already determined.
     let sc_and = false && (1 / 0 == 0);
-    let _ok7 = match sc_and { false => 0, };
+    let _ok7 = match sc_and { false => 0, _ => 0 / 0, };
     let sc_or = true || (1 / 0 == 0);
-    let _ok8 = match sc_or { true => 0, };
+    let _ok8 = match sc_or { true => 0, _ => 0 / 0, };
 }
