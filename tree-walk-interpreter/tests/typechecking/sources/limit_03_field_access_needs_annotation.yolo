@@ -1,0 +1,18 @@
+// Limitation: field access requires the receiver's type to be concrete at the
+// point of access (eager partial solve).
+//
+// The inference engine calls ctx.solve() eagerly when it encounters a field
+// access to determine the struct name for field lookup. If the receiver is an
+// unannotated parameter, no constraints have been emitted yet and the type
+// remains an unresolved variable — causing E0002. Adding a type annotation
+// (e.g. `p: Point`) makes the type concrete at the use site.
+//
+// The same applies to method calls and tuple index access.
+//
+// See: typechecker.md § "Pass 1 — Eager Partial Solves"
+
+struct Point { x: Int, y: Int }
+
+fun get_x(p) {
+    p.x  // ERROR[E0002]
+}

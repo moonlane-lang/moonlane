@@ -956,3 +956,129 @@ mod phase_7_infer_context {
         assert!(!scheme.quantified_vars.contains(&TypeVar(0)));
     }
 }
+
+#[cfg(test)]
+mod phase_8_known_limitations {
+    use yoloscript::ast::Span;
+    use yoloscript::typeinference::{
+        instantiate, solve_constraints, Constraint, InferType, TypeScheme, TypeVar, TypeVarGenerator,
+    };
+
+    fn span() -> Span {
+        Span::new(0, 1, "test")
+    }
+
+    /// Rank-1 limitation: a function parameter is a monotype.
+    ///
+    /// When `f` (a function arg with no annotation) is called at two different
+    /// concrete types within the same function body, the constraint solver sees
+    /// a conflict. This is the rank-1 restriction: `∀` only at the outermost
+    /// level, never in function argument position.
+    ///
+    /// See: typechecker.md § "Rank-1 Limitation"
+    #[test]
+    fn test_rank1_fn_arg_monotype_conflicts() {
+        // fun apply_both(f, x: Int, y: Bool) { f(x); f(y) }
+        //   f(x) emits: ?t0 = fun(Int) -> ?t1
+        //   f(y) emits: ?t0 = fun(Bool) -> ?t2
+        // After binding ?t0 = fun(Int) -> ?t1, the second constraint becomes
+        // fun(Int) -> ?t1 = fun(Bool) -> ?t2 → Int ≠ Bool → error
+        let cs = vec![
+            Constraint::new(
+                InferType::var(TypeVar(0)),
+                InferType::Fun(vec![InferType::int()], Box::new(InferType::var(TypeVar(1)))),
+                span(),
+            ),
+            Constraint::new(
+                InferType::var(TypeVar(0)),
+                InferType::Fun(vec![InferType::bool()], Box::new(InferType::var(TypeVar(2)))),
+                span(),
+            ),
+        ];
+        assert!(solve_constraints(cs).is_err());
+    }
+
+    /// Let-bound closures are NOT generalized into type schemes.
+    ///
+    /// `let id = fun(x) { x }` binds `id` as a monomorphic InferType::Fun.
+    /// Its type variable is unified at the first call site and cannot change.
+    /// A second call at a different type produces the same constraint conflict
+    /// as the rank-1 case above — the root cause is identical: no `∀` was
+    /// introduced so the type variable is shared across all uses.
+    ///
+    /// See: typechecker.md § "Extension Points — Epic 003 — let_polymorphism"
+    #[test]
+    fn test_let_closure_monomorphic_conflicts_at_two_types() {
+        // let identity = fun(x) { x }  →  identity : Fun([?t0], ?t0)
+        // identity(42)   emits: Fun([?t0], ?t0) = Fun([Int], ?t1)  → ?t0 = Int
+        // identity(true) emits: Fun([?t0], ?t0) = Fun([Bool], ?t2) → Int ≠ Bool → error
+        let cs = vec![
+            Constraint::new(
+                InferType::Fun(vec![InferType::var(TypeVar(0))], Box::new(InferType::var(TypeVar(0)))),
+                InferType::Fun(vec![InferType::int()], Box::new(InferType::var(TypeVar(1)))),
+                span(),
+            ),
+            Constraint::new(
+                InferType::Fun(vec![InferType::var(TypeVar(0))], Box::new(InferType::var(TypeVar(0)))),
+                InferType::Fun(vec![InferType::bool()], Box::new(InferType::var(TypeVar(2)))),
+                span(),
+            ),
+        ];
+        assert!(solve_constraints(cs).is_err());
+    }
+
+    /// Contrast: a properly generalized scheme CAN be used at two types.
+    ///
+    /// This is what `fun id(x) { x }` (top-level declaration) produces today,
+    /// and what `let id = fun(x) { x }` would produce once let-polymorphism
+    /// is fully implemented. The scheme ∀?t0. fun(?t0) -> ?t0 is instantiated
+    /// with fresh variables at each use site so the two calls are independent.
+    #[test]
+    fn test_poly_scheme_succeeds_at_two_types() {
+        // ∀?t0. fun(?t0) -> ?t0, instantiated twice with fresh variables
+        let scheme = TypeScheme {
+            quantified_vars: vec![TypeVar(0)],
+            ty: InferType::Fun(
+                vec![InferType::var(TypeVar(0))],
+                Box::new(InferType::var(TypeVar(0))),
+            ),
+        };
+        let mut var_gen = TypeVarGenerator::new();
+        var_gen.fresh(); // burn TypeVar(0) — already used in the scheme
+
+        let inst1 = instantiate(&scheme, &mut var_gen); // fun(?t1) -> ?t1
+        let inst2 = instantiate(&scheme, &mut var_gen); // fun(?t2) -> ?t2
+        let ret1 = InferType::Var(var_gen.fresh());     // ?t3
+        let ret2 = InferType::Var(var_gen.fresh());     // ?t4
+
+        let cs = vec![
+            Constraint::new(inst1, InferType::Fun(vec![InferType::int()],  Box::new(ret1)), span()),
+            Constraint::new(inst2, InferType::Fun(vec![InferType::bool()], Box::new(ret2)), span()),
+        ];
+        assert!(solve_constraints(cs).is_ok(), "generalized scheme can be instantiated independently at Int and Bool");
+    }
+
+    /// Eager partial solve limitation: field access requires the receiver type
+    /// to be concrete before any later constraints are processed.
+    ///
+    /// This is demonstrated at the full pipeline level in
+    /// limit_03_field_access_needs_annotation.yolo. At the constraint level,
+    /// the limitation manifests as: if a type variable stands for the receiver,
+    /// `named_type_name` returns None and inference fails immediately (not via
+    /// the constraint solver), so there is nothing to assert here about
+    /// constraint soundness — the error is structural, not a solver conflict.
+    ///
+    /// See: typechecker.md § "Pass 1 — Eager Partial Solves"
+    #[test]
+    fn test_eager_partial_solve_var_has_no_named_type() {
+        // Applying ctx.solve() to an unbound type variable leaves it as a Var.
+        // named_type_name on a Var returns None — field lookup cannot proceed.
+        use yoloscript::typeinference::Substitution;
+
+        let s = Substitution::new();
+        let unresolved = s.apply(&InferType::var(TypeVar(0)));
+        // An unresolved variable has no concrete struct name — this is what
+        // triggers E0002 "cannot infer struct type for field access".
+        assert!(matches!(unresolved, InferType::Var(_)));
+    }
+}

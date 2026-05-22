@@ -1,0 +1,16 @@
+// Limitation: let-bound closures are not generalized into type schemes.
+//
+// Top-level `fun` declarations are generalized (∀α. fun(α) -> α), so each call
+// site gets a fresh instantiation and the same function can be used at multiple
+// types. `let id = fun(x) { x }` binds `id` as a monomorphic InferType instead:
+// the first call site unifies the type variable to a concrete type, locking it
+// permanently for all subsequent uses.
+//
+// See: typechecker.md § "Extension Points — Epic 003 — let_polymorphism (#10)"
+//
+// To get polymorphic behaviour, use a top-level `fun` declaration.
+
+let identity = fun(x) { x };
+
+let a = identity(42);
+let b = identity(true);  // ERROR[E0001]

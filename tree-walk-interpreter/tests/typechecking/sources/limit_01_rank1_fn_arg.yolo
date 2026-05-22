@@ -1,0 +1,13 @@
+// Limitation: rank-1 polymorphism — function parameters are monotypes.
+//
+// The HM algorithm infers types at rank 1: ∀ quantifiers appear only at the
+// outermost level. A function argument `f` cannot itself be polymorphic within
+// the caller: it is unified to a single concrete function type at the first
+// call site and cannot be applied to a different argument type in the same body.
+//
+// See: typechecker.md § "Rank-1 Limitation"
+
+fun apply_both(f, x: Int, y: Bool) {
+    let a = f(x);
+    let b = f(y);  // ERROR[E0001]
+}

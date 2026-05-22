@@ -411,4 +411,21 @@ mod tests {
     fn stage6_neg_enum_field_type_mismatch() {
         check_file(&format!("{}/stage6_neg_09_enum_field_type_mismatch.yolo", test_dir()));
     }
+
+    // ── Known-limitation tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn limit_rank1_fn_arg() {
+        check_file(&format!("{}/limit_01_rank1_fn_arg.yolo", test_dir()));
+    }
+
+    #[test]
+    fn limit_let_closure_mono() {
+        check_file(&format!("{}/limit_02_let_closure_mono.yolo", test_dir()));
+    }
+
+    #[test]
+    fn limit_field_access_needs_annotation() {
+        check_file(&format!("{}/limit_03_field_access_needs_annotation.yolo", test_dir()));
+    }
 }
