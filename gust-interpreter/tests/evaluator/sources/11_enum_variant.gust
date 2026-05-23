@@ -4,14 +4,14 @@ fun main() {
     // Unit variant construction and match dispatch.
     let x = Direction::North;
     let r0 = match x { Direction::North => 0, Direction::South => 1, Direction::East => 2, Direction::West => 3, };
-    let _ok0 = match (r0 == 0) { true => 0, _ => 0 / 0, };
+    assert(r0 == 0);
     // All variants round-trip correctly.
     let rn = match Direction::North { Direction::North => 0, Direction::South => 1, Direction::East => 2, Direction::West => 3, };
     let rs = match Direction::South { Direction::North => 0, Direction::South => 1, Direction::East => 2, Direction::West => 3, };
     let re = match Direction::East  { Direction::North => 0, Direction::South => 1, Direction::East => 2, Direction::West => 3, };
     let rw = match Direction::West  { Direction::North => 0, Direction::South => 1, Direction::East => 2, Direction::West => 3, };
-    let _ok1 = match (rn == 0) { true => 0, _ => 0 / 0, };
-    let _ok2 = match (rs == 1) { true => 0, _ => 0 / 0, };
-    let _ok3 = match (re == 2) { true => 0, _ => 0 / 0, };
-    let _ok4 = match (rw == 3) { true => 0, _ => 0 / 0, };
+    assert(rn == 0);
+    assert(rs == 1);
+    assert(re == 2);
+    assert(rw == 3);
 }

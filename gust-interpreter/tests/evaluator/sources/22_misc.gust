@@ -2,14 +2,14 @@ let global = 42;
 
 fun main() {
     // Top-level let binding is in scope inside main.
-    let _ok1 = match (global == 42) { true => 0, _ => 0 / 0, };
+    assert(global == 42);
     // String equality and inequality.
-    let _ok2 = match ("abc" == "abc") { true => 0, _ => 0 / 0, };
-    let _ok3 = match ("abc" != "xyz") { true => 0, _ => 0 / 0, };
-    let _ok4 = match ("abc" == "xyz") { false => 0, _ => 0 / 0, };
+    assert("abc" == "abc");
+    assert("abc" != "xyz");
+    assert(!("abc" == "xyz"));
     // Bool equality and inequality.
-    let _ok5 = match (true  == true)  { true => 0, _ => 0 / 0, };
-    let _ok6 = match (false == false) { true => 0, _ => 0 / 0, };
-    let _ok7 = match (true  != false) { true => 0, _ => 0 / 0, };
-    let _ok8 = match (true  == false) { false => 0, _ => 0 / 0, };
+    assert(true  == true);
+    assert(false == false);
+    assert(true  != false);
+    assert(!(true  == false));
 }

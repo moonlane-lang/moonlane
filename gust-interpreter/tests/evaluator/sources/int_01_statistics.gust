@@ -223,166 +223,166 @@ fun main() {
     let raw: Float[] = [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0];
     let srt = sort_floats(raw);
     // Expected: [1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 9.0]
-    let _s1 = match (srt[0] == 1.0) { true => 0, _ => 0 / 0, };
-    let _s2 = match (srt[2] == 2.0) { true => 0, _ => 0 / 0, };
-    let _s3 = match (srt[3] == 3.0) { true => 0, _ => 0 / 0, };
-    let _s4 = match (srt[7] == 9.0) { true => 0, _ => 0 / 0, };
+    assert(srt[0] == 1.0);
+    assert(srt[2] == 2.0);
+    assert(srt[3] == 3.0);
+    assert(srt[7] == 9.0);
     // Sort is non-destructive: original is unchanged.
-    let _s5 = match (raw[0] == 3.0) { true => 0, _ => 0 / 0, };
+    assert(raw[0] == 3.0);
 
     // 2. Binary search in the sorted array.
     let fnd = binary_search(srt, 4.0);
-    let _b1 = match fnd {
-        Perhaps::Some { value } => match (value == 4) { true => 0, _ => 0 / 0, },
-        nope => 0 / 0,
+    match fnd {
+        Perhaps::Some { value } => assert(value == 4),
+        nope => assert_msg(false, "expected Some"),
     };
     let miss = binary_search(srt, 7.0);
-    let _b2 = match miss { Perhaps::Some { value } => 0 / 0, nope => 0, };
+    match miss { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
     // Searching an empty array returns nope.
     let empty_f: Float[] = [];
     let empty_srch = binary_search(empty_f, 1.0);
-    let _b3 = match empty_srch { Perhaps::Some { value } => 0 / 0, nope => 0, };
+    match empty_srch { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
 
     // 3. Descriptive statistics — match with blocks (RFC-0018).
     let d5: Float[] = [1.0, 2.0, 3.0, 4.0, 5.0];
     let r5 = compute_stats(d5);
     match r5 {
         Result::Ok { value } => {
-            let _c1 = match (value.count == 5)      { true => 0, _ => 0 / 0, };
-            let _c2 = match (value.sum == 15.0)     { true => 0, _ => 0 / 0, };
-            let _c3 = match (value.mean == 3.0)     { true => 0, _ => 0 / 0, };
-            let _c4 = match (value.variance == 2.0) { true => 0, _ => 0 / 0, };
-            let _c5 = match (value.min == 1.0)      { true => 0, _ => 0 / 0, };
-            let _c6 = match (value.max == 5.0)      { true => 0, _ => 0 / 0, };
-            let _c7 = match (value.range() == 4.0)  { true => 0, _ => 0 / 0, };
+            assert(value.count == 5);
+            assert(value.sum == 15.0);
+            assert(value.mean == 3.0);
+            assert(value.variance == 2.0);
+            assert(value.min == 1.0);
+            assert(value.max == 5.0);
+            assert(value.range() == 4.0);
             // std_dev ≈ sqrt(2) ≈ 1.4142
             let sd = value.std_dev();
-            let _c8 = match (sd > 1.41 && sd < 1.42) { true => 0, _ => 0 / 0, };
+            assert(sd > 1.41 && sd < 1.42);
         },
-        Result::Err { error } => { let _fail = 0 / 0; },
+        Result::Err { error } => assert_msg(false, "expected Ok"),
     };
 
     // 4. Error case: empty input returns Err (RFC-0019 constructs Err with
     //    the Stats type param inferred from the return annotation).
     let empty: Float[] = [];
     let rerr = compute_stats(empty);
-    let _e1 = match rerr {
-        Result::Ok  { value } => 0 / 0,
-        Result::Err { error } => match (string_len(error) > 0) { true => 0, _ => 0 / 0, },
+    match rerr {
+        Result::Ok  { value } => assert_msg(false, "expected Err"),
+        Result::Err { error } => assert(string_len(error) > 0),
     };
 
     // 5. Median — odd and even lengths, and empty.
     let med5 = median(d5);
-    let _m1 = match med5 {
-        Perhaps::Some { value } => match (value == 3.0) { true => 0, _ => 0 / 0, },
-        nope => 0 / 0,
+    match med5 {
+        Perhaps::Some { value } => assert(value == 3.0),
+        nope => assert_msg(false, "expected Some"),
     };
     let d4: Float[] = [4.0, 1.0, 3.0, 2.0];
     let med4 = median(d4);
-    let _m2 = match med4 {
-        Perhaps::Some { value } => match (value == 2.5) { true => 0, _ => 0 / 0, },
-        nope => 0 / 0,
+    match med4 {
+        Perhaps::Some { value } => assert(value == 2.5),
+        nope => assert_msg(false, "expected Some"),
     };
     let med_e = median(empty);
-    let _m3 = match med_e { Perhaps::Some { value } => 0 / 0, nope => 0, };
+    match med_e { Perhaps::Some { value } => assert_msg(false, "expected nope"), nope => (), };
 
     // 6. Error propagation with ?
     let zr = z_score(d5, 5.0);
     // z = (5.0 - 3.0) / sqrt(2.0) ≈ 1.414
     match zr {
         Result::Ok { value } => {
-            let _z1 = match (value > 1.4 && value < 1.5) { true => 0, _ => 0 / 0, };
+            assert(value > 1.4 && value < 1.5);
         },
-        Result::Err { error } => { let _fail = 0 / 0; },
+        Result::Err { error } => assert_msg(false, "expected Ok"),
     };
     // ? on empty array propagates Err.
     let zerr = z_score(empty, 0.0);
-    let _z2 = match zerr {
-        Result::Ok  { value } => 0 / 0,
-        Result::Err { error } => 0,
+    match zerr {
+        Result::Ok  { value } => assert_msg(false, "expected Err"),
+        Result::Err { error } => (),
     };
 
     // 7. Higher-order functions with closures.
     let d8: Float[] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
 
-    let _hof1 = match (sum_floats(d8) == 36.0) { true => 0, _ => 0 / 0, };
+    assert(sum_floats(d8) == 36.0);
 
     let above4 = count_if(d8, fun(x: Float) -> Bool { x > 4.0 });
-    let _hof2  = match (above4 == 4) { true => 0, _ => 0 / 0, };
+    assert(above4 == 4);
 
     let squares = map_floats(d8, fun(x: Float) -> Float { x * x });
-    let _hof3   = match (squares[0]  == 1.0)  { true => 0, _ => 0 / 0, };
-    let _hof4   = match (squares[3]  == 16.0) { true => 0, _ => 0 / 0, };
-    let _hof5   = match (squares[7]  == 64.0) { true => 0, _ => 0 / 0, };
+    assert(squares[0]  == 1.0);
+    assert(squares[3]  == 16.0);
+    assert(squares[7]  == 64.0);
 
     let big = filter_floats(d8, fun(x: Float) -> Bool { x > 5.0 });
-    let _hof6 = match (array_len(big) == 3) { true => 0, _ => 0 / 0, };
-    let _hof7 = match (big[0] == 6.0)       { true => 0, _ => 0 / 0, };
-    let _hof8 = match (big[2] == 8.0)       { true => 0, _ => 0 / 0, };
+    assert(array_len(big) == 3);
+    assert(big[0] == 6.0);
+    assert(big[2] == 8.0);
 
     // running_sums: [1, 3, 6, 10, 15, 21, 28, 36]
     let rsums = running_sums(d8);
-    let _hof9  = match (rsums[0] == 1.0)  { true => 0, _ => 0 / 0, };
-    let _hof10 = match (rsums[3] == 10.0) { true => 0, _ => 0 / 0, };
-    let _hof11 = match (rsums[7] == 36.0) { true => 0, _ => 0 / 0, };
+    assert(rsums[0] == 1.0);
+    assert(rsums[3] == 10.0);
+    assert(rsums[7] == 36.0);
 
     // 8. Composing higher-order functions: sum of squares.
     let sq_sum = sum_floats(map_floats(d5, fun(x: Float) -> Float { x * x }));
     // 1 + 4 + 9 + 16 + 25 = 55
-    let _hof12 = match (sq_sum == 55.0) { true => 0, _ => 0 / 0, };
+    assert(sq_sum == 55.0);
 
     // 9. Stats on a derived dataset (squares of 1..8).
     let sq_stats = compute_stats(squares);
     match sq_stats {
         Result::Ok { value } => {
             // [1, 4, 9, 16, 25, 36, 49, 64], sum = 204, mean = 25.5
-            let _sq1 = match (value.count == 8)   { true => 0, _ => 0 / 0, };
-            let _sq2 = match (value.sum == 204.0) { true => 0, _ => 0 / 0, };
-            let _sq3 = match (value.min == 1.0)   { true => 0, _ => 0 / 0, };
-            let _sq4 = match (value.max == 64.0)  { true => 0, _ => 0 / 0, };
-            let _sq5 = match (value.mean == 25.5) { true => 0, _ => 0 / 0, };
+            assert(value.count == 8);
+            assert(value.sum == 204.0);
+            assert(value.min == 1.0);
+            assert(value.max == 64.0);
+            assert(value.mean == 25.5);
         },
-        Result::Err { error } => { let _fail = 0 / 0; },
+        Result::Err { error } => assert_msg(false, "expected Ok"),
     };
 
     // 10. Tuple: capture (min, max) of the sorted array as a pair.
     let extremes: (Float, Float) = (srt[0], srt[7]);
-    let _t1 = match (extremes.0 == 1.0) { true => 0, _ => 0 / 0, };
-    let _t2 = match (extremes.1 == 9.0) { true => 0, _ => 0 / 0, };
+    assert(extremes.0 == 1.0);
+    assert(extremes.1 == 9.0);
 
     // 11. C-style for: build squares 1..5 and verify.
     let sq5 = squares_up_to(5);
-    let _cf1 = match (array_len(sq5) == 5) { true => 0, _ => 0 / 0, };
-    let _cf2 = match (sq5[0] == 1)          { true => 0, _ => 0 / 0, };
-    let _cf3 = match (sq5[4] == 25)         { true => 0, _ => 0 / 0, };
+    assert(array_len(sq5) == 5);
+    assert(sq5[0] == 1);
+    assert(sq5[4] == 25);
 
     // 12. Range for-in: sum 0..10 = 45.
     mut range_sum = 0;
     for (let i in 0..10) { range_sum += i; }
-    let _rf1 = match (range_sum == 45) { true => 0, _ => 0 / 0, };
+    assert(range_sum == 45);
 
     // 13. Closure capturing an outer variable.
     let threshold = 3.0;
     let above_threshold = count_if(d5, fun(x: Float) -> Bool { x > threshold });
-    let _cl1 = match (above_threshold == 2) { true => 0, _ => 0 / 0, };
+    assert(above_threshold == 2);
 
     // 14. Stats description as string (exercises to_str method).
     let desc = match compute_stats(d5) {
         Result::Ok  { value } => value.to_str(),
         Result::Err { error } => "error",
     };
-    let _str1 = match (string_len(desc) > 0) { true => 0, _ => 0 / 0, };
+    assert(string_len(desc) > 0);
 
     // 15. Single-element dataset: mean == value, variance == 0, range == 0.
     let single: Float[] = [42.0];
     let single_stats = compute_stats(single);
     match single_stats {
         Result::Ok { value } => {
-            let _ss1 = match (value.count == 1)   { true => 0, _ => 0 / 0, };
-            let _ss2 = match (value.mean == 42.0) { true => 0, _ => 0 / 0, };
-            let _ss3 = match (value.variance == 0.0) { true => 0, _ => 0 / 0, };
-            let _ss4 = match (value.range() == 0.0)  { true => 0, _ => 0 / 0, };
+            assert(value.count == 1);
+            assert(value.mean == 42.0);
+            assert(value.variance == 0.0);
+            assert(value.range() == 0.0);
         },
-        Result::Err { error } => { let _fail = 0 / 0; },
+        Result::Err { error } => assert_msg(false, "expected Ok"),
     };
 }

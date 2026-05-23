@@ -2,11 +2,11 @@ fun main() {
     // String.len() — built-in type method.
     let s = "hello";
     let n = s.len();
-    let _ok1 = match (n == 5) { true => 0, _ => 0 / 0, };
+    assert(n == 5);
     // Empty string.
     let empty = "";
-    let _ok2 = match (empty.len() == 0) { true => 0, _ => 0 / 0, };
+    assert(empty.len() == 0);
     // Unicode: len counts codepoints.
     let longer = "abcdef";
-    let _ok3 = match (longer.len() == 6) { true => 0, _ => 0 / 0, };
+    assert(longer.len() == 6);
 }

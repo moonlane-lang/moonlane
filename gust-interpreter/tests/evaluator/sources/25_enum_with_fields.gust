@@ -7,12 +7,12 @@ fun main() {
         Shape::Circle { radius } => radius,
         Shape::Rect   { w, h }   => w + h,
     };
-    let _ok1 = match (r == 5) { true => 0, _ => 0 / 0, };
+    assert(r == 5);
     // Second variant.
     let rect = Shape::Rect { w: 3, h: 4 };
     let area = match rect {
         Shape::Circle { radius } => radius,
         Shape::Rect   { w, h }   => w * h,
     };
-    let _ok2 = match (area == 12) { true => 0, _ => 0 / 0, };
+    assert(area == 12);
 }

@@ -2,16 +2,16 @@ fun main() {
     // Plain index assignment.
     mut arr = [10, 20, 30];
     arr[1] = 99;
-    let _ok1 = match (arr[0] == 10) { true => 0, _ => 0 / 0, };
-    let _ok2 = match (arr[1] == 99) { true => 0, _ => 0 / 0, };
-    let _ok3 = match (arr[2] == 30) { true => 0, _ => 0 / 0, };
+    assert(arr[0] == 10);
+    assert(arr[1] == 99);
+    assert(arr[2] == 30);
     // Compound index assignment operators.
     arr[0] += 5;
-    let _ok4 = match (arr[0] == 15) { true => 0, _ => 0 / 0, };
+    assert(arr[0] == 15);
     arr[2] *= 2;
-    let _ok5 = match (arr[2] == 60) { true => 0, _ => 0 / 0, };
+    assert(arr[2] == 60);
     // Assignment using a variable as the index.
     mut i = 1;
     arr[i] = 0;
-    let _ok6 = match (arr[1] == 0) { true => 0, _ => 0 / 0, };
+    assert(arr[1] == 0);
 }

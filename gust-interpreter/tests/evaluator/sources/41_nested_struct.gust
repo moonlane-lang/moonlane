@@ -19,27 +19,27 @@ fun main() {
     let br = Point { x: 5, y: 6 };
     let r = Rect { top_left: tl, bottom_right: br };
     // Nested field access: two levels deep.
-    let _ok1 = match (r.top_left.x     == 1) { true => 0, _ => 0 / 0, };
-    let _ok2 = match (r.top_left.y     == 2) { true => 0, _ => 0 / 0, };
-    let _ok3 = match (r.bottom_right.x == 5) { true => 0, _ => 0 / 0, };
-    let _ok4 = match (r.bottom_right.y == 6) { true => 0, _ => 0 / 0, };
+    assert(r.top_left.x     == 1);
+    assert(r.top_left.y     == 2);
+    assert(r.bottom_right.x == 5);
+    assert(r.bottom_right.y == 6);
     // Intermediate binding of a nested struct.
     let corner = r.top_left;
-    let _ok5 = match (corner.x == 1) { true => 0, _ => 0 / 0, };
+    assert(corner.x == 1);
     // Struct as function argument.
     let a = area(r);
-    let _ok6 = match (a == 16) { true => 0, _ => 0 / 0, };  // (5-1)*(6-2)=4*4=16
+    assert(a == 16);  // (5-1)*(6-2)=4*4=16
     // Struct returned from function.
     let r2 = translate_rect(r, 10, 20);
-    let _ok7 = match (r2.top_left.x     == 11) { true => 0, _ => 0 / 0, };
-    let _ok8 = match (r2.top_left.y     == 22) { true => 0, _ => 0 / 0, };
-    let _ok9 = match (r2.bottom_right.x == 15) { true => 0, _ => 0 / 0, };
+    assert(r2.top_left.x     == 11);
+    assert(r2.top_left.y     == 22);
+    assert(r2.bottom_right.x == 15);
     // Original rect is unchanged (value semantics).
-    let _ok10 = match (r.top_left.x == 1) { true => 0, _ => 0 / 0, };
+    assert(r.top_left.x == 1);
     // Inline nested struct construction.
     let r3 = Rect {
         top_left:     Point { x: 0, y: 0 },
         bottom_right: Point { x: 3, y: 4 },
     };
-    let _ok11 = match (area(r3) == 12) { true => 0, _ => 0 / 0, };
+    assert(area(r3) == 12);
 }

@@ -1,16 +1,16 @@
 fun main() {
     // Widening: Int as Float.
     let fi = 3 as Float;
-    let _ok1 = match (fi == 3.0) { true => 0, _ => 0 / 0, };
+    assert(fi == 3.0);
     // Identity casts.
     let ii = 5 as Int;
-    let _ok2 = match (ii == 5) { true => 0, _ => 0 / 0, };
+    assert(ii == 5);
     let ff = 2.5 as Float;
-    let _ok3 = match (ff == 2.5) { true => 0, _ => 0 / 0, };
+    assert(ff == 2.5);
     // Large integer to float.
     let big = 1000000 as Float;
-    let _ok4 = match (big == 1000000.0) { true => 0, _ => 0 / 0, };
+    assert(big == 1000000.0);
     // Negative integer to float.
     let neg = -7 as Float;
-    let _ok5 = match (neg == -7.0) { true => 0, _ => 0 / 0, };
+    assert(neg == -7.0);
 }

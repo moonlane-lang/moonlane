@@ -7,15 +7,15 @@ fun apply(f: fun(Int) -> Int, v: Int) -> Int {
 fun main() {
     let add5 = make_adder(5);
     let r1 = add5(3);
-    let _ok1 = match (r1 == 8) { true => 0, _ => 0 / 0, };
+    assert(r1 == 8);
     let r2 = add5(10);
-    let _ok2 = match (r2 == 15) { true => 0, _ => 0 / 0, };
+    assert(r2 == 15);
     // Pass a closure to a higher-order function.
     let add10 = make_adder(10);
     let r3 = apply(add10, 7);
-    let _ok3 = match (r3 == 17) { true => 0, _ => 0 / 0, };
+    assert(r3 == 17);
     // Closure created inline.
     let double = fun(n: Int) -> Int { n * 2 };
     let r4 = double(6);
-    let _ok4 = match (r4 == 12) { true => 0, _ => 0 / 0, };
+    assert(r4 == 12);
 }

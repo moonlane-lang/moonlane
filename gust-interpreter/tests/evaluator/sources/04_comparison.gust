@@ -1,8 +1,8 @@
 fun main() {
-    let _ok1 = match (1 < 2)  { true => 0, _ => 0 / 0, };
-    let _ok2 = match (2 > 1)  { true => 0, _ => 0 / 0, };
-    let _ok3 = match (1 == 1) { true => 0, _ => 0 / 0, };
-    let _ok4 = match (1 != 2) { true => 0, _ => 0 / 0, };
-    let _ok5 = match (2 <= 2) { true => 0, _ => 0 / 0, };
-    let _ok6 = match (3 >= 4) { false => 0, _ => 0 / 0, };
+    assert(1 < 2);
+    assert(2 > 1);
+    assert(1 == 1);
+    assert(1 != 2);
+    assert(2 <= 2);
+    assert(!(3 >= 4));
 }

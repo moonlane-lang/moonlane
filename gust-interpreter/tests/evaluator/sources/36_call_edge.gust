@@ -20,19 +20,19 @@ fun double(x: Int) -> Int { x * 2 }
 
 fun main() {
     // Mutual recursion.
-    let _ok1 = match (is_even(4)) { true => 0, _ => 0 / 0, };
-    let _ok2 = match (is_odd(3))  { true => 0, _ => 0 / 0, };
-    let _ok3 = match (is_even(0)) { true => 0, _ => 0 / 0, };
-    let _ok4 = match (is_odd(1))  { true => 0, _ => 0 / 0, };
+    assert(is_even(4));
+    assert(is_odd(3));
+    assert(is_even(0));
+    assert(is_odd(1));
     // Early return.
-    let _ok5 = match (sign(5)  ==  1) { true => 0, _ => 0 / 0, };
-    let _ok6 = match (sign(-3) == -1) { true => 0, _ => 0 / 0, };
-    let _ok7 = match (sign(0)  ==  0) { true => 0, _ => 0 / 0, };
+    assert(sign(5)  ==  1);
+    assert(sign(-3) == -1);
+    assert(sign(0)  ==  0);
     // Calling a builtin from a user function.
     let s = greet("world");
-    let _ok8 = match (s == "hello world") { true => 0, _ => 0 / 0, };
+    assert(s == "hello world");
     // Call through a variable binding.
     let f = double;
     let r = f(21);
-    let _ok9 = match (r == 42) { true => 0, _ => 0 / 0, };
+    assert(r == 42);
 }

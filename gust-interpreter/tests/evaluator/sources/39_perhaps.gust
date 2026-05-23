@@ -13,24 +13,24 @@ fun main() {
     // nope literal matches the nope pattern.
     let n: Perhaps<Int> = nope;
     let r1 = match n { nope => -1, Perhaps::Some { value } => value, };
-    let _ok1 = match (r1 == -1) { true => 0, _ => 0 / 0, };
+    assert(r1 == -1);
     // Perhaps::Some construction and field extraction via match.
     let s = Perhaps::Some { value: 42 };
     let r2 = match s { nope => -1, Perhaps::Some { value } => value, };
-    let _ok2 = match (r2 == 42) { true => 0, _ => 0 / 0, };
+    assert(r2 == 42);
     // Perhaps as function return type — found case.
     let arr = [10, 20, 30, 40];
     let idx = find(arr, 30);
     let r3 = match idx { nope => -1, Perhaps::Some { value } => value, };
-    let _ok3 = match (r3 == 2) { true => 0, _ => 0 / 0, };
+    assert(r3 == 2);
     // Perhaps as function return type — not-found case.
     let idx2 = find(arr, 99);
     let r4 = match idx2 { nope => -1, Perhaps::Some { value } => value, };
-    let _ok4 = match (r4 == -1) { true => 0, _ => 0 / 0, };
+    assert(r4 == -1);
     // Perhaps in expression position — the match result is usable directly.
     let doubled = match (find(arr, 20)) {
         Perhaps::Some { value } => value * 2,
         nope => 0,
     };
-    let _ok5 = match (doubled == 2) { true => 0, _ => 0 / 0, };
+    assert(doubled == 2);
 }

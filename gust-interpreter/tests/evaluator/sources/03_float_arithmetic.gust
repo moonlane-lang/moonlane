@@ -1,12 +1,12 @@
 fun main() {
-    let _ok1  = match (1.0 + 2.0 == 3.0) { true => 0, _ => 0 / 0, };
-    let _ok2  = match (5.0 - 1.5 == 3.5) { true => 0, _ => 0 / 0, };
-    let _ok3  = match (2.0 * 3.0 == 6.0) { true => 0, _ => 0 / 0, };
-    let _ok4  = match (7.0 / 2.0 == 3.5) { true => 0, _ => 0 / 0, };
-    let _ok5  = match (1.0 < 2.0)        { true => 0, _ => 0 / 0, };
-    let _ok6  = match (2.0 > 1.0)        { true => 0, _ => 0 / 0, };
-    let _ok7  = match (1.0 == 1.0)       { true => 0, _ => 0 / 0, };
-    let _ok8  = match (1.0 != 2.0)       { true => 0, _ => 0 / 0, };
-    let _ok9  = match (1.0 <= 1.0)       { true => 0, _ => 0 / 0, };
-    let _ok10 = match (2.0 >= 1.0)       { true => 0, _ => 0 / 0, };
+    assert(1.0 + 2.0 == 3.0);
+    assert(5.0 - 1.5 == 3.5);
+    assert(2.0 * 3.0 == 6.0);
+    assert(7.0 / 2.0 == 3.5);
+    assert(1.0 < 2.0);
+    assert(2.0 > 1.0);
+    assert(1.0 == 1.0);
+    assert(1.0 != 2.0);
+    assert(1.0 <= 1.0);
+    assert(2.0 >= 1.0);
 }

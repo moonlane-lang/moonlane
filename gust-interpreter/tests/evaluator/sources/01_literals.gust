@@ -2,14 +2,14 @@ let global_a = 7;
 
 fun main() {
     let i = 42;
-    let _ok1 = match (i == 42) { true => 0, _ => 0 / 0, };
+    assert(i == 42);
     let f = 3.14;
-    let _ok2 = match (f == 3.14) { true => 0, _ => 0 / 0, };
-    let _ok3 = match true  { true => 0, _ => 0 / 0, };
-    let _ok4 = match false { false => 0, _ => 0 / 0, };
+    assert(f == 3.14);
+    assert(true);
+    assert(!false);
     let s = "hello";
-    let _ok5 = match (s == "hello") { true => 0, _ => 0 / 0, };
+    assert(s == "hello");
     let _u = ();
     // Identifier lookup: top-level let is in scope inside main.
-    let _ok6 = match (global_a == 7) { true => 0, _ => 0 / 0, };
+    assert(global_a == 7);
 }

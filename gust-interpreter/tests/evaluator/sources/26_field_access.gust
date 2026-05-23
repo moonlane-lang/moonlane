@@ -4,13 +4,13 @@ enum Wrapper { Val { n: Int } }
 fun main() {
     // Field access on struct.
     let v = Vec2 { x: 10, y: 20 };
-    let _ok1 = match (v.x == 10) { true => 0, _ => 0 / 0, };
-    let _ok2 = match (v.y == 20) { true => 0, _ => 0 / 0, };
+    assert(v.x == 10);
+    assert(v.y == 20);
     // Field access on enum variant with named fields.
     let w = Wrapper::Val { n: 42 };
     let n = match w { Wrapper::Val { n } => n, };
-    let _ok3 = match (n == 42) { true => 0, _ => 0 / 0, };
+    assert(n == 42);
     // Chained field access via intermediate binding.
     let x_val = v.x;
-    let _ok4 = match (x_val == 10) { true => 0, _ => 0 / 0, };
+    assert(x_val == 10);
 }
