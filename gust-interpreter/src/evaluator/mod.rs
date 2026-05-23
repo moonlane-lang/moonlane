@@ -6,7 +6,27 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ast::{BinOp, Literal, Param, Pattern, Span, UnaryOp};
-use crate::error::{RuntimeErrorCode, GustError};
+use crate::error::{FrameInfo, RuntimeErrorCode, GustError};
+
+thread_local! {
+    static CALL_STACK: RefCell<Vec<FrameInfo>> = const { RefCell::new(Vec::new()) };
+}
+
+fn push_frame(fn_name: String, call_site: Span) {
+    CALL_STACK.with(|s| s.borrow_mut().push(FrameInfo { fn_name, call_site }));
+}
+
+fn pop_frame() {
+    CALL_STACK.with(|s| { s.borrow_mut().pop(); });
+}
+
+fn snapshot_stack() -> Vec<FrameInfo> {
+    CALL_STACK.with(|s| s.borrow().clone())
+}
+
+fn attach_stack(err: GustError) -> GustError {
+    err.with_stack(snapshot_stack())
+}
 use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedProgram, TypedStmt};
 
 // ── Runtime values ────────────────────────────────────────────────────────────
@@ -124,6 +144,7 @@ impl Environment {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 pub fn evaluate(program: TypedProgram) -> Result<(), GustError> {
+    CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut env = Environment::new();
     register_builtins(&mut env);
 
@@ -884,16 +905,21 @@ fn match_pattern(pattern: &Pattern, value: &Value, out: &mut HashMap<String, Val
 /// Converts `Signal::Return` and `Signal::PropagateErr` at the function boundary.
 fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, GustError> {
     match func {
-        Value::Builtin(_, f) => Ok(Signal::Value(f(args, span)?)),
+        Value::Builtin(_, f) => f(args, span).map(Signal::Value).map_err(attach_stack),
 
         Value::Closure(rc) => {
             let closure = (*rc).clone();
+            let fn_name = closure.name.clone().unwrap_or_else(|| "<closure>".to_string());
+            push_frame(fn_name, span.clone());
             let mut call_env = closure.captured.clone();
             call_env.push_scope();
             for (param, val) in closure.params.iter().zip(args.iter()) {
                 call_env.define(&param.name, val.clone());
             }
-            let sig = eval_block(&closure.body, &mut call_env)?;
+            let result = eval_block(&closure.body, &mut call_env);
+            let result = result.map_err(attach_stack);
+            pop_frame();
+            let sig = result?;
             Ok(match sig {
                 Signal::Return(v) => Signal::Value(v),
                 Signal::PropagateErr(e) => Signal::Value(Value::Enum {
@@ -906,13 +932,13 @@ fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, G
         }
 
         Value::Unit =>
-            Err(GustError::panic(RuntimeErrorCode::R0002, "call: target is a generic function (not supported in v0.1)", span)),
+            Err(attach_stack(GustError::panic(RuntimeErrorCode::R0002, "call: target is a generic function (not supported in v0.1)", span))),
 
-        other => Err(GustError::panic(
+        other => Err(attach_stack(GustError::panic(
             RuntimeErrorCode::R0010,
             format!("call: expected a closure or builtin, got {:?}", std::mem::discriminant(&other)),
             span,
-        )),
+        ))),
     }
 }
 

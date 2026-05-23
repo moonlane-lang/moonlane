@@ -1,5 +1,14 @@
 use crate::ast::Span;
 
+/// One frame in a runtime call stack.
+#[derive(Debug, Clone)]
+pub struct FrameInfo {
+    /// Name of the function that was entered.
+    pub fn_name: String,
+    /// Span of the call expression that invoked this frame.
+    pub call_site: Span,
+}
+
 // ── Error code enums, one per pipeline phase ──────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +101,8 @@ pub enum GustError {
         filename: String,
         line: u32,
         col: u32,
+        /// Call stack at the point of the panic, innermost frame first.
+        stack: Vec<FrameInfo>,
     },
     /// A bug in the interpreter or an unimplemented feature — never caused by user input.
     Internal {
@@ -109,8 +120,18 @@ impl std::fmt::Display for GustError {
                 write!(f, "[{code}] parse error in {filename}:{line}:{col} (`{src}`): {message}"),
             GustError::TypeError { code, message, filename, line, col, .. } =>
                 write!(f, "[{code}] type error in {filename}:{line}:{col}: {message}"),
-            GustError::RuntimePanic { code, message, filename, line, col, .. } =>
-                write!(f, "[{code}] runtime error in {filename}:{line}:{col}: {message}"),
+            GustError::RuntimePanic { code, message, filename, line, col, stack, .. } => {
+                write!(f, "[{code}] runtime error: {message}\n  at {filename}:{line}:{col}")?;
+                for frame in stack.iter().rev() {
+                    write!(f, "\n  in {} at {}:{}:{}",
+                        frame.fn_name,
+                        frame.call_site.filename,
+                        frame.call_site.line,
+                        frame.call_site.col,
+                    )?;
+                }
+                Ok(())
+            }
             GustError::Internal { code, message } =>
                 write!(f, "[{code}] internal error: {message}"),
         }
@@ -156,6 +177,17 @@ impl GustError {
             filename: span.filename.clone(),
             line: span.line,
             col: span.col,
+            stack: vec![],
+        }
+    }
+
+    /// Attach a call stack to a RuntimePanic; no-op if already set or not a panic.
+    pub fn with_stack(self, frames: Vec<FrameInfo>) -> Self {
+        match self {
+            Self::RuntimePanic { code, message, start, end, filename, line, col, stack }
+                if stack.is_empty() =>
+                Self::RuntimePanic { code, message, start, end, filename, line, col, stack: frames },
+            other => other,
         }
     }
 
