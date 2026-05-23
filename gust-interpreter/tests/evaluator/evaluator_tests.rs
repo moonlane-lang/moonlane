@@ -256,4 +256,21 @@ mod tests {
 
     #[test]
     fn neg_nonexhaustive_match() { check("neg_13_nonexhaustive_match.gust"); }
+
+    // ── Stack trace tests ─────────────────────────────────────────────────────
+
+    #[test]
+    fn neg_stack_single_frame() { check("neg_14_stack_single_frame.gust"); }
+
+    #[test]
+    fn neg_stack_outer_frame() { check("neg_15_stack_outer_frame.gust"); }
+
+    #[test]
+    fn neg_stack_deep_chain() { check("neg_16_stack_deep_chain.gust"); }
+
+    #[test]
+    fn neg_stack_recursive() { check("neg_17_stack_recursive.gust"); }
+
+    #[test]
+    fn neg_stack_closure_frame() { check("neg_18_stack_closure_frame.gust"); }
 }

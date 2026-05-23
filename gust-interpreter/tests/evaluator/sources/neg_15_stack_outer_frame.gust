@@ -1,0 +1,17 @@
+// In a two-level call chain, both the inner and outer function must appear in
+// the stack trace.  This file checks that the outer frame is captured —
+// a complementary test to neg_14 which only verifies the inner frame.
+
+fun inner_call() {
+    let _ = 1 / 0;
+}
+
+fun outer_call() {
+    inner_call();
+}
+
+fun main() {
+    outer_call();
+}
+
+// RUNTIME_ERROR[in outer_call]

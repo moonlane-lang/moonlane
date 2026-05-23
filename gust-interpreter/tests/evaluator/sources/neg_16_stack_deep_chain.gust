@@ -1,0 +1,29 @@
+// A five-level call chain must capture all intermediate frames, not just the
+// innermost or outermost.  Checking for depth_c proves that frames in the
+// middle of a deep stack are retained.
+
+fun depth_e() {
+    let _ = 1 / 0;
+}
+
+fun depth_d() {
+    depth_e();
+}
+
+fun depth_c() {
+    depth_d();
+}
+
+fun depth_b() {
+    depth_c();
+}
+
+fun depth_a() {
+    depth_b();
+}
+
+fun main() {
+    depth_a();
+}
+
+// RUNTIME_ERROR[in depth_c]
