@@ -59,7 +59,7 @@ target:
 - Language spec: `docs/public/spec.md`
 ```
 
-4. **Open the file** for the user to begin editing.
+4. **Fill in the RFC body.** If the user's request or the current conversation contains enough context to write the RFC sections (motivation, proposal, alternatives, open questions), fill them in now. Leave sections blank only when there is genuinely insufficient information.
 
 5. **Create the GitHub tracking issue:**
 
@@ -71,15 +71,13 @@ gh issue create \
   --body "Tracking issue for RFC-NNNN.\n\nDoc: \`docs/internal/rfcs/<slug>.md\`"
 ```
 
-6. **Commit the new file** inside the docs submodule, then update the submodule pointer in the parent repo:
+6. **Commit the new file** directly in the repo:
 ```bash
-cd docs && git add internal/rfcs/<slug>.md && git commit -m "docs: add RFC-NNNN <title>"
-cd .. && git add docs && git commit -m "docs: update docs submodule with RFC-NNNN"
+git add docs/internal/rfcs/<slug>.md && git commit -m "docs: add RFC-NNNN <title>"
 ```
 
 ## Notes
-- Do not start the RFC body — leave sections blank for the user to fill in.
 - The GitHub issue title must match the RFC id and title exactly.
 - The `target:` field is left blank until the RFC is accepted and assigned to a version.
 - Remind the user: the RFC must be accepted (status → `accepted`, `target:` set) and the relevant `docs/public/spec/` file updated before implementation begins.
-- When an RFC is incorporated into a release, mark it `incorporated` and commit the spec change in the docs submodule.
+- When an RFC is incorporated into a release, mark it `incorporated` and commit the spec change.
