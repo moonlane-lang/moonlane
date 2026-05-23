@@ -51,7 +51,7 @@ trait_method = { "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("-
 
 // ── Parameters ────────────────────────────────────────────────────────────────
 
-param_list = { param ~ ("," ~ param)* }
+param_list = { param ~ ("," ~ param)* ~ ","? }
 param      = { ("mut" ~ "self") | "self" | (ident ~ (":" ~ type_expr)?) }
 
 generic_params = { "<" ~ generic_param ~ ("," ~ generic_param)* ~ ">" }
@@ -122,7 +122,7 @@ postfix          = {
   | "?"                            // error propagation
 }
 
-arg_list = { expr ~ ("," ~ expr)* }
+arg_list = { expr ~ ("," ~ expr)* ~ ","? }
 
 primary_expr = {
     float_lit     // must come before int_lit — "3.14" would match int "3" first otherwise

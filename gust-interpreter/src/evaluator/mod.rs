@@ -46,6 +46,10 @@ pub enum Value {
     Builtin(String, fn(Vec<Value>, &Span) -> Result<Value, GustError>),
     Perhaps(Option<Box<Value>>),
     YoloResult(Result<Box<Value>, Box<Value>>),
+    /// Read-only pointer placeholder — never constructed in v0.2; reserved for RFC-0001.
+    Pointer(Rc<RefCell<Value>>),
+    /// Writable pointer placeholder — never constructed in v0.2; reserved for RFC-0001.
+    MutPointer(Rc<RefCell<Value>>),
 }
 
 #[derive(Debug, Clone)]
@@ -1286,5 +1290,6 @@ fn format_value(val: &Value) -> String {
         Value::Perhaps(None) => "None".to_string(),
         Value::YoloResult(Ok(v)) => format!("Ok({})", format_value(v)),
         Value::YoloResult(Err(e)) => format!("Err({})", format_value(e)),
+        Value::Pointer(_) | Value::MutPointer(_) => unreachable!("pointer values not constructed in v0.2"),
     }
 }
