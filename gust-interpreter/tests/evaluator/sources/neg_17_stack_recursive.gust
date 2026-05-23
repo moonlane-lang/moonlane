@@ -1,0 +1,18 @@
+// A recursive function that panics after several self-calls must appear in the
+// stack trace.  The name appears multiple times (once per live frame), so
+// checking for "in recurse" verifies at least one recursive frame was captured.
+
+fun recurse(n: Int) -> Int {
+    if (n == 0) {
+        let _ = 1 / 0;
+        0
+    } else {
+        recurse(n - 1)
+    }
+}
+
+fun main() {
+    recurse(5);
+}
+
+// RUNTIME_ERROR[in recurse]

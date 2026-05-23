@@ -1,0 +1,12 @@
+// A panic inside a function called from main must name that function in the
+// stack trace.
+
+fun panicking_fn() {
+    let _ = 1 / 0;
+}
+
+fun main() {
+    panicking_fn();
+}
+
+// RUNTIME_ERROR[in panicking_fn]

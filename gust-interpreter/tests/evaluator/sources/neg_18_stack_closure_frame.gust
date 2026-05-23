@@ -1,0 +1,12 @@
+// An anonymous closure passed as an argument and then called must appear in
+// the stack trace as "<closure>".
+
+fun apply(f: fun() -> Int) -> Int {
+    f()
+}
+
+fun main() {
+    apply(fun() -> Int { 1 / 0 });
+}
+
+// RUNTIME_ERROR[in <closure>]
