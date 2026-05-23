@@ -56,6 +56,29 @@ pub struct ClosureValue {
     pub captured: Environment,
 }
 
+/// Deep-clone a value so that arrays get independent copies.
+/// Tuples, structs, and enums are recursed into so that nested arrays are also copied.
+/// All other value kinds contain no shared mutable state and can be cloned shallowly.
+fn deep_clone_value(v: Value) -> Value {
+    match v {
+        Value::Array(rc) => {
+            let cloned: Vec<Value> = rc.borrow().iter().cloned().map(deep_clone_value).collect();
+            Value::Array(Rc::new(RefCell::new(cloned)))
+        }
+        Value::Tuple(items) => Value::Tuple(items.into_iter().map(deep_clone_value).collect()),
+        Value::Struct { name, fields } => Value::Struct {
+            name,
+            fields: fields.into_iter().map(|(k, v)| (k, deep_clone_value(v))).collect(),
+        },
+        Value::Enum { name, variant, fields } => Value::Enum {
+            name,
+            variant,
+            fields: fields.into_iter().map(|(k, v)| (k, deep_clone_value(v))).collect(),
+        },
+        other => other,
+    }
+}
+
 // ── Control flow signals ──────────────────────────────────────────────────────
 
 /// Returned by evaluation functions to handle non-local control flow.
@@ -104,8 +127,9 @@ impl Environment {
     }
 
     /// Define a new binding in the current scope.
+    /// Arrays are deep-cloned so each binding has an independent copy.
     pub fn define(&mut self, name: &str, value: Value) {
-        let cell = Rc::new(RefCell::new(value));
+        let cell = Rc::new(RefCell::new(deep_clone_value(value)));
         self.scopes.last_mut().unwrap().insert(name.to_string(), cell);
     }
 
@@ -120,10 +144,11 @@ impl Environment {
     }
 
     /// Assign to an existing binding anywhere in the scope chain.
+    /// Arrays are deep-cloned so each binding has an independent copy.
     pub fn set(&self, name: &str, value: Value) -> bool {
         for scope in self.scopes.iter().rev() {
             if let Some(cell) = scope.get(name) {
-                *cell.borrow_mut() = value;
+                *cell.borrow_mut() = deep_clone_value(value);
                 return true;
             }
         }
