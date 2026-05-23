@@ -42,3 +42,69 @@ fn test_10_comprehensive() { run("10_comprehensive.gust"); }
 
 #[test]
 fn test_11_block_expr_stmts() { run("11_block_expr_stmts.gust"); }
+
+// ── Error format tests ────────────────────────────────────────────────────────
+
+/// Parse a source with a known error and return the error Display string.
+fn parse_error_message(filename: &str) -> String {
+    let path = format!("tests/parsing/sources/{}", filename);
+    let source = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("could not read {}: {}", path, e));
+    match gust::parser::parse(&source, filename) {
+        Err(e) => format!("{}", e),
+        Ok(_) => panic!("expected a parse error from {filename} but parsing succeeded"),
+    }
+}
+
+// neg_01_syntax_error.gust: `@@@` on line 3, col 1 → P0001
+
+#[test]
+fn error_format_p0001_contains_filename() {
+    let msg = parse_error_message("neg_01_syntax_error.gust");
+    assert!(msg.contains("neg_01_syntax_error.gust"), "message was: {msg}");
+}
+
+#[test]
+fn error_format_p0001_contains_line_col() {
+    let msg = parse_error_message("neg_01_syntax_error.gust");
+    assert!(
+        msg.contains("neg_01_syntax_error.gust:3:1"),
+        "expected 'file:3:1' in message, got: {msg}"
+    );
+}
+
+#[test]
+fn error_format_p0001_contains_error_code() {
+    let msg = parse_error_message("neg_01_syntax_error.gust");
+    assert!(msg.contains("P0001"), "expected '[P0001]' in message, got: {msg}");
+}
+
+#[test]
+fn error_format_p0001_does_not_contain_raw_byte_offset() {
+    let msg = parse_error_message("neg_01_syntax_error.gust");
+    // Old format was "at <start>..<end>"; verify raw byte range is gone.
+    assert!(!msg.contains(".."), "message should not contain '..' (raw byte range), got: {msg}");
+}
+
+// neg_02_int_overflow.gust: oversized integer at line 1, col 14 → P0002
+
+#[test]
+fn error_format_p0002_file_line_col() {
+    let msg = parse_error_message("neg_02_int_overflow.gust");
+    assert!(msg.contains("P0002"), "expected '[P0002]' in message, got: {msg}");
+    assert!(
+        msg.contains("neg_02_int_overflow.gust:1:14"),
+        "expected 'file:1:14' in message, got: {msg}"
+    );
+}
+
+// neg_04_error_at_line_10.gust: `@@@` on line 10 — verifies line counting past line 9
+
+#[test]
+fn error_format_line_counting_past_nine() {
+    let msg = parse_error_message("neg_04_error_at_line_10.gust");
+    assert!(
+        msg.contains("neg_04_error_at_line_10.gust:10:1"),
+        "expected 'file:10:1' in message, got: {msg}"
+    );
+}

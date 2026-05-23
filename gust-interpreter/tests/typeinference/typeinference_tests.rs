@@ -525,8 +525,6 @@ mod phase_5_constraints {
         let err = solve_constraints(cs).unwrap_err();
         let msg = format!("{}", err);
         assert!(msg.contains("myfile.gust"));
-        assert!(msg.contains("10"));
-        assert!(msg.contains("20"));
     }
 
     #[test]

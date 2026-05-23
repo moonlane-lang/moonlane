@@ -193,7 +193,7 @@ pub fn evaluate(program: TypedProgram) -> Result<(), GustError> {
 
     // Call main() by executing its body directly in the full env so that any
     // top-level let/mut bindings from Pass 2 are visible.
-    let dummy = Span { start: 0, end: 0, filename: "<program>".to_string() };
+    let dummy = Span { start: 0, end: 0, filename: "<program>".to_string(), line: 0, col: 0 };
     let main_body = match env.get("main") {
         Some(Value::Closure(rc)) => rc.body.clone(),
         Some(Value::Unit) =>

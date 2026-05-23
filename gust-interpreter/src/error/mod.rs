@@ -69,8 +69,10 @@ pub enum GustError {
         start: usize,
         end: usize,
         filename: String,
+        line: u32,
+        col: u32,
         /// Source line text, if available (from the pest grammar failure).
-        line: Option<String>,
+        source_line: Option<String>,
     },
     TypeError {
         code: TypeErrorCode,
@@ -78,6 +80,8 @@ pub enum GustError {
         start: usize,
         end: usize,
         filename: String,
+        line: u32,
+        col: u32,
     },
     RuntimePanic {
         code: RuntimeErrorCode,
@@ -85,6 +89,8 @@ pub enum GustError {
         start: usize,
         end: usize,
         filename: String,
+        line: u32,
+        col: u32,
     },
     /// A bug in the interpreter or an unimplemented feature — never caused by user input.
     Internal {
@@ -96,14 +102,14 @@ pub enum GustError {
 impl std::fmt::Display for GustError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GustError::ParseError { code, message, start, end, filename, line: None } =>
-                write!(f, "[{code}] parse error in {filename} at {start}..{end}: {message}"),
-            GustError::ParseError { code, message, start, end, filename, line: Some(line) } =>
-                write!(f, "[{code}] parse error in {filename} at {start}..{end} (`{line}`): {message}"),
-            GustError::TypeError { code, message, start, end, filename } =>
-                write!(f, "[{code}] type error in {filename} at {start}..{end}: {message}"),
-            GustError::RuntimePanic { code, message, start, end, filename } =>
-                write!(f, "[{code}] runtime error in {filename} at {start}..{end}: {message}"),
+            GustError::ParseError { code, message, filename, line, col, source_line: None, .. } =>
+                write!(f, "[{code}] parse error in {filename}:{line}:{col}: {message}"),
+            GustError::ParseError { code, message, filename, line, col, source_line: Some(src), .. } =>
+                write!(f, "[{code}] parse error in {filename}:{line}:{col} (`{src}`): {message}"),
+            GustError::TypeError { code, message, filename, line, col, .. } =>
+                write!(f, "[{code}] type error in {filename}:{line}:{col}: {message}"),
+            GustError::RuntimePanic { code, message, filename, line, col, .. } =>
+                write!(f, "[{code}] runtime error in {filename}:{line}:{col}: {message}"),
             GustError::Internal { code, message } =>
                 write!(f, "[{code}] internal error: {message}"),
         }
@@ -122,7 +128,9 @@ impl GustError {
             start: span.start,
             end: span.end,
             filename: span.filename.clone(),
-            line: None,
+            line: span.line,
+            col: span.col,
+            source_line: None,
         }
     }
 
@@ -133,6 +141,8 @@ impl GustError {
             start: span.start,
             end: span.end,
             filename: span.filename.clone(),
+            line: span.line,
+            col: span.col,
         }
     }
 
@@ -143,6 +153,8 @@ impl GustError {
             start: span.start,
             end: span.end,
             filename: span.filename.clone(),
+            line: span.line,
+            col: span.col,
         }
     }
 

@@ -16,13 +16,19 @@ pub fn parse(source: &str, filename: &str) -> Result<Program, GustError> {
             pest::error::InputLocation::Pos(p) => (p, p),
             pest::error::InputLocation::Span((s, e)) => (s, e),
         };
+        let (line, col) = match &e.line_col {
+            pest::error::LineColLocation::Pos((l, c)) => (*l as u32, *c as u32),
+            pest::error::LineColLocation::Span((l, c), _) => (*l as u32, *c as u32),
+        };
         GustError::ParseError {
             code: ParseErrorCode::P0001,
             message: e.variant.to_string(),
             start,
             end,
             filename: filename.to_string(),
-            line: Some(e.line().to_string()),
+            line,
+            col,
+            source_line: Some(e.line().to_string()),
         }
     })?;
 
@@ -448,7 +454,7 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
                 code: ParseErrorCode::P0002,
                 message: format!("integer literal '{text}' is out of range for i64"),
                 start: span.start, end: span.end, filename: filename.to_string(),
-                line: None,
+                line: span.line, col: span.col, source_line: None,
             })?
         ),
         Rule::float_lit => Literal::Float(
@@ -456,7 +462,7 @@ fn parse_literal_expr(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resu
                 code: ParseErrorCode::P0003,
                 message: format!("invalid float literal '{text}'"),
                 start: span.start, end: span.end, filename: filename.to_string(),
-                line: None,
+                line: span.line, col: span.col, source_line: None,
             })?
         ),
         Rule::string_lit => Literal::Str(unescape(&text[1..text.len()-1])),
@@ -844,7 +850,7 @@ fn parse_pattern(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Pa
                         code: ParseErrorCode::P0003,
                         message: format!("float literal '{text}' is out of range"),
                         start: span.start, end: span.end, filename: filename.to_string(),
-                        line: None,
+                        line: span.line, col: span.col, source_line: None,
                     })?
                 ),
                 Rule::int_lit => Literal::Int(
@@ -852,7 +858,7 @@ fn parse_pattern(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<Pa
                         code: ParseErrorCode::P0002,
                         message: format!("integer literal '{text}' is out of range for i64"),
                         start: span.start, end: span.end, filename: filename.to_string(),
-                        line: None,
+                        line: span.line, col: span.col, source_line: None,
                     })?
                 ),
                 Rule::string_lit => Literal::Str(unescape(&text[1..text.len()-1])),

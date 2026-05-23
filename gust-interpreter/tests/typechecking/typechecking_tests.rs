@@ -29,11 +29,6 @@ mod tests {
         out
     }
 
-    fn byte_offset_to_line(source: &str, offset: usize) -> usize {
-        let safe = offset.min(source.len());
-        source[..safe].chars().filter(|&c| c == '\n').count() + 1
-    }
-
     fn check_file(path: &str) {
         let source = load_source(path);
         let annotations = parse_error_annotations(&source);
@@ -57,16 +52,15 @@ mod tests {
                 Ok(_) => panic!("expected type error in {filename} but check() returned Ok"),
             };
             match &err {
-                GustError::TypeError { code, start, .. } => {
+                GustError::TypeError { code, line, .. } => {
                     let (expected_line, expected_code) = &annotations[0];
-                    let actual_line = byte_offset_to_line(&source, *start);
                     assert_eq!(
                         format!("{code}"), *expected_code,
                         "wrong error code in {filename}"
                     );
                     assert_eq!(
-                        actual_line, *expected_line,
-                        "wrong error line in {filename}: expected {expected_line}, got {actual_line}"
+                        *line as usize, *expected_line,
+                        "wrong error line in {filename}: expected {expected_line}, got {line}"
                     );
                 }
                 other => panic!("expected TypeError in {filename}, got: {other}"),
