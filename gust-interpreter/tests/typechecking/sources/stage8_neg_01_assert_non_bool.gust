@@ -1,0 +1,3 @@
+// Stage 8 negative: assert with non-Bool argument must be a type error.
+
+assert(42); // ERROR[T0001]

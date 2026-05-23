@@ -50,12 +50,18 @@ impl<'a> ConstructCtx<'a> {
         let mono = |params, ret| Type::Fun(params, Box::new(ret));
         ctx.bind("print",           mono(vec![str_ty.clone()], unit_ty.clone()));
         ctx.bind("println",         mono(vec![str_ty.clone()], unit_ty.clone()));
+        ctx.bind("print_int",       mono(vec![int_ty.clone()], unit_ty.clone()));
+        ctx.bind("println_int",     mono(vec![int_ty.clone()], unit_ty.clone()));
+        ctx.bind("print_float",     mono(vec![float_ty.clone()], unit_ty.clone()));
+        ctx.bind("println_float",   mono(vec![float_ty.clone()], unit_ty.clone()));
         ctx.bind("int_to_string",   mono(vec![int_ty.clone()], str_ty.clone()));
         ctx.bind("float_to_string", mono(vec![float_ty],       str_ty.clone()));
-        ctx.bind("bool_to_string",  mono(vec![bool_ty],        str_ty.clone()));
+        ctx.bind("bool_to_string",  mono(vec![bool_ty.clone()], str_ty.clone()));
         ctx.bind("string_len",      mono(vec![str_ty.clone()], int_ty.clone()));
         ctx.bind("string_concat",   mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
         ctx.bind("clock",           mono(vec![], int_ty.clone()));
+        ctx.bind("assert",          mono(vec![bool_ty.clone()], unit_ty.clone()));
+        ctx.bind("assert_msg",      mono(vec![bool_ty, str_ty.clone()], unit_ty.clone()));
         ctx
     }
 

@@ -1,0 +1,6 @@
+// Stage 8: print_int, println_int, print_float, println_float builtins.
+
+print_int(42);
+println_int(0);
+print_float(3.14);
+println_float(0.0);

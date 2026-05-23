@@ -8,6 +8,7 @@ Panics are triggered by:
 - `.yolo()` on `nope` or a `Result::Err`
 - Out-of-bounds array access
 - Integer division by zero
+- `assert(false)` or `assert_msg(false, msg)`
 
 ## Built-in Functions
 
@@ -19,6 +20,10 @@ These are available globally without any `use` declaration:
 |-------------------|-------------------------------------|------------------------------------------|
 | `print`           | `(s: String)`                       | Print to stdout, no newline              |
 | `println`         | `(s: String)`                       | Print to stdout with newline             |
+| `print_int`       | `(n: Int)`                          | Print an Int to stdout, no newline       |
+| `println_int`     | `(n: Int)`                          | Print an Int to stdout with newline      |
+| `print_float`     | `(f: Float)`                        | Print a Float to stdout, no newline      |
+| `println_float`   | `(f: Float)`                        | Print a Float to stdout with newline     |
 | `int_to_string`   | `(n: Int) -> String`                | Decimal string representation of an Int |
 | `float_to_string` | `(n: Float) -> String`              | String representation of a Float        |
 | `bool_to_string`  | `(b: Bool) -> String`               | `"true"` or `"false"`                   |
@@ -27,3 +32,6 @@ These are available globally without any `use` declaration:
 | `array_push`      | `(arr: T[], value: T)`              | Append a value (mutates the array)      |
 | `array_len`       | `(arr: T[]) -> Int`                 | Number of elements in an array          |
 | `clock`           | `() -> Int`                         | Unix timestamp in milliseconds          |
+| `assert`          | `(cond: Bool)`                      | Panic with `"assertion failed"` if `cond` is `false` |
+| `assert_msg`      | `(cond: Bool, msg: String)`         | Panic with `msg` if `cond` is `false`   |
+| `dbg`             | `<T>(v: T) -> T`                    | Print `[dbg] <value>` to stderr and return the value unchanged |

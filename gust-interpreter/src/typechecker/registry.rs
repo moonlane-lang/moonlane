@@ -10,6 +10,16 @@ use crate::types::Type;
 
 use super::conversions::{infer_type_to_type, type_expr_to_infer};
 
+fn dbg_scheme(t: TypeVar) -> TypeScheme {
+    TypeScheme {
+        quantified_vars: vec![t],
+        ty: InferType::Fun(
+            vec![InferType::Var(t)],
+            Box::new(InferType::Var(t)),
+        ),
+    }
+}
+
 fn array_push_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
         quantified_vars: vec![t],
@@ -121,12 +131,18 @@ pub(super) fn register_builtins(ctx: &mut InferContext) {
 
     ctx.bind_poly("print",           mono(vec![str_ty.clone()], unit_ty.clone()));
     ctx.bind_poly("println",         mono(vec![str_ty.clone()], unit_ty.clone()));
+    ctx.bind_poly("print_int",       mono(vec![int_ty.clone()], unit_ty.clone()));
+    ctx.bind_poly("println_int",     mono(vec![int_ty.clone()], unit_ty.clone()));
+    ctx.bind_poly("print_float",     mono(vec![float_ty.clone()], unit_ty.clone()));
+    ctx.bind_poly("println_float",   mono(vec![float_ty.clone()], unit_ty.clone()));
     ctx.bind_poly("int_to_string",   mono(vec![int_ty.clone()], str_ty.clone()));
     ctx.bind_poly("float_to_string", mono(vec![float_ty],       str_ty.clone()));
-    ctx.bind_poly("bool_to_string",  mono(vec![bool_ty],        str_ty.clone()));
+    ctx.bind_poly("bool_to_string",  mono(vec![bool_ty.clone()], str_ty.clone()));
     ctx.bind_poly("string_len",      mono(vec![str_ty.clone()], int_ty.clone()));
     ctx.bind_poly("string_concat",   mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
     ctx.bind_poly("clock",           mono(vec![], int_ty.clone()));
+    ctx.bind_poly("assert",          mono(vec![bool_ty.clone()], unit_ty.clone()));
+    ctx.bind_poly("assert_msg",      mono(vec![bool_ty, str_ty.clone()], unit_ty.clone()));
 
     ctx.register_method("String".to_string(), "len".to_string(),
         InferType::Fun(vec![str_ty.clone()], Box::new(int_ty.clone())));
@@ -135,6 +151,8 @@ pub(super) fn register_builtins(ctx: &mut InferContext) {
     ctx.bind_poly("array_push", array_push_scheme(t));
     let t = ctx.fresh_type_var_raw();
     ctx.bind_poly("array_len", array_len_scheme(t));
+    let t = ctx.fresh_type_var_raw();
+    ctx.bind_poly("dbg", dbg_scheme(t));
 }
 
 pub(super) fn register_builtin_poly_schemes(
@@ -145,6 +163,8 @@ pub(super) fn register_builtin_poly_schemes(
     scheme_env.insert("array_push".into(), array_push_scheme(t));
     let t = gen.fresh();
     scheme_env.insert("array_len".into(), array_len_scheme(t));
+    let t = gen.fresh();
+    scheme_env.insert("dbg".into(), dbg_scheme(t));
 }
 
 pub(super) fn build_concrete_struct_env(

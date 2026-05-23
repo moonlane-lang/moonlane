@@ -35,6 +35,7 @@ pub enum RuntimeErrorCode {
     R0010, // Call on non-callable value
     R0011, // Invalid for-in iterator
     R0012, // Error propagation on non-Result value
+    R0013, // Assertion failed
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

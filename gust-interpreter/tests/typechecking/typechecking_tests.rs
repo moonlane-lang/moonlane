@@ -418,6 +418,28 @@ mod tests {
         check_file(&format!("{}/stage7_02_match_arm_blocks.gust", test_dir()));
     }
 
+    // ── Stage 8: assert / dbg / numeric print builtins ────────────────────────
+
+    #[test]
+    fn stage8_assert() {
+        check_file(&format!("{}/stage8_01_assert.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_dbg() {
+        check_file(&format!("{}/stage8_02_dbg.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_print_numeric() {
+        check_file(&format!("{}/stage8_03_print_numeric.gust", test_dir()));
+    }
+
+    #[test]
+    fn stage8_neg_assert_non_bool() {
+        check_file(&format!("{}/stage8_neg_01_assert_non_bool.gust", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]

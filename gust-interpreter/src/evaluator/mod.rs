@@ -1122,4 +1122,118 @@ fn register_builtins(env: &mut Environment) {
             .as_millis() as i64;
         Ok(Value::Int(ms))
     }));
+
+    env.define("print_int", Value::Builtin("print_int".to_string(), |args, _span| {
+        if let Some(Value::Int(n)) = args.first() {
+            print!("{}", n);
+            Ok(Value::Unit)
+        } else {
+            Err(GustError::internal("print_int: expected Int argument"))
+        }
+    }));
+
+    env.define("println_int", Value::Builtin("println_int".to_string(), |args, _span| {
+        if let Some(Value::Int(n)) = args.first() {
+            println!("{}", n);
+            Ok(Value::Unit)
+        } else {
+            Err(GustError::internal("println_int: expected Int argument"))
+        }
+    }));
+
+    env.define("print_float", Value::Builtin("print_float".to_string(), |args, _span| {
+        if let Some(Value::Float(f)) = args.first() {
+            print!("{}", f);
+            Ok(Value::Unit)
+        } else {
+            Err(GustError::internal("print_float: expected Float argument"))
+        }
+    }));
+
+    env.define("println_float", Value::Builtin("println_float".to_string(), |args, _span| {
+        if let Some(Value::Float(f)) = args.first() {
+            println!("{}", f);
+            Ok(Value::Unit)
+        } else {
+            Err(GustError::internal("println_float: expected Float argument"))
+        }
+    }));
+
+    env.define("assert", Value::Builtin("assert".to_string(), |args, span| {
+        match args.first() {
+            Some(Value::Bool(true)) => Ok(Value::Unit),
+            Some(Value::Bool(false)) => Err(GustError::panic(
+                RuntimeErrorCode::R0013,
+                "assertion failed",
+                span,
+            )),
+            _ => Err(GustError::internal("assert: expected Bool argument")),
+        }
+    }));
+
+    env.define("assert_msg", Value::Builtin("assert_msg".to_string(), |args, span| {
+        match (args.first(), args.get(1)) {
+            (Some(Value::Bool(true)), _) => Ok(Value::Unit),
+            (Some(Value::Bool(false)), Some(Value::Str(msg))) => Err(GustError::panic(
+                RuntimeErrorCode::R0013,
+                msg.clone(),
+                span,
+            )),
+            (Some(Value::Bool(false)), _) => Err(GustError::panic(
+                RuntimeErrorCode::R0013,
+                "assertion failed",
+                span,
+            )),
+            _ => Err(GustError::internal("assert_msg: expected (Bool, String) arguments")),
+        }
+    }));
+
+    env.define("dbg", Value::Builtin("dbg".to_string(), |args, _span| {
+        if let Some(val) = args.first() {
+            eprintln!("[dbg] {}", format_value(val));
+            Ok(val.clone())
+        } else {
+            Err(GustError::internal("dbg: expected one argument"))
+        }
+    }));
+}
+
+fn format_value(val: &Value) -> String {
+    match val {
+        Value::Int(n)   => n.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::Bool(b)  => b.to_string(),
+        Value::Str(s)   => format!("{:?}", s),
+        Value::Unit     => "()".to_string(),
+        Value::Tuple(items) => {
+            let inner = items.iter().map(format_value).collect::<Vec<_>>().join(", ");
+            format!("({})", inner)
+        }
+        Value::Array(arr) => {
+            let inner = arr.borrow().iter().map(format_value).collect::<Vec<_>>().join(", ");
+            format!("[{}]", inner)
+        }
+        Value::Struct { name, fields } => {
+            let mut pairs: Vec<_> = fields.iter().collect();
+            pairs.sort_by_key(|(k, _)| k.as_str());
+            let inner = pairs.iter().map(|(k, v)| format!("{}: {}", k, format_value(v))).collect::<Vec<_>>().join(", ");
+            format!("{} {{ {} }}", name, inner)
+        }
+        Value::Enum { name, variant, fields } => {
+            if fields.is_empty() {
+                format!("{}::{}", name, variant)
+            } else {
+                let mut pairs: Vec<_> = fields.iter().collect();
+                pairs.sort_by_key(|(k, _)| k.as_str());
+                let inner = pairs.iter().map(|(k, v)| format!("{}: {}", k, format_value(v))).collect::<Vec<_>>().join(", ");
+                format!("{}::{}{{ {} }}", name, variant, inner)
+            }
+        }
+        Value::Closure(_) => "<closure>".to_string(),
+        Value::Builtin(name, _) => format!("<builtin:{}>", name),
+        Value::Perhaps(Some(v)) => format!("Some({})", format_value(v)),
+        Value::Perhaps(None) => "None".to_string(),
+        Value::YoloResult(Ok(v)) => format!("Ok({})", format_value(v)),
+        Value::YoloResult(Err(e)) => format!("Err({})", format_value(e)),
+    }
 }
