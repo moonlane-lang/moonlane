@@ -19,7 +19,7 @@ Gust is a statically-typed, expression-oriented language. This repository contai
 | `tree-walk-interpreter/docs/typechecker.md` | **Typechecker** — HM theory background + implementation notes |
 | `tree-walk-interpreter/docs/evaluator.md` | **Evaluator** — runtime values, signals, environment, known limitations |
 | `tree-walk-interpreter/docs/decisions/` | **Decision records** — why a non-obvious implementation choice was made |
-| GitHub Projects v2 | **Task board** — canonical status view (https://github.com/users/Vladastos/projects/1) |
+| GitHub Projects v2 | **Task board** — canonical status view (https://github.com/orgs/gust-lang/projects/1) |
 | GitHub Issues | **Tasks** — unit of work; use `gh issue list` for CLI access |
 | GitHub Milestones | **Version milestones** (`v0.2`, `v0.3`, …) and **Epic milestones** (implementation groupings) |
 
@@ -40,6 +40,8 @@ Sprints are the unit of shipping. All sprint work must live on a dedicated branc
    Branch naming convention: `sprint/<N>` where `N` is the sprint number (matches the kickoff issue number's sprint label).
 
 2. **Create the kickoff issue** (title: `Sprint N Kickoff — <theme>`) listing all planned tracks and issues. Leave it open until the sprint closes.
+
+3. **Add all planned issues to the project board** with Status **Todo**. "In Progress" is reserved for tasks actively being worked on — sprint kickoff only moves issues from Backlog → Todo, never to In Progress.
 
 3. **All subsequent work on this sprint goes on `sprint/N`**. This includes code commits, doc commits, and submodule pointer updates.
 

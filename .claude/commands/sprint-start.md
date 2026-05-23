@@ -47,14 +47,14 @@ $(for each selected issue: - [ ] #N)
 - PR opened against main with sprint review linked"
 ```
 
-6. **Mark each planned issue as in-progress:**
+6. **Mark each planned issue as in sprint** (label only — do not move to in-progress yet):
 ```bash
 gh issue edit <N> --repo Vladastos/Gust \
   --remove-label "status:backlog" \
   --add-label "status:in-progress"
 ```
 
-7. **Update the project board** Status field to "In Progress" for each planned issue via GraphQL.
+7. **Update the project board** Status field to **"Todo"** for each planned issue via GraphQL. Do NOT set "In Progress" — that status is reserved for tasks actively being worked on. Sprint kickoff only moves issues from Backlog → Todo.
 
 8. **Report** the kickoff issue URL, the sprint branch name, and the list of issues now in the sprint.
 
