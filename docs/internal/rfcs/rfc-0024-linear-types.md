@@ -232,6 +232,10 @@ Gate raw memory operations behind an `unsafe` boundary, as in Rust. Rejected by 
 
 5. **Error recovery.** When a linear value is not consumed, should the compiler attempt to insert a `drop` call automatically and emit a warning rather than a hard error? This would make the system more lenient for early-stage code.
 
+6. **Mandatory vs. inferred `drop`.** This RFC requires the programmer to call `drop` (or a consuming method) explicitly. An alternative is for the compiler to infer a `drop` call at the point where a linear value goes out of scope unconsumed — emitting a warning rather than an error, or silently inserting it when the type implements a destructor. The tradeoff: mandatory `drop` maximises explicitness and catches forgotten closes/frees at compile time; inferred `drop` reduces boilerplate for cases where the only goal is deterministic cleanup timing (e.g. a scoped lock). A middle ground is mandatory by default, with an `#[auto_drop]` attribute on the type declaration to opt into silent inference.
+
+7. **Linear vs. affine types.** Linear (exactly once) and affine (at most once — may be dropped without consuming) are distinct disciplines. This RFC proposes linear semantics throughout. Affine types would allow a value to go out of scope silently — the compiler would not error on an unconsumed binding — while still preventing double-use. The benefit is a gentler model: affine types enforce no-aliasing and prevent use-after-free without requiring explicit cleanup. A possible design is two keywords (`linear` and `affine`) or a single keyword with a flag (`linear(drop: optional)`). The distinction matters most for types that carry no external resource (e.g. a unique token used for ordering guarantees) where silent drop is safe and desirable, versus types that own a file handle or socket where silent drop would leak.
+
 ---
 
 ## Timing Recommendation
