@@ -1,39 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" fill="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="320" viewBox="0 0 1200 320" fill="none">
 
-  <!-- Black rounded square behind moon and stars -->
-  <rect x="32" y="32" width="256" height="256" rx="24" ry="24" fill="#0A0A14"/>
+  <rect x="32" y="32" width="1100" height="256" rx="24" ry="24" fill="#eaeafc"/>
 
-  <!-- Mask that subtracts the cutout circle -->
+  <!-- Left chevron -->
+  <path d="M110 160 L145 125 M110 160 L145 195"
+        stroke="#8B3DFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Mask that subtracts the cutout circle -->
   <mask id="crescent-mask">
-    <rect x="0" y="0" width="320" height="320" fill="white"/>
-    <circle cx="182" cy="146" r="70" fill="black"/>
+    <rect x="0" y="0" width="1200" height="320" fill="white"/>
+    <circle cx="312" cy="144" r="70" fill="black"/>
   </mask>
 
-  <!-- Crescent moon (centered) -->
+  <!-- Crescent moon (thicker) -->
   <g>
-    <circle cx="160" cy="160" r="86" fill="#F7A1E8" mask="url(#crescent-mask)"/>
+    <circle cx="290" cy="160" r="86" fill="#F7A1E8" mask="url(#crescent-mask)"/>
   </g>
 
-  <!-- Main star (centered relative to group) -->
-  <path d="M221 73
-           L229 97
-           L253 105
-           L229 113
-           L221 137
-           L213 113
-           L189 105
-           L213 97 Z"
+  <!-- Star  -->
+  <path d="M351 66
+           L359 90
+           L383 98
+           L359 106
+           L351 130
+           L343 106
+           L319 98
+           L343 90 Z"
         fill="#8B3DFF"/>
 
-  <!-- Small star (centered relative to group) -->
-  <path d="M180 145
-           L184 154
-           L193 157
-           L184 160
-           L180 169
-           L176 160
-           L167 157
-           L176 154 Z"
-        fill="#F38AEF"/>
+<!-- Small star (moved further down) -->
+<path d="M310 124
+         L314 133
+         L323 136
+         L314 139
+         L310 148
+         L306 139
+         L297 136
+         L306 133 Z"
+      fill="#F38AEF"/>
+
+
+  <!-- Right chevron  -->
+  <path d="M433 125 L468 160 M433 195 L468 160"
+        stroke="#8B3DFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Divider -->
+  <line x1="560" y1="70" x2="560" y2="250" stroke="#111111" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Wordmark -->
+  <text x="620" y="195" font-family="Inter, Arial, Helvetica, sans-serif"
+      font-size="88" font-weight="700" fill="#0A0A14" letter-spacing="-3">
+  moonlane
+</text>
 
 </svg>

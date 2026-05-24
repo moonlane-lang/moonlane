@@ -6,7 +6,7 @@
   <!-- Mask that subtracts the cutout circle -->
   <mask id="crescent-mask">
     <rect x="0" y="0" width="320" height="320" fill="white"/>
-    <circle cx="160" cy="160" r="70" fill="black"/>
+    <circle cx="182" cy="146" r="70" fill="black"/>
   </mask>
 
   <!-- Crescent moon (centered) -->
