@@ -42,7 +42,7 @@ if (condition) { expr; }
 
 ## Alternatives Considered
 
-**Reject braceless bodies entirely.** Braces are explicit and eliminate ambiguity. This is Gust's current behavior. Rejected because it is overly strict for trivial single-expression branches.
+**Reject braceless bodies entirely.** Braces are explicit and eliminate ambiguity. This is Moonlane's current behavior. Rejected because it is overly strict for trivial single-expression branches.
 
 **Allow braceless bodies only in statement position.** Prevents use as an expression even with an `else` branch. Overly restrictive — `let x = if (flag) a else b;` is unambiguous and useful.
 
@@ -68,5 +68,5 @@ Target v0.3. This is a pure syntax extension with no type system or evaluator im
 
 - Language spec: `docs/public/spec.md`
 - `docs/public/spec/expressions.md` — `if` expression section
-- `gust-interpreter/src/grammar.pest` line 151 — current `if_expr` rule
-- `gust-interpreter/src/parser/mod.rs` line 513 — `parse_if_expr`
+- `moonlane-interpreter/src/grammar.pest` line 151 — current `if_expr` rule
+- `moonlane-interpreter/src/parser/mod.rs` line 513 — `parse_if_expr`

@@ -7,7 +7,7 @@ status: draft
 
 ## Summary
 
-Define the initial scope and organisation of the Gust standard library: which modules exist, what they contain, and how they are imported. Blocked on RFC-0009 (module system).
+Define the initial scope and organisation of the Moonlane standard library: which modules exist, what they contain, and how they are imported. Blocked on RFC-0009 (module system).
 
 ---
 

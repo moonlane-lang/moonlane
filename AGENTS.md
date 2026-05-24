@@ -1,8 +1,8 @@
-# Gust — Agent Guide
+# Moonlane — Agent Guide
 
 ## Project
 
-Gust is a statically-typed, expression-oriented language. This repository contains its tree-walk interpreter. Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `docs/`. The versioning model (language versions, RFC lifecycle, doc conventions) is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
+Moonlane is a statically-typed, expression-oriented language. This repository contains its tree-walk interpreter. Tasks are tracked in GitHub Projects v2; spec docs and decision records live in `docs/`. The versioning model (language versions, RFC lifecycle, doc conventions) is defined in [`docs/internal/versioning.md`](docs/internal/versioning.md).
 
 ---
 
@@ -19,7 +19,7 @@ Gust is a statically-typed, expression-oriented language. This repository contai
 | `tree-walk-interpreter/docs/typechecker.md` | **Typechecker** — HM theory background + implementation notes |
 | `tree-walk-interpreter/docs/evaluator.md` | **Evaluator** — runtime values, signals, environment, known limitations |
 | `tree-walk-interpreter/docs/decisions/` | **Decision records** — why a non-obvious implementation choice was made |
-| GitHub Projects v2 | **Task board** — canonical status view (https://github.com/orgs/gust-lang/projects/1) |
+| GitHub Projects v2 | **Task board** — canonical status view (https://github.com/orgs/moonlane-lang/projects/1) |
 | GitHub Issues | **Tasks** — unit of work; use `gh issue list` for CLI access |
 | GitHub Milestones | **Version milestones** (`v0.2`, `v0.3`, …) and **Epic milestones** (implementation groupings) |
 
@@ -100,7 +100,7 @@ If **any gate fails**, the sprint cannot close. Fix the issue, commit the fix to
 3. **Open a PR** from `sprint/N` → `main`:
    ```bash
    gh pr create \
-     --repo gust-lang/gust \
+     --repo moonlane-lang/moonlane \
      --base main \
      --head sprint/N \
      --title "Sprint N — <theme>" \

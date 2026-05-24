@@ -10,7 +10,7 @@ Open a new sprint: create the sprint branch, the kickoff issue, assign issues to
 
 2. **Show the current backlog** for the active epic so the user can decide what goes into the sprint:
 ```bash
-gh issue list --repo gust-lang/gust --label "status:backlog" --json number,title,labels,milestone
+gh issue list --repo moonlane-lang/moonlane --label "status:backlog" --json number,title,labels,milestone
 ```
 
 3. **Ask the user** which issue numbers to include in this sprint before proceeding.
@@ -26,7 +26,7 @@ All sprint work must be committed to `sprint/<N>`. Nothing goes directly to `mai
 5. **Create the sprint kickoff issue:**
 ```bash
 gh issue create \
-  --repo gust-lang/gust \
+  --repo moonlane-lang/moonlane \
   --title "Sprint <N> Kickoff: <goal>" \
   --label "sprint:kickoff" \
   --body "## Sprint Goal
@@ -49,7 +49,7 @@ $(for each selected issue: - [ ] #N)
 
 6. **Mark each planned issue as in sprint** (label only — do not move to in-progress yet):
 ```bash
-gh issue edit <N> --repo gust-lang/gust \
+gh issue edit <N> --repo moonlane-lang/moonlane \
   --remove-label "status:backlog" \
   --add-label "status:in-progress"
 ```

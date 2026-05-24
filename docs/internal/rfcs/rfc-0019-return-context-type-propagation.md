@@ -15,7 +15,7 @@ Fix a bug in typechecker Pass 2 where `return` and `break` statements do not pro
 
 The spec states that `nope`'s type must be "determinable from context" and shows `return Result::Err { ... }` as valid code in a function annotated `-> Result<Float, String>`. Both currently fail with E0002 at the typechecker's Pass 2 stage.
 
-```gust
+```moonlane
 fun find(arr: Int[], target: Int) -> Perhaps<Int> {
     return nope;            // E0002 — cannot infer type of `nope`
 }
@@ -123,8 +123,8 @@ Small, isolated fix with no design risk. No new language surface. Implement befo
 ## References
 
 - Language spec: `docs/public/spec/types.md` (§ `Perhaps<T>`, § `Result<T, E>`)
-- `gust-interpreter/src/typechecker/construction.rs`
-- `gust-interpreter/src/typechecker/inference.rs` — `InferContext::current_return_type` for reference
+- `moonlane-interpreter/src/typechecker/construction.rs`
+- `moonlane-interpreter/src/typechecker/inference.rs` — `InferContext::current_return_type` for reference
 
 ## Decision
 

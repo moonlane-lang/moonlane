@@ -1,6 +1,6 @@
-# Gust Error Code Reference
+# Moonlane Error Code Reference
 
-All Gust errors carry a code. Codes are prefixed by phase:
+All Moonlane errors carry a code. Codes are prefixed by phase:
 
 | Prefix | Phase |
 |---|---|
@@ -15,10 +15,10 @@ All Gust errors carry a code. Codes are prefixed by phase:
 
 ### P0001 — Syntax error
 
-The source text does not match the Gust grammar.
+The source text does not match the Moonlane grammar.
 
 ```
-[P0001] parse error in main.gust at 12..18 (`let x = ;`): expected expression
+[P0001] parse error in main.mln at 12..18 (`let x = ;`): expected expression
 ```
 
 **Fix:** correct the syntax at the indicated position.
@@ -28,7 +28,7 @@ The source text does not match the Gust grammar.
 An integer literal is out of range for `i64` (−9,223,372,036,854,775,808 to 9,223,372,036,854,775,807).
 
 ```
-[P0002] parse error in main.gust at 4..24: integer literal '99999999999999999999' is out of range for i64
+[P0002] parse error in main.mln at 4..24: integer literal '99999999999999999999' is out of range for i64
 ```
 
 **Fix:** use a value that fits in `i64`, or split the computation.
@@ -38,7 +38,7 @@ An integer literal is out of range for `i64` (−9,223,372,036,854,775,808 to 9,
 A float literal cannot be represented as an `f64`.
 
 ```
-[P0003] parse error in main.gust at 4..12: invalid float literal '1e9999'
+[P0003] parse error in main.mln at 4..12: invalid float literal '1e9999'
 ```
 
 **Fix:** use a value within the `f64` range (~±1.8 × 10³⁰⁸).
@@ -52,7 +52,7 @@ A float literal cannot be represented as an `f64`.
 Two types that must be equal are not.
 
 ```
-[T0001] type error in main.gust at 10..20: expected Int, got Bool
+[T0001] type error in main.mln at 10..20: expected Int, got Bool
 ```
 
 **Fix:** ensure the expression produces the expected type. Add an explicit cast if widening (e.g. `x as Float`).
@@ -62,7 +62,7 @@ Two types that must be equal are not.
 The type checker cannot infer a type without an explicit annotation.
 
 ```
-[T0002] type error in main.gust at 5..10: cannot infer type of `x`; add a type annotation
+[T0002] type error in main.mln at 5..10: cannot infer type of `x`; add a type annotation
 ```
 
 **Fix:** annotate the binding: `let x: Int = ...`.
@@ -72,7 +72,7 @@ The type checker cannot infer a type without an explicit annotation.
 A name is used but not defined in the current scope.
 
 ```
-[T0003] type error in main.gust at 8..12: undefined name `foo`
+[T0003] type error in main.mln at 8..12: undefined name `foo`
 ```
 
 **Fix:** define the variable or function before use, or correct the spelling.
@@ -82,7 +82,7 @@ A name is used but not defined in the current scope.
 A function is called with the wrong number of arguments.
 
 ```
-[T0004] type error in main.gust at 5..20: expected 2 arguments, got 3
+[T0004] type error in main.mln at 5..20: expected 2 arguments, got 3
 ```
 
 **Fix:** pass the exact number of arguments the function declares.
@@ -92,7 +92,7 @@ A function is called with the wrong number of arguments.
 A binary operator is applied to types it does not support.
 
 ```
-[T0005] type error in main.gust at 6..13: operator `+` cannot be applied to Bool and Int
+[T0005] type error in main.mln at 6..13: operator `+` cannot be applied to Bool and Int
 ```
 
 **Fix:** use compatible types, or cast one operand.
@@ -102,7 +102,7 @@ A binary operator is applied to types it does not support.
 A `let` binding is assigned after initial definition.
 
 ```
-[T0006] type error in main.gust at 3..12: `x` is immutable; use `mut x` to allow reassignment
+[T0006] type error in main.mln at 3..12: `x` is immutable; use `mut x` to allow reassignment
 ```
 
 **Fix:** change the binding declaration to `mut`.
@@ -112,7 +112,7 @@ A `let` binding is assigned after initial definition.
 A `as` cast between incompatible types.
 
 ```
-[T0007] type error in main.gust at 5..15: cannot cast Bool to Int
+[T0007] type error in main.mln at 5..15: cannot cast Bool to Int
 ```
 
 **Fix:** only cast between numeric types (`Int as Float`). Use an explicit conversion function for other types.
@@ -122,7 +122,7 @@ A `as` cast between incompatible types.
 A `match` expression does not cover all possible values of the scrutinee type.
 
 ```
-[T0008] type error in main.gust at 2..30: match on Colour is non-exhaustive; missing variant `Blue`
+[T0008] type error in main.mln at 2..30: match on Colour is non-exhaustive; missing variant `Blue`
 ```
 
 **Fix:** add the missing arms, or add a wildcard arm `_ => ...`.
@@ -136,7 +136,7 @@ A `match` expression does not cover all possible values of the scrutinee type.
 Execution requires a `main` function but none was found.
 
 ```
-[R0001] runtime error in main.gust at 0..0: no main() function defined
+[R0001] runtime error in main.mln at 0..0: no main() function defined
 ```
 
 **Fix:** add `fn main() { ... }` to your program.
@@ -146,7 +146,7 @@ Execution requires a `main` function but none was found.
 `main` exists but is generic or is not a function.
 
 ```
-[R0002] runtime error in main.gust at 0..0: main() is generic — not supported in v0.1
+[R0002] runtime error in main.mln at 0..0: main() is generic — not supported in v0.1
 ```
 
 **Fix:** `main` must be a concrete, non-generic function with no parameters.
@@ -156,7 +156,7 @@ Execution requires a `main` function but none was found.
 A variable name is not found in the current environment. This can occur when a variable is used before it is defined in a branch that the type-checker did not flag.
 
 ```
-[R0003] runtime error in main.gust at 10..15: undefined variable `x`
+[R0003] runtime error in main.mln at 10..15: undefined variable `x`
 ```
 
 ### R0004 — Index out of bounds
@@ -164,7 +164,7 @@ A variable name is not found in the current environment. This can occur when a v
 An array index is negative or ≥ the array length.
 
 ```
-[R0004] runtime error in main.gust at 5..10: index 5 out of bounds (len 3)
+[R0004] runtime error in main.mln at 5..10: index 5 out of bounds (len 3)
 ```
 
 **Fix:** check that the index is within `0..array.len()` before access.
@@ -174,7 +174,7 @@ An array index is negative or ≥ the array length.
 A tuple element is accessed by an index that does not exist.
 
 ```
-[R0005] runtime error in main.gust at 5..10: tuple index 3 out of bounds
+[R0005] runtime error in main.mln at 5..10: tuple index 3 out of bounds
 ```
 
 **Fix:** tuple indices are fixed at compile time; verify the index against the tuple's declared length.
@@ -184,7 +184,7 @@ A tuple element is accessed by an index that does not exist.
 A `match` expression reached its end without any arm matching. This indicates a pattern that the type checker approved as exhaustive but that is not, which is a known limitation.
 
 ```
-[R0006] runtime error in main.gust at 2..30: match: no arm matched scrutinee
+[R0006] runtime error in main.mln at 2..30: match: no arm matched scrutinee
 ```
 
 ### R0007 — Arithmetic error
@@ -192,7 +192,7 @@ A `match` expression reached its end without any arm matching. This indicates a 
 Integer division or remainder by zero.
 
 ```
-[R0007] runtime error in main.gust at 8..13: division by zero
+[R0007] runtime error in main.mln at 8..13: division by zero
 ```
 
 **Fix:** guard with a zero check before dividing.
@@ -202,7 +202,7 @@ Integer division or remainder by zero.
 A struct or enum value does not have the accessed field.
 
 ```
-[R0008] runtime error in main.gust at 5..12: no field `colour` on value
+[R0008] runtime error in main.mln at 5..12: no field `colour` on value
 ```
 
 **Fix:** check the field name against the type definition.
@@ -212,7 +212,7 @@ A struct or enum value does not have the accessed field.
 A method call cannot be resolved for the receiver type.
 
 ```
-[R0009] runtime error in main.gust at 5..20: no method `draw` on `Circle`
+[R0009] runtime error in main.mln at 5..20: no method `draw` on `Circle`
 ```
 
 **Fix:** define the method in an `impl` block for the type.
@@ -222,7 +222,7 @@ A method call cannot be resolved for the receiver type.
 A call expression (`f(...)`) is applied to a value that is not a function or closure.
 
 ```
-[R0010] runtime error in main.gust at 3..8: call: expected a closure or builtin
+[R0010] runtime error in main.mln at 3..8: call: expected a closure or builtin
 ```
 
 ### R0011 — Invalid for-in iterator
@@ -230,7 +230,7 @@ A call expression (`f(...)`) is applied to a value that is not a function or clo
 A `for x in expr` loop where `expr` does not evaluate to an `Array` or `Range`.
 
 ```
-[R0011] runtime error in main.gust at 1..20: for-in: expected Array or Range
+[R0011] runtime error in main.mln at 1..20: for-in: expected Array or Range
 ```
 
 **Fix:** ensure the iterable is an array literal, a range (`a..b`), or a variable of those types.
@@ -240,7 +240,7 @@ A `for x in expr` loop where `expr` does not evaluate to an `Array` or `Range`.
 The `?` operator is applied to a value that is not a `Result`.
 
 ```
-[R0012] runtime error in main.gust at 5..10: ?: expected a Result value
+[R0012] runtime error in main.mln at 5..10: ?: expected a Result value
 ```
 
 **Fix:** only use `?` on expressions whose type is `Result[T, E]`.
@@ -257,7 +257,7 @@ The interpreter reached an impossible state. This is a bug in the interpreter �
 [I0001] internal error: binop: unsupported operand types (typechecker should have caught this)
 ```
 
-**What to do:** please file a bug report at <https://github.com/Vladastos/gust/issues> with the source program that triggered this error.
+**What to do:** please file a bug report at <https://github.com/Vladastos/moonlane/issues> with the source program that triggered this error.
 
 ### I0002 — Not implemented
 

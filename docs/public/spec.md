@@ -1,21 +1,21 @@
 ---
 id: doc-2
-title: "Gust Language Specification"
+title: "Moonlane Language Specification"
 type: spec
 version: v0.2
 created_date: '2026-05-16'
 ---
 
-> **Status:** Active. This document is the single source of truth for the Gust language.
+> **Status:** Active. This document is the single source of truth for the Moonlane language.
 > Features not described here are not part of the language.
 
-Source files use the `.gust` extension.
+Source files use the \`.mln\` extension.
 
 ---
 
 ## Overview
 
-Gust is a statically typed, expression-oriented language with a Rust-inspired syntax that runs in two first-class execution modes: a production-quality interpreter and a native compiler. The same source file runs in both. Neither mode is a prototype or a stepping stone — both are permanent, supported, and maintained to the same standard.
+Moonlane is a statically typed, expression-oriented language with a Rust-inspired syntax that runs in two first-class execution modes: a production-quality interpreter and a native compiler. The same source file runs in both. Neither mode is a prototype or a stepping stone — both are permanent, supported, and maintained to the same standard.
 
 The language's core design principles are:
 

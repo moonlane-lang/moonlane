@@ -2,7 +2,7 @@
 
 ## Comments
 
-```gust
+```moonlane
 // Single-line comment
 
 /* Multi-line
@@ -35,13 +35,13 @@ use       where     while
 ## Literals
 
 **Integers** — decimal, with optional `_` separators:
-```gust
+```moonlane
 42
 1_000_000
 ```
 
 **Floats:**
-```gust
+```moonlane
 3.14
 2.0
 ```

@@ -16,7 +16,7 @@ Introduce `unsafe { }` blocks and `unsafe fun` declarations as explicit escape h
 
 The safe memory model (RFC-0024 linear types, RFC-0001 pointers, RFC-0003 Send constraints) is statically verified. This verification is necessarily conservative: the compiler rejects programs it cannot prove safe, including some programs that are in fact correct but whose correctness depends on invariants the type system cannot represent.
 
-Concrete cases that safe Gust cannot express:
+Concrete cases that safe Moonlane cannot express:
 
 - **FFI.** Calling a C function requires raw pointers, which have no safety guarantees at the boundary. The type system cannot verify that a `*mut T` passed to `malloc`/`free` is used correctly.
 - **Hardware/OS interfaces.** Memory-mapped I/O, syscalls, and interrupt handlers operate at addresses the type system knows nothing about.
@@ -32,9 +32,9 @@ Without an escape hatch, these use cases require the programmer to work around t
 
 ### `unsafe { }` blocks
 
-An `unsafe` block is an expression that opts its body out of a specific set of static checks. Outside those checks, the body is otherwise normal Gust code — types are still checked, syntax is still enforced.
+An `unsafe` block is an expression that opts its body out of a specific set of static checks. Outside those checks, the body is otherwise normal Moonlane code — types are still checked, syntax is still enforced.
 
-```gust
+```moonlane
 let result = unsafe {
     let raw = region.create_unchecked(MyStruct { ... });
     raw.field + 1
@@ -49,7 +49,7 @@ The return type of `unsafe { ... }` is the type of the last expression in the bl
 
 A function declared `unsafe fun` may only be called from within an `unsafe { }` block or another `unsafe fun`. Calling an `unsafe fun` outside an unsafe context is a compile error.
 
-```gust
+```moonlane
 unsafe fun memcpy(dst: *mut Byte, src: *const Byte, n: Int) {
     // raw memory copy — no bounds checking, no type safety
 }
@@ -64,7 +64,7 @@ unsafe {
 
 ### What `unsafe` relaxes
 
-| Check | Safe Gust | Inside `unsafe` |
+| Check | Safe Moonlane | Inside `unsafe` |
 |---|---|---|
 | Linearity — double use | Compile error | Permitted |
 | Linearity — unconsumed value | Compile error | Permitted |
@@ -82,7 +82,7 @@ Type checking remains fully enforced inside `unsafe`. An expression of type `Int
 
 To pass a non-`Send` value across a fiber boundary (e.g. to implement `Arc` or a lock-free queue), an explicit `unsafe_send(value)` cast is required inside an `unsafe` block:
 
-```gust
+```moonlane
 unsafe {
     let raw: *mut T = get_shared_ptr();
     ch <- unsafe_send(raw);   // programmer asserts Send is safe here
@@ -95,7 +95,7 @@ unsafe {
 
 Inside an `unsafe` block, the linearity checker is relaxed — a linear value may be used zero times or more than once. This does not change the semantics at runtime — double-freeing or leaking a resource still causes the same runtime consequences. `unsafe` just means the programmer has asserted these won't happen.
 
-```gust
+```moonlane
 let buf = Buffer::alloc(1024);
 unsafe {
     let raw: *mut Byte = &mut buf as *mut Byte;  // take pointer to linear value — forbidden in safe code
@@ -107,7 +107,7 @@ buf.free();
 
 ### Propagation
 
-`unsafe` does not propagate. A safe function called from within an `unsafe` block is still subject to all safe-Gust rules. Only the direct body of the `unsafe { }` block or `unsafe fun` is relaxed.
+`unsafe` does not propagate. A safe function called from within an `unsafe` block is still subject to all safe-Moonlane rules. Only the direct body of the `unsafe { }` block or `unsafe fun` is relaxed.
 
 The inverse also holds: an `unsafe fun` can call safe functions freely.
 
@@ -123,9 +123,9 @@ If linear types, regions, and the safe pointer model cover all practical use cas
 
 ### `extern` blocks only (C FFI-scoped unsafe)
 
-Restrict the escape hatch to `extern` declarations that call into C. Unsafe is only required at the FFI boundary; all Gust-to-Gust code is safe.
+Restrict the escape hatch to `extern` declarations that call into C. Unsafe is only required at the FFI boundary; all Moonlane-to-Moonlane code is safe.
 
-**Partial merit:** this is simpler and more restricted. However, it does not cover the region allocation (Option B), lock-free data structure, or custom allocator use cases. Those require unsafe operations entirely within Gust code.
+**Partial merit:** this is simpler and more restricted. However, it does not cover the region allocation (Option B), lock-free data structure, or custom allocator use cases. Those require unsafe operations entirely within Moonlane code.
 
 ### Trusted functions (no block syntax)
 

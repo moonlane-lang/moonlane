@@ -45,7 +45,7 @@ Linear types originate in Girard's linear logic (1987). The following table cove
 | FabULous — Scherer et al. (2017) | Multi-language interoperability between ML (GC) and a linear language, full abstraction | GC, not RC; boundary is about multi-language interop, not opt-in linearity |
 | Quill — Morris (2016) | Mixes linear and unrestricted types via qualified types | No memory management model |
 
-### What is explicitly prior art for Gust
+### What is explicitly prior art for Moonlane
 
 - Hindley-Milner type inference
 - Reference counting as a memory management strategy
@@ -78,7 +78,7 @@ A `&T` restricted to expression position only — cannot be bound to a `let`, st
 
 The *specific syntactic mechanism* — expression-position-only as the no-escape guarantee, with no lifetime annotation machinery — does not appear verbatim in the literature. However, the problem it solves (inspection without consumption) is actively studied:
 
-- **Austral** has region-scoped borrows (`&[T, Region]`) that cannot escape the borrow block. Unlike Gust's `&T`, Austral's borrows can be bound to names and passed around inside the scope. The no-escape guarantee comes from a type-level region tag, not from a syntactic expression-position restriction. Austral has no formal soundness paper.
+- **Austral** has region-scoped borrows (`&[T, Region]`) that cannot escape the borrow block. Unlike Moonlane's `&T`, Austral's borrows can be bound to names and passed around inside the scope. The no-escape guarantee comes from a type-level region tag, not from a syntactic expression-position restriction. Austral has no formal soundness paper.
 - **Affe** (ICFP 2020) has Rust-style shared borrows that can be named inside a scope. Full type inference and formal soundness. Not expression-position-only.
 - **Mezzo** (TOPLAS 2016) has duplicable permissions that allow reading without consuming. References are storable within their permission scope. Full Coq proof. Not expression-position-only.
 - **Marshall & Orchard** (POPL 2024) unifies borrowing under graded types. Borrows are graded "fractional" capabilities, not an expression-scoped syntactic restriction.

@@ -7,13 +7,13 @@ status: incorporated
 
 ## Summary
 
-Rename a set of language keywords and builtin identifiers to align with the Gust wind theme. This is a **breaking change** targeting v0.2 — no edition gating. Three changes are accepted: `nope` → `None`, `trait` → `aspect`, and `mod` → `harness` (reserved for the future module system). One item is deferred: the `.yolo()` builtin rename, pending the stdlib migration of `Result` and `Perhaps`.
+Rename a set of language keywords and builtin identifiers to align with the Moonlane wind theme. This is a **breaking change** targeting v0.2 — no edition gating. Three changes are accepted: `nope` → `None`, `trait` → `aspect`, and `mod` → `harness` (reserved for the future module system). One item is deferred: the `.yolo()` builtin rename, pending the stdlib migration of `Result` and `Perhaps`.
 
 ---
 
 ## Motivation
 
-The language is named **Gust**. The current keyword set is a mix of Rust-influenced names (`trait`) and prototype-era playful names (`nope`) from an earlier development phase. A coherent naming strategy signals the language's identity and removes misleading familiarity: `trait` in Gust does not carry Rust's semantics (no orphan rules, no lifetime bounds, no `dyn` dispatch by default), so using the same word invites incorrect assumptions.
+The language is named **Moonlane**. The current keyword set is a mix of Rust-influenced names (`trait`) and prototype-era playful names (`nope`) from an earlier development phase. A coherent naming strategy signals the language's identity and removes misleading familiarity: `trait` in Moonlane does not carry Rust's semantics (no orphan rules, no lifetime bounds, no `dyn` dispatch by default), so using the same word invites incorrect assumptions.
 
 ---
 
@@ -23,7 +23,7 @@ The language is named **Gust**. The current keyword set is a mix of Rust-influen
 
 The `Perhaps` type's empty variant is renamed from `nope` (or `Perhaps::Nope`) to `None`.
 
-```gust
+```moonlane
 // Before
 let x: Perhaps<Int> = nope;
 
@@ -39,7 +39,7 @@ let x: Perhaps<Int> = None;
 
 Behaviour contracts are declared with `aspect` instead of `trait`.
 
-```gust
+```moonlane
 // Before
 trait Comparable {
     fun compare(other: Self) -> Int;
@@ -65,7 +65,7 @@ impl Comparable for Point { ... }
 
 `harness` is reserved as the module declaration keyword, to be activated when the module system (RFC-0009) is implemented.
 
-```gust
+```moonlane
 // Future syntax (RFC-0009)
 harness math {
     pub fun sqrt(x: Float) -> Float { ... }
@@ -86,7 +86,7 @@ Candidates noted for that future RFC:
 
 | Candidate | Notes |
 |---|---|
-| `.gust()` | Self-referential, memorable |
+| `.yolo()` | Self-referential, memorable |
 | `.blow()` | Direct wind action; terse |
 | `.squall()` | Fits panic semantics — sudden, violent |
 | `.breeze()` | Connotation: effortless — fits a "just give me the value" call |
@@ -108,7 +108,7 @@ All other keywords remain as-is: `fun`, `let`, `mut`, `struct`, `enum`, `type`, 
 | `trait` keyword | → `aspect` | v0.2 (breaking) |
 | `harness` | reserved keyword | v0.2 (reserved, activated in RFC-0009) |
 | `.yolo()` | deferred | stdlib migration phase |
-| File extension `.yolo` | no change | — |
+| File extension `.mln` | adopted | v0.1 |
 
 ---
 

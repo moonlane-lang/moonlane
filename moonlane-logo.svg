@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="320" viewBox="0 0 1200 320" fill="none">
+
+  <!-- Left chevron -->
+  <path d="M110 160 L145 125 M110 160 L145 195"
+        stroke="#8B3DFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Mask that subtracts the cutout circle -->
+  <mask id="crescent-mask">
+    <rect x="0" y="0" width="1200" height="320" fill="white"/>
+    <circle cx="312" cy="144" r="70" fill="black"/>
+  </mask>
+
+  <!-- Crescent moon -->
+  <g>
+    <circle cx="288" cy="160" r="70" fill="#F7A1E8" mask="url(#crescent-mask)"/>
+  </g>
+
+  <!-- Star (moved 12px left) -->
+  <path d="M363 66
+           L371 90
+           L395 98
+           L371 106
+           L363 130
+           L355 106
+           L331 98
+           L355 90 Z"
+        fill="#F38AEF"/>
+
+  <!-- Right chevron -->
+  <path d="M445 125 L480 160 M445 195 L480 160"
+        stroke="#8B3DFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Divider -->
+  <line x1="560" y1="70" x2="560" y2="250" stroke="#111111" stroke-width="4"/>
+
+  <!-- Wordmark -->
+  <text x="620" y="195" font-family="Inter, Arial, Helvetica, sans-serif"
+        font-size="88" font-weight="700" fill="#0A0A14" letter-spacing="-3">
+    moonlane
+  </text>
+
+</svg>

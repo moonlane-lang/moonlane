@@ -1,6 +1,6 @@
 # Functions
 
-```gust
+```moonlane
 fun add(a: Int, b: Int) -> Int {
     return a + b;
 }
@@ -12,7 +12,7 @@ Parameter type annotations are optional when types can be inferred from context.
 
 `impl` blocks may contain functions with no `self` parameter. These are called on the type via `::` syntax and serve as the canonical constructor pattern:
 
-```gust
+```moonlane
 impl Point {
     fun new(x: Float, y: Float) -> Point {
         return Point { x: x, y: y };
@@ -26,7 +26,7 @@ let p = Point::new(1.0, 2.0);
 
 Functions are first-class values and can be assigned, passed, and returned:
 
-```gust
+```moonlane
 let f = add;
 f(1, 2);   // 3
 
@@ -41,14 +41,14 @@ The type of a function or closure is written as `fun(ParamTypes) -> ReturnType`.
 
 Anonymous functions are written with `fun` in expression position:
 
-```gust
+```moonlane
 let double = fun(x: Int) -> Int { return x * 2; };
 double(5);   // 10
 ```
 
 Closures capture variables from their enclosing scope. Captured `mut` variables are shared — mutations are visible in the outer scope:
 
-```gust
+```moonlane
 mut count = 0;
 let inc = fun() { count += 1; };
 inc();
@@ -60,7 +60,7 @@ inc();
 
 Inside a function returning `Result<T, E>`, `?` propagates errors early:
 
-```gust
+```moonlane
 fun parse_and_double(s: String) -> Result<Int, String> {
     let n = parse_int(s)?;   // returns Err early if parse_int fails
     return Result::Ok { value: n * 2 };

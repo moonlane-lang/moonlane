@@ -26,8 +26,8 @@ The spec ([Static Dispatch Only](../../public/spec/declarations.md#static-dispat
 ## Open Questions
 
 - **Syntax**: `dyn Trait` (Rust-style), just `Trait` as a type (Go-style), or something else?
-- **Sizing**: trait objects are unsized. Does Gust need a `Box<dyn Trait>` / heap-allocated wrapper, or does the runtime's RC model absorb this?
-- **Object safety**: which traits can be used as trait objects? Methods with `Self` in position other than receiver break object safety in Rust. Does Gust adopt the same rule?
+- **Sizing**: trait objects are unsized. Does Moonlane need a `Box<dyn Trait>` / heap-allocated wrapper, or does the runtime's RC model absorb this?
+- **Object safety**: which traits can be used as trait objects? Methods with `Self` in position other than receiver break object safety in Rust. Does Moonlane adopt the same rule?
 - **Interaction with generics**: can a generic function accept `dyn Trait` as a type argument?
 
 ---

@@ -8,7 +8,7 @@
 
 ## Overview
 
-Four open RFCs collectively define Gust's memory and concurrency model. They were written independently but are deeply interdependent — accepting or implementing any one of them without resolving the others will produce inconsistencies that require breaking changes later. This document maps the conflicts, establishes the decisions that must be made, and proposes a resolution order.
+Four open RFCs collectively define Moonlane's memory and concurrency model. They were written independently but are deeply interdependent — accepting or implementing any one of them without resolving the others will produce inconsistencies that require breaking changes later. This document maps the conflicts, establishes the decisions that must be made, and proposes a resolution order.
 
 The four RFCs:
 
@@ -55,7 +55,7 @@ RFC-0006 explicitly lists RFC-0001 and RFC-0003 as blocking dependencies. RFC-00
 
 RFC-0001 proposes `&x` as the address-of operator, producing a storable, RC-backed `*T` pointer:
 
-```gust
+```moonlane
 mut x: Int = 42;
 let p: *Int = &x;       // p is a *Int — storable, cloneable, RC-backed
 let q: *mut Int = &mut x;
@@ -63,7 +63,7 @@ let q: *mut Int = &mut x;
 
 RFC-0024 proposes `&T` as a read reference — a non-storable, expression-only view used to inspect a linear value without consuming it:
 
-```gust
+```moonlane
 let buf = Buffer::alloc(1024);
 let len = buf_len(&buf);   // &buf is a temporary — cannot be stored, cannot outlive the expression
 ```
@@ -108,7 +108,7 @@ This leaves no way to use a linear value from an enclosing scope inside a closur
 - **Explicit opt-in** — a `move` qualifier on the closure (as in Rust's `move || { ... }`) transfers all linear free variables. Non-linear values can still be clone-captured.
 - **Per-variable** — something like `capture(move buf, clone counter)` in the closure header. Maximum control, maximum verbosity.
 
-The explicit opt-in (`move fun(...) { ... }`) is the most consistent with Gust's "no implicit conversions" principle. Automatic move-capture for linear values specifically is a reasonable middle ground since the linear type system already tracks whether a value is consumed.
+The explicit opt-in (`move fun(...) { ... }`) is the most consistent with Moonlane's "no implicit conversions" principle. Automatic move-capture for linear values specifically is a reasonable middle ground since the linear type system already tracks whether a value is consumed.
 
 ---
 
@@ -152,7 +152,7 @@ Document whether "tracked unique pointers" (a `*T` known to be the sole alias) a
 
 With the pointer boundary established, RFC-0006 can be amended with a move capture form. The recommended approach is an explicit `move` qualifier on closures:
 
-```gust
+```moonlane
 let buf = Buffer::alloc(1024);
 let process = move fun() { buf.write(data); buf.free(); };
 // buf is consumed here — it has moved into the closure

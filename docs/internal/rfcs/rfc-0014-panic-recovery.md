@@ -7,7 +7,7 @@ status: draft
 
 ## Summary
 
-Define whether and how Gust programs can recover from panics — the runtime errors currently triggered by `.yolo()` on `nope`/`Err`, out-of-bounds access, and division by zero.
+Define whether and how Moonlane programs can recover from panics — the runtime errors currently triggered by `.yolo()` on `nope`/`Err`, out-of-bounds access, and division by zero.
 
 ---
 

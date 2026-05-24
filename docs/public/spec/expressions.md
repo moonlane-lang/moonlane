@@ -4,7 +4,7 @@
 
 `match` performs exhaustive pattern matching. All cases must be covered.
 
-```gust
+```moonlane
 match value {
     pattern => expression,
     _       => expression,   // catch-all
@@ -13,7 +13,7 @@ match value {
 
 Each arm body can be a single expression **or** a block:
 
-```gust
+```moonlane
 match value {
     pattern => expression,
     _       => { stmts* expression? },
@@ -22,7 +22,7 @@ match value {
 
 `match` is an expression — all arms must produce the same type:
 
-```gust
+```moonlane
 let label = match x {
     0 => "zero",
     1 => "one",
@@ -32,7 +32,7 @@ let label = match x {
 
 Arms with blocks follow the same rules as function bodies: the block's tail expression (if present) is the arm's value; a block with no tail produces `Unit`.
 
-```gust
+```moonlane
 let desc: String = match shape {
     Shape::Circle { radius } => {
         let area = radius * radius;
@@ -56,7 +56,7 @@ let desc: String = match shape {
 
 ### Examples
 
-```gust
+```moonlane
 // enum destructuring
 match shape {
     Shape::Circle { radius } => println(float_to_string(radius)),
@@ -85,7 +85,7 @@ match point {
 
 ### If / Else
 
-```gust
+```moonlane
 if (condition) {
     // ...
 } else if (other) {
@@ -97,13 +97,13 @@ if (condition) {
 
 `if` is also an expression (both branches must produce the same type):
 
-```gust
+```moonlane
 let label = if (x > 0) { "positive" } else { "non-positive" };
 ```
 
 ### While
 
-```gust
+```moonlane
 while (condition) {
     // ...
 }
@@ -111,7 +111,7 @@ while (condition) {
 
 ### For
 
-```gust
+```moonlane
 for (mut i = 0; i < 10; i += 1) {
     // ...
 }
@@ -124,13 +124,13 @@ receives type `T`. `T[]` (array) and `Range` (produced by `..` and `..=`) implem
 `Iterable<T>` by default. User-defined types can be made iterable by implementing
 `Iterable<T>`:
 
-```gust
+```moonlane
 trait Iterable<T> {
     fun next(mut self) -> Perhaps<T>;
 }
 ```
 
-```gust
+```moonlane
 for (let item in collection) { ... }
 for (let i in 0..10) { ... }    // 0, 1, ..., 9
 for (let i in 0..=10) { ... }   // 0, 1, ..., 10
@@ -143,7 +143,7 @@ for (let i in 0..=10) { ... }   // 0, 1, ..., 10
 
 `loop` creates an infinite loop. It is the only loop form that can produce a value:
 
-```gust
+```moonlane
 loop {
     // runs forever unless break is used
 }
@@ -166,7 +166,7 @@ let result = loop {
 
 ### Return
 
-```gust
+```moonlane
 return;         // from a function returning ()
 return value;   // from a typed function
 ```

@@ -21,7 +21,7 @@ cast_expr = { unary_expr ~ ("as" ~ type_expr)* }
 
 This was implemented with only numeric casts in mind (`Int as Float`). It fails on any other use:
 
-```gust
+```moonlane
 let n = [] as String[];  // T0007: only Int as Float and identity casts are supported
 ```
 
@@ -32,11 +32,11 @@ The current implementation conflates two distinct concepts that warrant separate
 
 `as` is the right operator for explicit conversions. Rust's `as` is safe and explicit (not unsafe — no `unsafe` block required); Swift's `as` is safe for upcasts and checked downcasts. The common thread is that `as` signals a runtime operation the programmer is taking deliberate responsibility for. That is the correct home for `1 as Float`.
 
-What Gust is missing is the *other* operator: a way to annotate an expression's type for inference purposes, without any conversion. That is type ascription, and `:` is the established form (Scala uses `expr: Type` in expression position).
+What Moonlane is missing is the *other* operator: a way to annotate an expression's type for inference purposes, without any conversion. That is type ascription, and `:` is the established form (Scala uses `expr: Type` in expression position).
 
 The practical gap: without expression-level ascription, there is no way to write an empty array or empty `Perhaps` literal unless the binding already has a type annotation:
 
-```gust
+```moonlane
 // This works — annotation is on the binding
 let n: String[] = [];
 
@@ -81,7 +81,7 @@ Type ascription is **not** a runtime operation. It is a compile-time annotation 
 
 It is a type error if the inferred type of the sub-expression cannot be unified with the ascribed type.
 
-```gust
+```moonlane
 let n = [] : String[];     // ok — element type resolved to String
 let x = 1 : Int;           // ok — identity ascription
 let y = 1 : String;        // type error — Int is not String
@@ -125,7 +125,7 @@ The two operators are now cleanly distinct:
 | `: T` | type ascription | none | inferred type unifies with T |
 | `as T` | explicit conversion | yes | a conversion from the value's type to T is defined |
 
-```gust
+```moonlane
 let n = [] : String[];     // ascription — no conversion, inference hint only
 let x = 1 as Float;       // conversion — produces a Float at runtime
 let y = 3.14 as Int;      // conversion — truncates

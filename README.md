@@ -1,31 +1,42 @@
-# Gust
+<p align="center">
+  <img src="moonlane-logo.svg" alt="Moonlane" width="600"/>
+</p>
 
-A statically typed, expression-oriented language with first-class functions, explicit nullability, and a compiler at the horizon.
+A statically typed, expression-oriented language that runs in two first-class modes: a production-quality interpreter and a native compiler. The same source file, the same type checker, both targets permanently supported.
 
 ## Why?
 
-A sudden gust of inspiration — sometimes a project just takes flight on its own momentum. This one started with a suggestion: write an interpreter. The first iteration was chaotic momentum (hence the predecessor's name). The second iteration aims for clarity and structure, guided by better design up front.
+Most languages commit to one execution model. Scripting languages are interpreted and sacrifice performance. Systems languages compile and sacrifice startup time, embeddability, and the REPL. Moonlane is an attempt to refuse that trade.
 
-Gust draws heavily from Rust's approach: strong static typing, algebraic data types, explicit error handling — but designed to be learnable without the borrow checker's complexity. The goal is a language that feels safe and expressive without requiring deep knowledge of ownership mechanics.
+The closest reference point is OCaml — a language with equal engineering investment in its bytecode interpreter and native compiler. Moonlane tries to occupy an analogous position in the Rust-influenced design space: **Rust-like expressiveness and safety, in both a scriptable and a compilable form, without the mandatory borrow checker.**
 
-The implementation is intentionally simple: a tree-walk interpreter in Rust, paired with a living specification. They evolve together in a tight feedback loop, with real programs revealing gaps and design flaws before they ossify in a compiler.
+The mechanism is opt-in linear types instead of mandatory ownership. The goal is that the interpreter catches your resource management bugs at type-check time, and the compiler eliminates the runtime overhead on top of that — genuine value in both modes, not just one. Whether that holds up in practice is what this project is trying to find out.
 
 ## What?
 
-Gust is a statically typed, expression-oriented programming language. It features:
+### Available now (v0.1)
 
 - **Strong static typing** with local type inference (Hindley-Milner)
-- **Algebraic data types** — enums with data-carrying variants
+- **Algebraic data types** — structs and enums with data-carrying variants
 - **Exhaustive pattern matching**
 - **Explicit nullability** via `Perhaps<T>` (no null pointers)
-- **Explicit error handling** via `Result<T, E>`
+- **Explicit error handling** via `Result<T, E>` with `?` propagation
 - **First-class functions** and closures
-- **Generics** with compile-time monomorphization
+- **Generics** with trait bounds
 - **Traits** for ad-hoc polymorphism
-- **Memory managed by the runtime** (reference counting)
+- **Runtime memory management** via reference counting
 
-See the Language Specification for the complete definition.
+### Planned
 
+- **Opt-in linear types** — the `linear` keyword marks a type as use-exactly-once. The type checker statically prevents resource leaks, double-frees, and unconsumed handles. No runtime overhead; in the compiler, linear values are freed deterministically with zero allocator cost.
+
+- **Fiber green threads** — lightweight concurrent tasks launched with `spawn { }`. M:N scheduled by the runtime; no `async`/`await`, no function colouring. A function that blocks inside a fiber does not need a different declaration.
+
+- **Typed channels** — `Chan<T>` is the primary concurrency primitive. Values are transferred between fibers with `ch <- value` (send) and `<- ch` (receive). A `select` expression waits on multiple channels simultaneously. Channels are the natural transport for linear values: sending consumes the value, satisfying the exactly-once rule across fiber boundaries.
+
+- **C FFI** — `extern "C"` blocks declare functions callable via the C ABI. Calls require an `unsafe` block. The primary use case is Rust crate interop: any Rust crate can be exposed to Moonlane through a thin `#[no_mangle] extern "C"` shim, giving access to the full `crates.io` ecosystem.
+
+See the [Language Specification](docs/public/spec.md) and [RFCs](docs/internal/rfcs/) for the complete design.
 
 ## How?
 
@@ -43,7 +54,7 @@ Observe gaps, wrong assumptions, usability issues
 Refine the spec  →  implement the refinement  →  next feature
 ```
 
-The spec is the source of truth within each iteration — no code diverges from it — but the spec itself is a living document expected to evolve through usage. The tree-walk interpreter is the feedback mechanism: fast enough to iterate on, disposable enough not to over-invest in.
+The spec is the contract both the interpreter and the future compiler must satisfy. Any behaviour not described in the spec is a bug in whichever backend exhibits it. The interpreter is not scaffolding to be discarded when the compiler arrives — it is a permanent, supported execution mode with its own product requirements: embeddable as a library, a REPL, good error messages, stable public API.
 
 ## Quick Start
 
@@ -55,14 +66,14 @@ The spec is the source of truth within each iteration — no code diverges from 
 ### Build
 
 ```bash
-cd gust-interpreter
+cd moonlane-interpreter
 cargo build --release
 ```
 
 ### Run a Program
 
 ```bash
-cargo run -- path/to/program.gust
+cargo run -- path/to/program.mln
 ```
 
 ### Run Tests
@@ -72,15 +83,15 @@ cargo run -- path/to/program.gust
 cargo test
 
 # Type inference unit tests
-cargo test --test lib typeinference_tests
+cargo test --test typeinference_tests
 
 # Typechecking integration tests
-cargo test --test lib typechecking_tests
+cargo test --test typechecking_tests
 ```
 
 ## Example
 
-```gust
+```moonlane
 fun factorial(n: Int) -> Int {
     if (n <= 1) { 1 } else { n * factorial(n - 1) }
 }
@@ -91,8 +102,8 @@ let result = factorial(5);
 ## Project Structure
 
 ```
-Gust/
-├── gust-interpreter/
+Moonlane/
+├── moonlane-interpreter/
 │   ├── src/
 │   │   ├── parser/         # PEG grammar (pest) → untyped AST
 │   │   ├── ast/            # Untyped AST node definitions
@@ -103,7 +114,6 @@ Gust/
 │   │   ├── types/          # Concrete type representation
 │   │   └── error/          # Unified error type
 │   ├── tests/
-│   │   ├── lib.rs
 │   │   ├── typeinference/  # HM engine unit tests (phases 1–7)
 │   │   ├── typechecking/   # Full pipeline integration tests
 │   │   └── parsing/        # Parser tests
@@ -115,11 +125,12 @@ Gust/
 ## Resources
 
 - **Language Specification:** [`docs/public/spec.md`](docs/public/spec.md)
-- **Typechecker Architecture:** [`gust-interpreter/docs/typechecker.md`](gust-interpreter/docs/typechecker.md)
-- **Evaluator Design:** [`gust-interpreter/docs/evaluator.md`](gust-interpreter/docs/evaluator.md)
+- **Project Vision:** [`docs/internal/vision.md`](docs/internal/vision.md)
+- **Typechecker Architecture:** [`moonlane-interpreter/docs/typechecker.md`](moonlane-interpreter/docs/typechecker.md)
+- **Evaluator Design:** [`moonlane-interpreter/docs/evaluator.md`](moonlane-interpreter/docs/evaluator.md)
 - **RFCs:** [`docs/internal/rfcs/`](docs/internal/rfcs/) — language change proposals and decisions
-- **Decision Records:** [`gust-interpreter/docs/decisions/`](gust-interpreter/docs/decisions/) — implementation rationales
+- **Decision Records:** [`moonlane-interpreter/docs/decisions/`](moonlane-interpreter/docs/decisions/) — implementation rationales
 
 ## License
 
-Gust is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+Moonlane is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.

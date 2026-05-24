@@ -8,13 +8,13 @@ target:
 
 ## Summary
 
-Add opt-in linear types to Gust. A value whose type is declared `linear` must be used **exactly once** — not silently dropped, not used twice. Linearity is checked statically as a second pass after type inference, with no runtime overhead. A narrow read-reference form `&T` (expression-only, non-storable) allows inspection without consumption. The default runtime-managed memory model is unchanged.
+Add opt-in linear types to Moonlane. A value whose type is declared `linear` must be used **exactly once** — not silently dropped, not used twice. Linearity is checked statically as a second pass after type inference, with no runtime overhead. A narrow read-reference form `&T` (expression-only, non-storable) allows inspection without consumption. The default runtime-managed memory model is unchanged.
 
 ---
 
 ## Motivation
 
-Gust's default memory model is runtime-managed (reference counting). This is ergonomic for most code, but insufficient for systems-level use cases where:
+Moonlane's default memory model is runtime-managed (reference counting). This is ergonomic for most code, but insufficient for systems-level use cases where:
 
 - A resource must be explicitly released (file handles, sockets, buffers)
 - Allocation and deallocation must be deterministic and zero-overhead
@@ -30,7 +30,7 @@ Linear types provide this without requiring the full ownership and borrow-checke
 
 The `linear` keyword annotates a `struct` or `enum` declaration:
 
-```gust
+```moonlane
 linear struct Buffer {
     ptr: Int,
     len: Int,
@@ -50,7 +50,7 @@ Any value whose static type is `linear` is subject to the use-exactly-once rule.
 
 A struct or enum that contains a `linear` field is itself treated as linear automatically. The `linear` keyword need not (and should not) be repeated on the outer type — it is inferred transitively:
 
-```gust
+```moonlane
 struct Request {
     body: Buffer,    // Buffer is linear → Request is implicitly linear
     url: String,
@@ -68,7 +68,7 @@ A linear value is **consumed** by any of:
 
 Consuming a linear value that has already been consumed is a compile error. A linear binding that reaches the end of its scope without being consumed is a compile error.
 
-```gust
+```moonlane
 let f = FileHandle::open("data.txt");
 f.close();   // consumed — ok
 
@@ -89,7 +89,7 @@ Without a way to inspect a linear value without consuming it, every method call 
 - `&T` is not itself linear — it may be used any number of times within its expression scope
 - A function that accepts `&T` may read from the value but cannot consume it (it does not own it)
 
-```gust
+```moonlane
 linear struct Buffer { ptr: Int, len: Int }
 
 fun buf_len(b: &Buffer) -> Int { b.len }
@@ -107,7 +107,7 @@ Mutable references are out of scope for this RFC. Mutation of a linear value is 
 
 Every branch of an `if` or `match` expression must leave all in-scope linear values in the same consumption state at the merge point. If a linear value is consumed in one branch, it must be consumed in all branches:
 
-```gust
+```moonlane
 let buf = Buffer::alloc(1024);
 
 if condition {
@@ -130,7 +130,7 @@ This rule applies to all arms of a `match` expression identically.
 
 A linear value created **outside** a loop body may not be consumed inside it. The consumption count would be unpredictable (zero iterations, one, or many):
 
-```gust
+```moonlane
 let buf = Buffer::alloc(1024);
 for item in items {
     buf.write(item);  // ERROR: buf created outside; cannot consume in loop body
@@ -139,7 +139,7 @@ for item in items {
 
 A linear value created **inside** a loop body is fine — it is created and consumed once per iteration:
 
-```gust
+```moonlane
 for item in items {
     let conn = Connection::open(item.addr);
     conn.send(item.data);
@@ -151,7 +151,7 @@ for item in items {
 
 To consume a linear value intentionally without performing any operation, use the built-in `drop`:
 
-```gust
+```moonlane
 let buf = Buffer::alloc(1024);
 drop(buf);   // consumed; satisfies the linearity checker
 ```
@@ -162,7 +162,7 @@ drop(buf);   // consumed; satisfies the linearity checker
 
 Destructuring a linear value in `let` or `match` consumes the outer value and introduces each field as a new binding. Each extracted linear field must itself be consumed:
 
-```gust
+```moonlane
 let Request { body, url } = req;   // req consumed; body is a new live linear binding
 body.free();                        // body consumed
 // url: String — non-linear, no constraint
@@ -170,7 +170,7 @@ body.free();                        // body consumed
 
 Partially destructuring a linear struct (binding some fields and ignoring others with `_`) is only valid if the ignored fields are non-linear. Ignoring a linear field is a compile error:
 
-```gust
+```moonlane
 let Buffer { ptr, .. } = buf;   // ERROR if len is linear or if Buffer has linear fields not bound
 ```
 
@@ -248,7 +248,7 @@ Linear types depend on generics (v0.2, RFC-0024 needs `fun<T: Linear>`). Target 
 
 - Language spec: `docs/public/spec.md`
 - Type system spec: `docs/public/spec/types.md`
-- Typechecker notes: `gust-interpreter/docs/typechecker.md`
+- Typechecker notes: `moonlane-interpreter/docs/typechecker.md`
 - Related: RFC-0003 (concurrency model), RFC-0006 (closure capture semantics)
 - RFC-0025: `docs/internal/rfcs/rfc-0025-region-allocation.md` — `Region` is a linear type; bulk deallocation complement to per-object linear management
 - RFC-0026: `docs/internal/rfcs/rfc-0026-unsafe-blocks.md` — linearity checker relaxed inside unsafe; escape hatch for FFI and custom allocators

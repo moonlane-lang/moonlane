@@ -12,12 +12,12 @@ Close a sprint: run the mandatory quality gate, then build and publish the sprin
 
 Read the kickoff issue to get the sprint goal and planned issue list:
 ```bash
-gh issue list --repo gust-lang/gust --search "Sprint $ARGUMENTS Kickoff" --state all --json number,title,body
+gh issue list --repo moonlane-lang/moonlane --search "Sprint $ARGUMENTS Kickoff" --state all --json number,title,body
 ```
 
 Categorise all planned issues as completed (closed) or carried over (still open):
 ```bash
-gh issue list --repo gust-lang/gust --milestone "v0.X" --state open --json number,title
+gh issue list --repo moonlane-lang/moonlane --milestone "v0.X" --state open --json number,title
 ```
 
 ---
@@ -29,7 +29,7 @@ Work through every gate in order. **If any gate fails, stop, report what failed,
 ### Gate 1: Test suite
 
 ```bash
-cd gust-interpreter && cargo test
+cd moonlane-interpreter && cargo test
 ```
 
 All tests must pass with zero failures. If any fail, fix them before continuing.
@@ -55,9 +55,9 @@ For every feature or fix introduced in the sprint, verify a test exists:
 
 | Change type | Required test location |
 |---|---|
-| New builtin | `gust-interpreter/tests/typechecking/sources/stage*_*.gust` — positive and at least one negative (wrong arg type) |
+| New builtin | `moonlane-interpreter/tests/typechecking/sources/stage*_*.mln` — positive and at least one negative (wrong arg type) |
 | New grammar construct | Parsing test or typechecking test |
-| New evaluator behaviour | Evaluator test in `gust-interpreter/tests/evaluator_tests.rs` or integration `.gust` file |
+| New evaluator behaviour | Evaluator test in `moonlane-interpreter/tests/evaluator_tests.rs` or integration `.mln` file |
 | Bug fix | A regression test that would have caught the original bug |
 | New error code | A negative typechecking or evaluator test that triggers it |
 
@@ -87,9 +87,9 @@ For every component touched during the sprint, check:
 
 | Component | Doc to verify |
 |---|---|
-| Evaluator (`src/evaluator/`) | `gust-interpreter/docs/evaluator.md` — Value variants, signals, builtins, known limitations |
-| Typechecker (`src/typechecker/`) | `gust-interpreter/docs/typechecker.md` — passes, constraints, inference rules |
-| Parser / grammar | `gust-interpreter/docs/architecture.md` — pipeline diagram still accurate |
+| Evaluator (`src/evaluator/`) | `moonlane-interpreter/docs/evaluator.md` — Value variants, signals, builtins, known limitations |
+| Typechecker (`src/typechecker/`) | `moonlane-interpreter/docs/typechecker.md` — passes, constraints, inference rules |
+| Parser / grammar | `moonlane-interpreter/docs/architecture.md` — pipeline diagram still accurate |
 
 Report any internal doc that is stale or missing.
 
@@ -106,7 +106,7 @@ For each commit, ask: did this change involve a non-obvious architectural decisi
 - A constraint or invariant that future contributors must know to avoid breaking the design
 - A workaround for a language or library limitation that isn't obvious from the code
 
-For each qualifying decision, verify a decision record exists in `gust-interpreter/docs/decisions/`. If any are missing, create them now — before the PR is opened.
+For each qualifying decision, verify a decision record exists in `moonlane-interpreter/docs/decisions/`. If any are missing, create them now — before the PR is opened.
 
 List every qualifying decision found and whether a record exists or was created.
 
@@ -122,7 +122,7 @@ For every failing gate from Step 2: fix the issue, commit to the sprint branch, 
 
 For each issue that is still open and was planned for this sprint:
 ```bash
-gh issue edit <N> --repo gust-lang/gust \
+gh issue edit <N> --repo moonlane-lang/moonlane \
   --remove-label "status:in-progress" \
   --add-label "status:backlog"
 ```
@@ -139,7 +139,7 @@ Edit the kickoff issue body to reflect what was actually completed vs. deferred 
 
 Epic progress — for each milestone touched this sprint:
 ```bash
-gh api repos/gust-lang/gust/milestones --jq '.[] | select(.title == "<milestone>") | "\(.title): \(.closed_issues)/\(.open_issues + .closed_issues) issues closed"'
+gh api repos/moonlane-lang/moonlane/milestones --jq '.[] | select(.title == "<milestone>") | "\(.title): \(.closed_issues)/\(.open_issues + .closed_issues) issues closed"'
 ```
 
 Spec changes — all commits on the sprint branch that touched `docs/`:
@@ -153,7 +153,7 @@ git log main..HEAD --oneline -- docs/
 
 ```bash
 gh issue create \
-  --repo gust-lang/gust \
+  --repo moonlane-lang/moonlane \
   --title "Sprint $ARGUMENTS Review" \
   --body "$(cat <<'EOF'
 ## Sprint Goal
@@ -197,7 +197,7 @@ Note the issue number returned — needed for the PR.
 
 ```bash
 gh pr create \
-  --repo gust-lang/gust \
+  --repo moonlane-lang/moonlane \
   --base main \
   --head sprint/$ARGUMENTS \
   --title "Sprint $ARGUMENTS — <theme>" \

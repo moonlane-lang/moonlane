@@ -14,7 +14,7 @@ If the current branch is not `sprint/<N>`, warn the user and do not proceed. All
 
 2. **Read the issue:**
 ```bash
-gh issue view <N> --repo gust-lang/gust
+gh issue view <N> --repo moonlane-lang/moonlane
 ```
 Display the title, description, acceptance criteria, labels, and milestone to the user.
 
@@ -22,7 +22,7 @@ Display the title, description, acceptance criteria, labels, and milestone to th
 
 4. **Mark as in-progress:**
 ```bash
-gh issue edit <N> --repo gust-lang/gust \
+gh issue edit <N> --repo moonlane-lang/moonlane \
   --remove-label "status:backlog" \
   --add-label "status:in-progress"
 ```

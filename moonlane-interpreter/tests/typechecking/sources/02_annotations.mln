@@ -1,0 +1,20 @@
+// Test: explicit type annotations
+//
+// When a type annotation is present on a let binding, the inferred type of
+// the value must unify with it. If they match, inference succeeds.
+// If they conflict, a type error is produced.
+//
+// All cases here are correct — annotation matches the inferred value type.
+//
+// Expected inferred types:
+//   x : Int          (annotation Int, value infers Int — unification succeeds)
+//   y : Float        (annotation Float, value infers Float)
+//   z : Bool         (annotation Bool, value infers Bool)
+//   s : String       (annotation String, value infers String)
+//   n : Perhaps<Int> (nope literal; type comes from annotation — Pass 2 expected_ty path)
+
+let x: Int = 100;
+let y: Float = 2.718;
+let z: Bool = false;
+let s: String = "moonlane";
+let n: Perhaps<Int> = nope;

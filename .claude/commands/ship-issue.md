@@ -8,7 +8,7 @@ Complete an issue: verify acceptance criteria, commit with the correct format, a
 
 1. **Read the issue** to retrieve title, acceptance criteria, and milestone:
 ```bash
-gh issue view <N> --repo gust-lang/gust
+gh issue view <N> --repo moonlane-lang/moonlane
 ```
 
 2. **Verify acceptance criteria.** Go through each checkbox in the issue body and confirm it is met. If any criterion is unmet, stop and tell the user what remains.
@@ -42,7 +42,7 @@ Closes #<N>
 
 7. **Verify the issue closes automatically on push**, or close it manually if not pushing immediately:
 ```bash
-gh issue close <N> --repo gust-lang/gust
+gh issue close <N> --repo moonlane-lang/moonlane
 ```
 
 8. **Update the GitHub Projects v2 board** status to "Done" via GraphQL.

@@ -23,7 +23,7 @@ Linear types (RFC-0024) give the programmer per-object control over allocation a
 
 For these patterns, per-object `free()` is not just redundant — it is slower than freeing the entire backing block at once. Region allocation (also called arena allocation or bump allocation) is the standard solution: allocate from the front of a contiguous block, free the whole block in one operation.
 
-The key design constraint for Gust: without lifetime annotations, a region-allocated pointer cannot be statically verified to not outlive the region. This RFC presents two options for handling that constraint and leaves the choice as an open decision.
+The key design constraint for Moonlane: without lifetime annotations, a region-allocated pointer cannot be statically verified to not outlive the region. This RFC presents two options for handling that constraint and leaves the choice as an open decision.
 
 ---
 
@@ -33,7 +33,7 @@ The key design constraint for Gust: without lifetime annotations, a region-alloc
 
 `Region` is a built-in linear type. It must be consumed — either by calling `region.free()` or by passing it to a consuming function. It cannot be cloned or stored behind `Rc`/`Arc` (all pointer-to-linear restrictions from RFC-0024 and RFC-0001 apply).
 
-```gust
+```moonlane
 let region = Region::new(4096);   // allocate a 4096-byte backing block
 // ... use the region ...
 region.free();                     // consumed; backing block is freed
@@ -43,7 +43,7 @@ region.free();                     // consumed; backing block is freed
 
 Region-allocated values are accessible only inside a callback passed to `region.scope(...)`. The callback receives a reference to the region and can allocate from it. The scope returns a value that must not contain region-internal references — enforced by restricting the return type to types that are `Send` (and therefore contain no raw pointers or region-internal borrows).
 
-```gust
+```moonlane
 let region = Region::new(65536);
 
 let result: ParseTree = region.scope(fun(r) {
@@ -62,9 +62,9 @@ region.free();
 
 ### Option B — Programmer-responsibility access (flexible, requires discipline)
 
-The region provides direct allocation. Region-allocated values are regular Gust values. The programmer is responsible for not using them after `region.free()` is called. This is not statically verified — it is a performance primitive that accepts the risk of use-after-free in exchange for flexibility.
+The region provides direct allocation. Region-allocated values are regular Moonlane values. The programmer is responsible for not using them after `region.free()` is called. This is not statically verified — it is a performance primitive that accepts the risk of use-after-free in exchange for flexibility.
 
-```gust
+```moonlane
 let region = Region::new(65536);
 let tokens = region.create(tokenise(source));
 let tree   = region.create(parse(tokens));

@@ -13,7 +13,7 @@ This document is the north star for the language's design and development direct
 
 ## Identity Statement
 
-Gust is a statically typed, expression-oriented language with a Rust-inspired syntax that runs in two first-class modes: a production-quality interpreter and a native compiler. Both modes are maintained to the same standard — neither is a prototype, a stepping stone, or an afterthought. The same source file runs in both.
+Moonlane is a statically typed, expression-oriented language with a Rust-inspired syntax that runs in two first-class modes: a production-quality interpreter and a native compiler. Both modes are maintained to the same standard — neither is a prototype, a stepping stone, or an afterthought. The same source file runs in both.
 
 ---
 
@@ -27,9 +27,9 @@ The following combination of properties is unoccupied in the current language la
 - **Static type system in both modes** — the same type checker runs before execution whether you interpret or compile *(currently interpreter only; compiler will share the same frontend)*
 - **Opt-in memory control** *(planned, RFC-0024)* — safe RC-managed memory by default; linear types for deterministic, zero-overhead allocation when needed
 
-The closest reference point is OCaml: a language that commits to both a bytecode interpreter and a native compiler with equal engineering investment. Gust occupies an analogous position but in the Rust-influenced, systems-adjacent design space that OCaml does not target.
+The closest reference point is OCaml: a language that commits to both a bytecode interpreter and a native compiler with equal engineering investment. Moonlane occupies an analogous position but in the Rust-influenced, systems-adjacent design space that OCaml does not target.
 
-This is not "Rust but easier." Rust's ownership model solves a specific problem (fearless concurrency + zero-cost memory) with a specific mechanism (mandatory borrow checking). Gust solves a different problem: **expressive, safe code that is both scriptable and compilable without changing the source.** The mechanism is different — opt-in linear types instead of mandatory ownership — and the goals are different — dual-mode execution instead of systems programming exclusively.
+This is not "Rust but easier." Rust's ownership model solves a specific problem (fearless concurrency + zero-cost memory) with a specific mechanism (mandatory borrow checking). Moonlane solves a different problem: **expressive, safe code that is both scriptable and compilable without changing the source.** The mechanism is different — opt-in linear types instead of mandatory ownership — and the goals are different — dual-mode execution instead of systems programming exclusively.
 
 ---
 
@@ -45,7 +45,7 @@ Implication: spec prose that is ambiguous enough to be implemented differently b
 
 ### 2. A shared test suite
 
-A cross-backend test corpus runs every Gust program against both the interpreter and the compiler and asserts identical output. Divergence between backends is a P0 bug regardless of which backend is "right." The test suite is the executable form of the spec.
+A cross-backend test corpus runs every Moonlane program against both the interpreter and the compiler and asserts identical output. Divergence between backends is a P0 bug regardless of which backend is "right." The test suite is the executable form of the spec.
 
 Implication: any feature that cannot be tested in both modes is not shippable until both modes support it.
 
@@ -115,7 +115,7 @@ See `docs/internal/research.md` for the full analysis: prior work map, per-claim
 
 **It does not mean equal performance.** The interpreter will always be slower than the compiler for CPU-bound workloads. This is expected and not a failure. They have different performance profiles for different use cases.
 
-**It does not mean the language is trying to be everything.** Gust is not a general-purpose scripting language in competition with Python. It is not a systems language in competition with Rust or Zig. It is a language for programmers who want Rust-like expressiveness and safety in both a scriptable and a compilable form — a specific and narrow target.
+**It does not mean the language is trying to be everything.** Moonlane is not a general-purpose scripting language in competition with Python. It is not a systems language in competition with Rust or Zig. It is a language for programmers who want Rust-like expressiveness and safety in both a scriptable and a compilable form — a specific and narrow target.
 
 **It does not mean the aesthetic is secondary.** The dark-fantasy visual identity, the wind-themed keywords, the deliberate naming choices — these are part of the project's personality. They are not in tension with the technical vision; they make the project recognisable.
 

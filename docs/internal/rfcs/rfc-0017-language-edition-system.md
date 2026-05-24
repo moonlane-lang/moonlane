@@ -29,7 +29,7 @@ An edition system decouples the evolution of the language from the update cycle 
 
 An `edition` directive is the first non-comment statement in a source file:
 
-```gust
+```moonlane
 edition "0.1";
 ```
 

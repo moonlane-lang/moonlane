@@ -5,7 +5,7 @@ type: guide
 created_date: '2026-05-21'
 ---
 
-# Gust Versioning Model
+# Moonlane Versioning Model
 
 This document is the authority on version numbering, the RFC lifecycle, and documentation conventions. All other guides defer to it on these topics.
 

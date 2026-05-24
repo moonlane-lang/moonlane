@@ -7,7 +7,7 @@ status: draft
 
 ## Summary
 
-Gust's `main()` function currently returns `()`. This was a deliberate design
+Moonlane's `main()` function currently returns `()`. This was a deliberate design
 choice: because `?` is only valid inside functions returning `Result<T, E>`, callers
 in `main` must handle errors explicitly — either via `match` or via `.yolo()`, which
 panics and signals intentional "I accept program termination if this fails" semantics.
@@ -22,7 +22,7 @@ The current design has an intentional philosophy: in `main`, every fallible call
 be handled visibly. The `.yolo()` escape hatch exists precisely for this: its name
 signals that the author knowingly accepts a panic (and therefore a non-zero, unclean
 exit) at that call site. This keeps error paths explicit at the highest level of the
-program, consistent with Gust's principle of explicit error handling.
+program, consistent with Moonlane's principle of explicit error handling.
 
 In practice, however, this creates friction. Most real programs contain many fallible
 operations at the top level (reading config, connecting to a database, parsing
@@ -36,7 +36,7 @@ in Rust 1.26 precisely because the ergonomic cost of not having it was high. The
 `Termination` trait lets the runtime print the error and exit with a non-zero code,
 giving programs a clean, informative exit path without boilerplate.
 
-The question is whether the same trade-off applies to Gust, and if so, how to
+The question is whether the same trade-off applies to Moonlane, and if so, how to
 introduce it without undermining the explicit-handling philosophy.
 
 ---
@@ -86,7 +86,7 @@ Silently treat `main` as returning `Result<(), !>` (or `Result<(), String>`), ma
 `?` always valid inside it, without requiring an explicit annotation.
 
 **Downside:** hides the return type from the programmer; reduces the transparency that
-Gust values.
+Moonlane values.
 
 ---
 

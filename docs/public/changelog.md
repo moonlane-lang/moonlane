@@ -1,5 +1,5 @@
 ---
-title: "Gust Language Changelog"
+title: "Moonlane Language Changelog"
 ---
 
 # Changelog

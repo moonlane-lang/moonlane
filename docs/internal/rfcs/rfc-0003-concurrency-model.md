@@ -7,13 +7,13 @@ status: draft
 
 ## Summary
 
-Define Gust's concurrency model: language-native fibers, typed channels as the primary communication primitive, a `select` expression for multiplexing, and a single `Send` marker trait to prevent data races at the type level without ownership semantics. The design follows Go's philosophy — concurrency is transparent syntactically, managed by the runtime, and idiomatic code communicates through channels rather than shared memory.
+Define Moonlane's concurrency model: language-native fibers, typed channels as the primary communication primitive, a `select` expression for multiplexing, and a single `Send` marker trait to prevent data races at the type level without ownership semantics. The design follows Go's philosophy — concurrency is transparent syntactically, managed by the runtime, and idiomatic code communicates through channels rather than shared memory.
 
 ---
 
 ## Motivation
 
-Gust's current spec has no concurrency primitives. Adding them now, before the pointer RFC (RFC-0001) is finalised, is important because the two designs are coupled: `*mut T` in a concurrent setting creates data races unless the type system or runtime prevents them. Resolving the concurrency model first lets RFC-0001 make the right choices about pointer transferability.
+Moonlane's current spec has no concurrency primitives. Adding them now, before the pointer RFC (RFC-0001) is finalised, is important because the two designs are coupled: `*mut T` in a concurrent setting creates data races unless the type system or runtime prevents them. Resolving the concurrency model first lets RFC-0001 make the right choices about pointer transferability.
 
 The three problems concurrency must address:
 
@@ -27,12 +27,12 @@ The chosen model determines how complex each of these is to express and how easy
 
 ## Design Philosophy
 
-Go's concurrency model provides the clearest reference point for Gust's stated goals:
+Go's concurrency model provides the clearest reference point for Moonlane's stated goals:
 
 > *"Don't communicate by sharing memory; share memory by communicating."*
 > — Rob Pike
 
-The concrete implications for Gust:
+The concrete implications for Moonlane:
 
 - **No function colouring** — launching a fiber does not require functions to be declared differently (`async fn` in Rust/JavaScript). Blocking inside a fiber is fine; the runtime schedules around it. This avoids the "what colour is my function?" problem entirely.
 - **Channels are the primary primitive** — values are *transferred* between fibers through typed channels, not *shared*. Fibers own their data; ownership moves when a value is sent.
@@ -48,7 +48,7 @@ The concrete implications for Gust:
 
 A fiber is a lightweight concurrent task launched with the `spawn` keyword:
 
-```gust
+```moonlane
 spawn { heavy_computation(data) }
 ```
 
@@ -56,7 +56,7 @@ spawn { heavy_computation(data) }
 
 Any expression is valid inside `spawn { ... }`. The return value of the block is discarded unless the fiber communicates through a channel.
 
-```gust
+```moonlane
 let ch: Chan<Int> = Chan::new();
 spawn {
     let result = compute();
@@ -75,7 +75,7 @@ There is no handle to a fiber — fibers are fire-and-forget at the language lev
 
 `Chan<T>` is a typed, bidirectional, first-class channel. Both unbuffered and buffered variants exist:
 
-```gust
+```moonlane
 // Unbuffered — sender blocks until receiver is ready
 let ch: Chan<Int> = Chan::new();
 
@@ -87,13 +87,13 @@ let ch: Chan<Int> = Chan::buffered(16);
 
 **Directional subtypes** (for documentation and API clarity, not enforced at the implementation level in the PoC):
 
-```gust
+```moonlane
 Chan<T>      // bidirectional (default)
 SendChan<T>  // write-only view
 RecvChan<T>  // read-only view
 ```
 
-`Chan<T>` coerces to `SendChan<T>` or `RecvChan<T>` where the directional type is expected. This mirrors Go's `chan<- T` and `<-chan T` but uses named types instead of directional syntax, which is more readable and consistent with Gust's type conventions.
+`Chan<T>` coerces to `SendChan<T>` or `RecvChan<T>` where the directional type is expected. This mirrors Go's `chan<- T` and `<-chan T` but uses named types instead of directional syntax, which is more readable and consistent with Moonlane's type conventions.
 
 ---
 
@@ -101,15 +101,15 @@ RecvChan<T>  // read-only view
 
 **Send** — `ch <- value`:
 
-```gust
+```moonlane
 ch <- 42;           // blocks if ch is unbuffered and no receiver is ready
 ```
 
-Send is a statement. It moves `value` into the channel; `value` is no longer accessible in the sending fiber after this point (value semantics — the value is copied into the channel buffer, consistent with Gust's existing copy semantics for structs).
+Send is a statement. It moves `value` into the channel; `value` is no longer accessible in the sending fiber after this point (value semantics — the value is copied into the channel buffer, consistent with Moonlane's existing copy semantics for structs).
 
 **Receive** — `<- ch`:
 
-```gust
+```moonlane
 let x = <- ch;      // blocks until a value is available
 ```
 
@@ -119,7 +119,7 @@ let x = <- ch;      // blocks until a value is available
 
 This models channel exhaustion without introducing a new primitive — `Perhaps<T>` already exists, and the close-signals-completion pattern maps cleanly onto it.
 
-```gust
+```moonlane
 while let Perhaps::Some { value: x } = <- ch {
     process(x);
 }
@@ -136,7 +136,7 @@ Marks the channel as closed. Further sends are a runtime panic. Receivers drain 
 
 `select` waits on multiple channel operations simultaneously, executing the first one that is ready. It is an expression — every arm produces a value of the same type.
 
-```gust
+```moonlane
 let result = select {
     v <- ch1       => process(v),
     ch2 <- payload => "sent",
@@ -152,7 +152,7 @@ let result = select {
 
 Semantics: if multiple arms are ready simultaneously, one is chosen at random (same as Go). This prevents starvation but means `select` with multiple ready arms is non-deterministic.
 
-```gust
+```moonlane
 // Fan-in: merge two channels into one result
 fun merge<T: Send>(a: RecvChan<T>, b: RecvChan<T>) -> Perhaps<T> {
     select {
@@ -169,7 +169,7 @@ fun merge<T: Send>(a: RecvChan<T>, b: RecvChan<T>) -> Perhaps<T> {
 
 `Send` is a marker trait — no methods, no implementations to write. A type that is `Send` can be moved across fiber boundaries (passed through a channel or captured by a `spawn { }` block).
 
-```gust
+```moonlane
 trait Send {}
 ```
 
@@ -193,7 +193,7 @@ The rule for `*T`/`*mut T` being non-`Send` is the single constraint that preven
 
 If shared read-only access is genuinely needed, wrap in a `Mutex<T>` or use `Arc<T>` (a reference-counted, `Send`-safe shared pointer — a standard library type, not a language primitive):
 
-```gust
+```moonlane
 // Wrong: *mut T is not Send
 let p: *mut Int = &mut x;
 ch <- p;   // type error: *mut Int does not implement Send
@@ -229,7 +229,7 @@ Go's goroutines are unstructured — a goroutine outlives its spawning scope, an
 
 **Structured concurrency** (Swift's `async let`, Kotlin's `launch { }` within a scope) ties fiber lifetime to a lexical scope. This prevents fiber leaks but requires a scope object and changes the programming model.
 
-For Gust's first concurrency implementation, **unstructured fibers** (`spawn { }`) are proposed, matching Go's model. Structured concurrency can be layered on top as a library pattern using `WaitGroup` and channels. If experience shows that fiber leaks are a common source of bugs, a structured API (`scope { |s| s.spawn { ... } }`) can be added without changing the core primitives.
+For Moonlane's first concurrency implementation, **unstructured fibers** (`spawn { }`) are proposed, matching Go's model. Structured concurrency can be layered on top as a library pattern using `WaitGroup` and channels. If experience shows that fiber leaks are a common source of bugs, a structured API (`scope { |s| s.spawn { ... } }`) can be added without changing the core primitives.
 
 ---
 
@@ -263,7 +263,7 @@ The recommended sequencing remains RFC-0001's Option B: resolve RFC-0001 (pointe
 
 ### `async`/`await` (Rust, JavaScript, TypeScript, Python)
 
-Functions are coloured: async functions must be called with `await`; non-async callers cannot. This solves structured concurrency naturally (tasks have explicit handles and lifetimes) but introduces the "what colour is my function?" problem. Every blocking operation requires an `async` propagation through the entire call stack. This complexity is inconsistent with Gust's goal of concurrency that is "easy to use and largely managed by the runtime."
+Functions are coloured: async functions must be called with `await`; non-async callers cannot. This solves structured concurrency naturally (tasks have explicit handles and lifetimes) but introduces the "what colour is my function?" problem. Every blocking operation requires an `async` propagation through the entire call stack. This complexity is inconsistent with Moonlane's goal of concurrency that is "easy to use and largely managed by the runtime."
 
 **Verdict:** rejected. The function colouring problem is a significant ergonomic cost that conflicts with the stated design goal.
 
@@ -275,7 +275,7 @@ Actors are isolated processes (no shared state at all) that communicate only via
 
 This model eliminates data races entirely — there is no shared memory to race on. It also maps well onto distributed systems (actor locations are transparent).
 
-**Downsides for Gust:**
+**Downsides for Moonlane:**
 - Higher abstraction overhead than fibers — every concurrent unit is a named actor
 - Requires a process supervisor tree for fault tolerance (desirable for Erlang; heavy for a general-purpose language)
 - Struct values would still need copying on send (same as channels), but the model is less composable with functions and iterators
@@ -292,7 +292,7 @@ Rust has two marker traits:
 
 The `Sync` trait is what makes `Arc<T>` safe: `Arc<T>` is `Send` only if `T: Sync`.
 
-For Gust, `Sync` would be needed if `*T` (read-only shared pointer) could be made `Send` when `T: Sync`. This mirrors Rust's treatment of `Arc<T>`.
+For Moonlane, `Sync` would be needed if `*T` (read-only shared pointer) could be made `Send` when `T: Sync`. This mirrors Rust's treatment of `Arc<T>`.
 
 **Decision:** defer `Sync` to a follow-up RFC. Introducing it now requires reasoning about `Arc<T>` (a standard library type not yet designed) and adds significant type-system complexity before the evaluator PoC even exists. The conservative position — all pointer types are non-`Send` — is sound and can be relaxed later. The converse (allowing `*T: Send` and discovering a soundness hole) would require a breaking spec change.
 
@@ -304,16 +304,16 @@ Go's channels are anonymous — you hold a reference to the channel, not to the 
 
 Named-process addressing enables supervision, restart, and distributed messaging. Anonymous channels enable simpler local coordination without a runtime registry.
 
-**Verdict:** anonymous channels (Go model) are simpler for the use cases Gust targets. Named processes are a future extension point if distribution is ever a goal.
+**Verdict:** anonymous channels (Go model) are simpler for the use cases Moonlane targets. Named processes are a future extension point if distribution is ever a goal.
 
 ---
 
 ## Open Questions
 
 1. **Fiber panic isolation**
-   Go terminates the whole program when any goroutine panics (unless `recover()` is used). Should Gust fiber panics be isolated (actor model — one fiber dies, others continue) or program-terminating (Go model — simple but unforgiving)?
+   Go terminates the whole program when any goroutine panics (unless `recover()` is used). Should Moonlane fiber panics be isolated (actor model — one fiber dies, others continue) or program-terminating (Go model — simple but unforgiving)?
    
-   The `Result<T, E>` type suggests Gust favours explicit error handling. A fiber could return a `Result<T, E>` through a channel rather than panicking. Whether panics inside fibers are always program-terminating or can be caught is unresolved.
+   The `Result<T, E>` type suggests Moonlane favours explicit error handling. A fiber could return a `Result<T, E>` through a channel rather than panicking. Whether panics inside fibers are always program-terminating or can be caught is unresolved.
 
 2. **`Chan<T>` close semantics and `Perhaps<T>` receive**
    The proposal makes `<- ch` return `Perhaps<T>`. Go's closed-channel receive returns the zero value with a second `ok bool` (two-return-value idiom). `Perhaps<T>` is cleaner but means receive always allocates a `Perhaps` wrapper.
@@ -324,10 +324,10 @@ Named-process addressing enables supervision, restart, and distributed messaging
    `SendChan<T>` and `RecvChan<T>` are proposed as stdlib types that `Chan<T>` coerces to. An alternative is language-level directional syntax (`chan<- T`, `<-chan T` as in Go). Language-level directional types would allow the typechecker to prevent sends on a receive-only channel at compile time. Proposed as library types for the initial design — promote to language-level if experience shows the coercion model is insufficient.
 
 4. **`select` with timeout**
-   Go's `select` with a timeout uses a `time.After(d)` channel. Should Gust provide a `Chan::timeout(duration) -> RecvChan<Unit>` stdlib function with the same pattern, or is a first-class `select` timeout arm needed?
+   Go's `select` with a timeout uses a `time.After(d)` channel. Should Moonlane provide a `Chan::timeout(duration) -> RecvChan<Unit>` stdlib function with the same pattern, or is a first-class `select` timeout arm needed?
 
 5. **Fiber names and observability**
-   Go's goroutines are anonymous at the language level but have stack traces in panics and the runtime debugger. Should Gust allow optional fiber names for debugging? (`spawn "worker" { ... }` or via a stdlib API.) Defer to tooling.
+   Go's goroutines are anonymous at the language level but have stack traces in panics and the runtime debugger. Should Moonlane allow optional fiber names for debugging? (`spawn "worker" { ... }` or via a stdlib API.) Defer to tooling.
 
 6. **`WaitGroup` ergonomics**
    `WaitGroup` is the standard Go pattern for "wait for N goroutines to finish." An alternative is a first-class `join` expression that waits for a set of fibers and collects their channel results. This would be more ergonomic than explicit `WaitGroup.add` / `WaitGroup.done` / `WaitGroup.wait` calls but requires fibers to have a first-class handle — which conflicts with the fire-and-forget model. Deferred.

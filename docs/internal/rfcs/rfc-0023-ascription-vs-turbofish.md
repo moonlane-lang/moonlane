@@ -16,7 +16,7 @@ Re-evaluate whether the type ascription operator (`:`) should remain in the lang
 
 RFC-0021 introduced `:` as a type ascription operator in expression position. Its primary motivation was resolving inherently ambiguous expressions — empty array literals and `nope` — in positions where no binding annotation is available:
 
-```gust
+```moonlane
 foo([] : String[]);                    // empty array in argument position
 foo(nope : Perhaps<String>);           // nope in argument position
 match flag { true => [] : Int[], ... } // empty literal in match arm
@@ -60,7 +60,7 @@ Turbofish and ascription solve overlapping but different problems:
 
 They are not equivalent. Consider a generic function with two independent type parameters:
 
-```gust
+```moonlane
 fun zip<A, B>(a: A[], b: B[]) -> (A, B)[] { ... }
 
 // Turbofish: one annotation covers both type parameters
@@ -72,7 +72,7 @@ zip([] : Int[], [] : String[])
 
 In this case turbofish is more concise. But for a function that returns an ambiguous type and takes no ambiguous arguments, ascription on the result is cleaner:
 
-```gust
+```moonlane
 fun empty<T>() -> T[] { [] }
 
 empty() : String[]     // ascription — clean

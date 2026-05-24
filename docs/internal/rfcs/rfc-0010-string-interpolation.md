@@ -15,7 +15,7 @@ Define syntax for embedding expressions inside string literals, eliminating the 
 
 Current string formatting requires:
 
-```gust
+```moonlane
 println("x = " + int_to_string(x) + ", y = " + float_to_string(y));
 ```
 

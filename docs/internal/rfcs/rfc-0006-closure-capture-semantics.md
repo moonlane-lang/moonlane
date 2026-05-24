@@ -16,7 +16,7 @@ Define how closures capture values from their enclosing scope, what mechanisms e
 The PoC evaluator captures all free variables by cloning them at closure definition time. This is correct for independent closures but makes two important patterns impossible:
 
 **Shared mutable state between closures:**
-```gust
+```moonlane
 // Intended: inc and get both operate on the same counter.
 // Under clone capture: each holds its own copy — inc's mutations are invisible to get.
 mut counter = 0;
@@ -25,7 +25,7 @@ let get = fun() -> Int { counter };
 ```
 
 **Mutation visible to the enclosing scope:**
-```gust
+```moonlane
 // Intended: calling double() updates the original.
 // Under clone capture: double works on a copy.
 mut x = 5;
@@ -34,7 +34,7 @@ double();
 // x is still 5 here
 ```
 
-These are genuine use cases; every production language with closures solves them somehow. Gust needs a principled answer before the PoC evaluator is rewritten.
+These are genuine use cases; every production language with closures solves them somehow. Moonlane needs a principled answer before the PoC evaluator is rewritten.
 
 The answer is constrained by two upstream RFCs:
 
@@ -56,7 +56,7 @@ Three axes define the problem:
 **By reference (Go model):** the closure holds an implicit pointer to the enclosing scope's binding. Mutations are visible in both directions. This is the source of Go's classic closure-over-loop-variable bug (`for i := range xs { go func() { use(i) }() }` where all goroutines see the final value of `i`).
 
 **Explicit pointer capture (RFC-0001 model):** value capture by default; reference capture requires the programmer to explicitly take a pointer before closing:
-```gust
+```moonlane
 mut counter = 0;
 let p = &mut counter;
 let inc = fun() -> () { *p += 1; };
@@ -88,7 +88,7 @@ RFC-0003 requires all values captured by a `spawn { }` block to be `Send`. RFC-0
 Closures capture by value. At definition time, every free variable that appears in the closure body is cloned into the closure's environment. This is the current PoC behaviour and becomes the permanent default.
 
 Rationale:
-- Consistent with Gust's existing value semantics (struct assignment clones).
+- Consistent with Moonlane's existing value semantics (struct assignment clones).
 - No implicit aliasing — the programmer always sees a clone at the definition site.
 - `spawn { }` compatibility: value-capture closures are spawnable when all captured types are `Send`.
 - Eliminates the loop variable bug class entirely.
@@ -97,7 +97,7 @@ Rationale:
 
 To share mutable state between two closures, the programmer takes an explicit pointer before closing over it:
 
-```gust
+```moonlane
 mut counter = 0;
 let p: *mut Int = &mut counter;
 let inc = fun() -> () { *p += 1; };
@@ -119,7 +119,7 @@ A closure passed to or spawned by `spawn { }` must have all captures satisfy `Se
 
 For shared mutable state across fiber boundaries, wrap in `Arc<Mutex<T>>`:
 
-```gust
+```moonlane
 let counter: Arc<Mutex<Int>> = Arc::new(0);
 let c1 = counter;   // Arc::clone — shares the same Mutex
 let c2 = counter;
@@ -139,7 +139,7 @@ The single dimension is therefore: **does this closure hold any non-`Send` captu
 
 **Syntax:** an optional `send` qualifier on the function type:
 
-```gust
+```moonlane
 fun(T) -> R         // unqualified — captures may or may not be Send
 send fun(T) -> R    // qualified — all captures are guaranteed Send
 ```
@@ -150,7 +150,7 @@ Free functions (no captures) are always `send fun`. A closure literal is inferre
 
 **Inference:** the compiler infers the most precise type the closure satisfies. If all captures are `Send`, the inferred type is `send fun`; otherwise `fun`. The programmer may also write the qualifier explicitly to get a compile-time check:
 
-```gust
+```moonlane
 // Inferred as send fun — counter: Int is Send
 let inc: send fun() -> () = fun() -> () { counter += 1; };
 
@@ -163,7 +163,7 @@ let safe: send fun() -> Int = fun() -> Int { captured_int };
 
 **Parameter types and API boundaries:** a function that accepts a closure can declare whether it requires `Send`-ness:
 
-```gust
+```moonlane
 // Accepts any closure — cannot guarantee spawnability
 fun run(f: fun() -> Int) -> Int { f() }
 
@@ -186,7 +186,7 @@ fun run_parallel(f: send fun() -> Int) -> Int {
 
 All closures close over references to the enclosing scope. Mutations are always shared.
 
-**Rejected.** Implicit aliasing violates Gust's design principle of "no implicit conversions." The loop variable bug is a well-documented footgun. Cross-fiber spawning of closures with reference captures requires the programmer to think about `Send` for every closure; Go simply has no such protection and races are possible. Explicit pointer capture makes aliasing visible at the definition site.
+**Rejected.** Implicit aliasing violates Moonlane's design principle of "no implicit conversions." The loop variable bug is a well-documented footgun. Cross-fiber spawning of closures with reference captures requires the programmer to think about `Send` for every closure; Go simply has no such protection and races are possible. Explicit pointer capture makes aliasing visible at the definition site.
 
 ### B — `move` / non-`move` closure distinction (Rust model)
 
@@ -196,7 +196,7 @@ Two syntactic forms:
 
 In Rust, `spawn` requires `move` closures because thread-local references cannot cross thread boundaries.
 
-**Rejected.** Gust does not have borrow checking or lifetimes. A reference-capture closure whose enclosing scope has ended would dangle — there is no mechanism to prevent this at compile time. Without borrow checking, implicit reference capture is unsound. The explicit-pointer approach (Proposal) gives the same expressive power with safety enforced by the `*T`/`*mut T` type system rather than a borrow checker.
+**Rejected.** Moonlane does not have borrow checking or lifetimes. A reference-capture closure whose enclosing scope has ended would dangle — there is no mechanism to prevent this at compile time. Without borrow checking, implicit reference capture is unsound. The explicit-pointer approach (Proposal) gives the same expressive power with safety enforced by the `*T`/`*mut T` type system rather than a borrow checker.
 
 ### C — `Rc<RefCell<T>>` as primary sharing primitive (no pointer syntax)
 
@@ -250,7 +250,7 @@ Eliminate `Rc` entirely. Use `Arc` everywhere (atomic reference count, `Send`-sa
    - `fun` → `send fun`: additive, non-breaking (callers gain capability)
    - `send fun` → `fun`: visibly breaking (callers lose capability and the annotation disappears)
 
-   This is consistent with Rust's rule that `pub fn` signatures cannot rely on inference for types that appear in public position, and with Gust's "no implicit conversions" principle — `Send`-ness at API boundaries should be a deliberate declaration, not a side-effect of implementation details.
+   This is consistent with Rust's rule that `pub fn` signatures cannot rely on inference for types that appear in public position, and with Moonlane's "no implicit conversions" principle — `Send`-ness at API boundaries should be a deliberate declaration, not a side-effect of implementation details.
 
    A lint warning when an exported signature uses `fun` but the body is provably `send fun` would help authors discover the upgrade opportunity without making it a hard error.
 

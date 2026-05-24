@@ -21,7 +21,7 @@ match_arm = { pattern ~ ("if" ~ expr)? ~ "=>" ~ expr }
 
 This means any arm that needs more than one step requires hoisting logic outside the match or wrapping it in an immediately-called closure — both of which are unnatural. `if`, `loop`, and closures all accept blocks; match arms should too.
 
-```gust
+```moonlane
 // currently impossible — has to be hoisted or crammed into one expression
 match result {
     Result::Ok { value } => {
@@ -74,7 +74,7 @@ A bare `expr` arm is sugar for a block with no statements and the expression as 
 
 The match expression section in `docs/public/spec/expressions.md` is updated to show block bodies in examples and to document that both forms are valid:
 
-```gust
+```moonlane
 match value {
     pattern => expression,           // single-expression arm
     pattern => { stmts* expr? },    // block arm
@@ -104,7 +104,7 @@ Small, self-contained change. No design risk. Implement alongside other v0.2 gra
 ## References
 
 - Language spec: `docs/public/spec/expressions.md`
-- Grammar: `gust-interpreter/src/grammar.pest`
+- Grammar: `moonlane-interpreter/src/grammar.pest`
 
 ## Decision
 

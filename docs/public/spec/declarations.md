@@ -4,7 +4,7 @@
 
 ### Immutable Bindings
 
-```gust
+```moonlane
 let x = 42;
 let name: String = "Vlad";
 ```
@@ -13,7 +13,7 @@ let name: String = "Vlad";
 
 ### Mutable Bindings
 
-```gust
+```moonlane
 mut counter = 0;
 counter = counter + 1;
 counter += 1;   // compound assignment
@@ -31,7 +31,7 @@ Variables are lexically scoped. Each block `{ }` introduces a new scope. Inner s
 
 Hoisting is block-local: a `fun` declared in an inner block is not visible in the outer block. Normal lexical scoping applies across block boundaries — inner blocks see outer declarations, outer blocks do not see inner declarations.
 
-```gust
+```moonlane
 fun a() { b(); }        // OK — b is hoisted within this block
 fun b() { a(); }        // OK — mutual recursion at top level
 
@@ -49,7 +49,7 @@ fun outer() {
 
 `struct` and `enum` declarations are hoisted to **program scope** — they are visible throughout the entire program regardless of where they appear in the source. A type declared inside a function body or any nested block is as visible as a top-level type declaration. Unlike `fun` hoisting, which is block-local, type definition hoisting is global.
 
-```gust
+```moonlane
 fun make_point() -> Point {
     return Point { x: 1.0, y: 2.0 };   // OK — Point is globally visible
 }
@@ -68,7 +68,7 @@ fun inner() {
 
 ## Structs
 
-```gust
+```moonlane
 struct Point {
     x: Float,
     y: Float,
@@ -77,14 +77,14 @@ struct Point {
 
 ### Instantiation and Field Access
 
-```gust
+```moonlane
 let p = Point { x: 1.0, y: 2.0 };
 let x = p.x;
 ```
 
 When a local variable has the same name as a field, the `: value` part can be omitted (**shorthand field init**):
 
-```gust
+```moonlane
 let x = 1.0;
 let y = 2.0;
 let p = Point { x, y };   // equivalent to Point { x: x, y: y }
@@ -94,7 +94,7 @@ Shorthand and explicit fields may be mixed freely within one literal.
 
 ### Methods
 
-```gust
+```moonlane
 impl Point {
     fun distance(self, other: Point) -> Float {
         let dx = self.x - other.x;
@@ -112,7 +112,7 @@ let d = p.distance(q);
 
 Methods that mutate the receiver declare `mut self`. Mutation happens in place:
 
-```gust
+```moonlane
 impl Counter {
     fun increment(mut self) {
         self.value += 1;
@@ -122,7 +122,7 @@ impl Counter {
 
 ### Generic Structs
 
-```gust
+```moonlane
 struct Pair<A, B> {
     first: A,
     second: B,
@@ -133,7 +133,7 @@ struct Pair<A, B> {
 
 ## Enums
 
-```gust
+```moonlane
 enum Direction { North, South, East, West }
 
 enum Shape {
@@ -146,7 +146,7 @@ Variants may be unit (no data) or struct-like (named fields).
 
 ### Instantiation
 
-```gust
+```moonlane
 let dir = Direction::North;
 let s = Shape::Circle { radius: 5.0 };
 ```
@@ -155,7 +155,7 @@ let s = Shape::Circle { radius: 5.0 };
 
 `impl` blocks on enums follow the same syntax as structs:
 
-```gust
+```moonlane
 impl Shape {
     fun area(self) -> Float {
         match self {
@@ -175,7 +175,7 @@ impl Shape {
 > and ranges) is available in v0.1 as hardcoded special cases. User-defined traits,
 > `impl Trait for Type`, and trait bounds are v0.2.
 
-```gust
+```moonlane
 trait Printable {
     fun print(self);
 }
@@ -187,7 +187,7 @@ trait Comparable {
 
 ### Implementing a Trait
 
-```gust
+```moonlane
 impl Printable for Point {
     fun print(self) {
         println("(" + float_to_string(self.x) + ", " + float_to_string(self.y) + ")");
@@ -197,7 +197,7 @@ impl Printable for Point {
 
 ### Trait Bounds
 
-```gust
+```moonlane
 fun print_all<T: Printable>(items: T[]) {
     for (let item in items) {
         item.print();
@@ -207,7 +207,7 @@ fun print_all<T: Printable>(items: T[]) {
 
 ### Default Method Implementations
 
-```gust
+```moonlane
 trait Greet {
     fun name(self) -> String;
 
@@ -221,7 +221,7 @@ trait Greet {
 
 `Self` inside a trait definition refers to the concrete implementing type:
 
-```gust
+```moonlane
 trait Comparable {
     fun compare(self, other: Self) -> Int;
 }
