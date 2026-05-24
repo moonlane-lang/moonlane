@@ -212,11 +212,11 @@ A library type `Owned<T>` wraps a value and requires explicit `.free()`. Simpler
 
 ### Region/arena allocation
 
-Allocate from a `Region`; all values in the region are freed together when the region is freed. Complementary to linear types rather than an alternative — a region could itself be a linear value. Regions avoid per-object tracking but cannot express single-object deterministic release. Proposed as a future RFC.
+Allocate from a `Region`; all values in the region are freed together when the region is freed. Complementary to linear types rather than an alternative — a region could itself be a linear value. Regions avoid per-object tracking but cannot express single-object deterministic release. Tracked in **RFC-0025** (`docs/internal/rfcs/rfc-0025-region-allocation.md`).
 
 ### `unsafe` blocks
 
-Gate raw memory operations behind an `unsafe` boundary, as in Rust. Rejected by the author — the goal is fine-grained control without requiring unsafe code, preserving a uniform safety story.
+Gate raw memory operations behind an `unsafe` boundary, as in Rust. Rejected as the *primary* mechanism — the goal is fine-grained control without requiring unsafe code, preserving a uniform safety story. However, `unsafe` blocks are a necessary complement for FFI, custom allocators, and cases the type system cannot reason about. Tracked in **RFC-0026** (`docs/internal/rfcs/rfc-0026-unsafe-blocks.md`). Inside an `unsafe` block, the linearity checker is relaxed — linear values may be aliased or dropped without consuming, with correctness asserted by the programmer.
 
 ---
 
@@ -250,4 +250,7 @@ Linear types depend on generics (v0.2, RFC-0024 needs `fun<T: Linear>`). Target 
 - Type system spec: `docs/public/spec/types.md`
 - Typechecker notes: `gust-interpreter/docs/typechecker.md`
 - Related: RFC-0003 (concurrency model), RFC-0006 (closure capture semantics)
+- RFC-0025: `docs/internal/rfcs/rfc-0025-region-allocation.md` — `Region` is a linear type; bulk deallocation complement to per-object linear management
+- RFC-0026: `docs/internal/rfcs/rfc-0026-unsafe-blocks.md` — linearity checker relaxed inside unsafe; escape hatch for FFI and custom allocators
+- Cluster report: `docs/internal/rfc-cluster-memory-model.md`
 - Prior art: Linear Haskell (Bernardy et al. 2018), Rust ownership model, Cyclone regions

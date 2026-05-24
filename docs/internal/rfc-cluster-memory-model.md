@@ -2,7 +2,7 @@
 
 **Status:** Under resolution  
 **Tracking issue:** #118  
-**RFCs in scope:** RFC-0001, RFC-0003, RFC-0006, RFC-0024
+**RFCs in scope:** RFC-0001, RFC-0003, RFC-0006, RFC-0024, RFC-0025, RFC-0026
 
 ---
 
@@ -18,6 +18,8 @@ The four RFCs:
 | RFC-0003 | Concurrency Model | Draft | v0.4 |
 | RFC-0006 | Closure Capture Semantics | Draft | — |
 | RFC-0024 | Linear Types | Draft | v0.3 |
+| RFC-0025 | Region Allocation | Draft | v0.4 |
+| RFC-0026 | Unsafe Blocks | Draft | v0.4 |
 
 ---
 
@@ -32,7 +34,15 @@ RFC-0024 (Linear Types)
     │                                    │
     │                                    └──► depends on ──► RFC-0003 (Concurrency)
     │
-    └──► constrains ──► RFC-0003 (Concurrency)
+    ├──► constrains ──► RFC-0003 (Concurrency)
+    │
+    ├──► required by ──► RFC-0025 (Region Allocation)
+    │        │
+    │        └──► escape hatch from ──► RFC-0026 (Unsafe Blocks)
+    │
+    └──► escape hatch from ──► RFC-0026 (Unsafe Blocks)
+             │
+             └──► also escapes ──► RFC-0001, RFC-0003, RFC-0006
 ```
 
 RFC-0006 explicitly lists RFC-0001 and RFC-0003 as blocking dependencies. RFC-0024 introduces constraints on both RFC-0001 (aliasing) and RFC-0006 (capture). RFC-0003 is the most independent but is constrained by both RFC-0001 and RFC-0024.
@@ -174,6 +184,8 @@ All four RFCs can then be formally accepted. Their targets:
 | RFC-0024 | v0.3 (alongside RFC-0001) |
 | RFC-0006 | v0.3 (closure rewrite is pre-requisite for pointer and linear type implementation) |
 | RFC-0003 | v0.4 (unchanged — concurrency is post-generics) |
+| RFC-0025 | v0.4 (depends on RFC-0024; pairs naturally with concurrency where region patterns emerge) |
+| RFC-0026 | v0.4 (`unsafe fun` syntax locked in at v0.3 alongside RFC-0001; block implementation deferred) |
 
 ---
 
@@ -186,6 +198,8 @@ All four RFCs can then be formally accepted. Their targets:
 | D3 | Move capture: linear-only automatic, or explicit `move` qualifier | **Open** |
 | D4 | `Mutex<LinearT>`: forbidden or permitted with restrictions | **Proposed forbidden** — pending review |
 | D5 | Linear `Send` derivation rule | **Proposed** — same as non-linear (field-based) |
+| D6 | Region access: scope/callback (Option A) vs direct in `unsafe` (Option B) vs both | **Open** |
+| D7 | `unsafe fun` syntax: lock in at v0.3 with RFC-0001 or defer to v0.4 | **Open** |
 
 ---
 
@@ -195,3 +209,5 @@ All four RFCs can then be formally accepted. Their targets:
 - RFC-0003: `docs/internal/rfcs/rfc-0003-concurrency-model.md`
 - RFC-0006: `docs/internal/rfcs/rfc-0006-closure-capture-semantics.md`
 - RFC-0024: `docs/internal/rfcs/rfc-0024-linear-types.md`
+- RFC-0025: `docs/internal/rfcs/rfc-0025-region-allocation.md`
+- RFC-0026: `docs/internal/rfcs/rfc-0026-unsafe-blocks.md`

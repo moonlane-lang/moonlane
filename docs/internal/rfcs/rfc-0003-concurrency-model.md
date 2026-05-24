@@ -357,6 +357,10 @@ Do not implement concurrency primitives in the current PoC evaluator (v0.1). The
 - RFC-0001: `docs/internal/rfcs/rfc-0001-pointer-syntax.md` — `*T`/`*mut T` as non-`Send`; timing interaction
 - RFC-0002: `docs/internal/rfcs/rfc-0002-trait-bound-syntax.md` — `Send` as marker trait; fiber capture bounds
 - v0.1: #1–#4 (Evaluator — PoC must complete before concurrency implementation begins)
+- RFC-0024: `docs/internal/rfcs/rfc-0024-linear-types.md` — linear types are `Send` if all fields are `Send`; channel send is a natural consumption point for linear values; `Arc<LinearT>` and `Mutex<LinearT>` are forbidden
+- RFC-0025: `docs/internal/rfcs/rfc-0025-region-allocation.md` — `Region` is not `Send`; region allocation is a single-fiber primitive
+- RFC-0026: `docs/internal/rfcs/rfc-0026-unsafe-blocks.md` — `unsafe_send` built-in bypasses `Send` constraint inside `unsafe` blocks for lock-free data structure implementation
+- Cluster report: `docs/internal/rfc-cluster-memory-model.md`
 - Go specification: https://go.dev/ref/spec#Go_statements, https://go.dev/ref/spec#Select_statements
 - Go memory model: https://go.dev/ref/mem
 

@@ -298,6 +298,10 @@ Complete the PoC evaluator. Resolve the RFC after the PoC ships. Grammar/AST/typ
 - Language Spec: [`spec/types.md`](../../public/spec/types.md) (type system), [`spec/declarations.md`](../../public/spec/declarations.md) (variables, structs, enums)
 - ADR-0001: `gust-interpreter/docs/decisions/adr-0001-typeregistry-structure-and-location.md` (TypeRegistry — will need Pointer handling for v0.3)
 - Typechecker impl-notes: `gust-interpreter/docs/typechecker.md`
+- RFC-0024: `docs/internal/rfcs/rfc-0024-linear-types.md` — `&x` on linear values must be restricted; `&T` read reference conflicts with address-of syntax
+- RFC-0025: `docs/internal/rfcs/rfc-0025-region-allocation.md` — pointer-into-region lifetime problem; scope/callback solution avoids need for lifetime annotations
+- RFC-0026: `docs/internal/rfcs/rfc-0026-unsafe-blocks.md` — pointer arithmetic and `*T` to linear values unlocked inside `unsafe`; `unsafe fun` form needed for FFI pointer signatures
+- Cluster report: `docs/internal/rfc-cluster-memory-model.md`
 - Related: #5 (Type Variables and Constraint System — generics RFC; pointer type params interact)
 
 ---
