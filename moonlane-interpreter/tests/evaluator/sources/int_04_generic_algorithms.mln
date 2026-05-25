@@ -42,7 +42,7 @@ fun filter<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
 }
 
 fun map_arr<T, U>(arr: T[], f: fun(T) -> U) -> U[] {
-    mut out = [];
+    mut out: U[] = [];   // type annotation inside generic body — issue #128
     for (let x in arr) { array_push(out, f(x)); }
     out
 }

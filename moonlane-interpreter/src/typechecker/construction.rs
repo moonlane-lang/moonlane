@@ -651,7 +651,11 @@ fn construct_expr(
             for (p, ty) in params.iter().zip(param_types.iter()) {
                 ctx.bind(&p.name, ty.clone());
             }
-            let typed_body = construct_block(body, None, ctx)?;
+            // Pass the declared return type as the expected tail type so enum
+            // variant literals with unmentioned type params (e.g. Result::Ok)
+            // can fall back to the annotation for unresolved type arguments.
+            let body_expected = return_type.as_ref().map(|_| &ret_ty);
+            let typed_body = construct_block(body, body_expected, ctx)?;
             ctx.pop_scope();
             let ty = Type::Fun(param_types, Box::new(ret_ty));
             Ok(TypedExpr::Closure {

@@ -1,0 +1,78 @@
+// Test: multi-param generic enum variant construction where some type params
+// are not mentioned in the variant fields — the unmentioned param must be
+// inferred from surrounding context (let annotation, return type, if-else arms).
+// Covers issue #129.
+
+enum Either<L, R> {
+    Left  { val: L },
+    Right { val: R },
+}
+
+fun either_map_left<L, R, M>(e: Either<L, R>, f: fun(L) -> M) -> Either<M, R> {
+    match e {
+        Either::Left  { val } => Either::Left  { val: f(val) },
+        Either::Right { val } => Either::Right { val: val },
+    }
+}
+
+fun either_is_left<L, R>(e: Either<L, R>) -> Bool {
+    match e {
+        Either::Left  { val } => true,
+        Either::Right { val } => false,
+    }
+}
+
+fun either_left_or<L, R>(e: Either<L, R>, default: L) -> L {
+    match e {
+        Either::Left  { val } => val,
+        Either::Right { val } => default,
+    }
+}
+
+fun either_right_or<L, R>(e: Either<L, R>, default: R) -> R {
+    match e {
+        Either::Left  { val } => default,
+        Either::Right { val } => val,
+    }
+}
+
+fun classify(n: Int) -> Either<Int, String> {
+    if (n > 0) { Either::Left { val: n } }
+    else       { Either::Right { val: "non-positive" } }
+}
+
+fun main() {
+    // Explicit annotation provides the missing type param
+    let l: Either<Int, String> = Either::Left  { val: 42 };
+    let r: Either<Int, String> = Either::Right { val: "hello" };
+
+    assert(either_is_left(l));
+    assert(!either_is_left(r));
+    assert(either_left_or(l, 0)   == 42);
+    assert(either_right_or(r, "") == "hello");
+
+    // map_left: Left(42) → Left(84)
+    let doubled = either_map_left(l, fun(x: Int) -> Int { x * 2 });
+    assert(either_is_left(doubled));
+    assert(either_left_or(doubled, 0) == 84);
+
+    // map_left on Right: Right passes through unchanged
+    let pass = either_map_left(r, fun(x: Int) -> Int { x + 1 });
+    assert(!either_is_left(pass));
+
+    // Type inference from if-else arms in a function with return annotation
+    let pos = classify(5);
+    let neg = classify(-3);
+    assert(either_is_left(pos));
+    assert(!either_is_left(neg));
+    assert(either_left_or(pos,  0)  == 5);
+    assert(either_right_or(neg, "") == "non-positive");
+
+    // Either<Bool, Int>
+    let b: Either<Bool, Int> = Either::Left  { val: true };
+    let n: Either<Bool, Int> = Either::Right { val: 99 };
+    assert(either_is_left(b));
+    assert(!either_is_left(n));
+    assert(either_left_or(b, false));
+    assert(either_right_or(n, 0) == 99);
+}

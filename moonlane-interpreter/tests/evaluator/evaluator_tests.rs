@@ -262,6 +262,12 @@ mod tests {
     #[test]
     fn generic_nested() { check("55_generic_nested.mln"); }
 
+    #[test]
+    fn generic_body_annotation() { check("56_generic_body_annotation.mln"); }
+
+    #[test]
+    fn generic_enum_infer_context() { check("57_generic_enum_infer_context.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]

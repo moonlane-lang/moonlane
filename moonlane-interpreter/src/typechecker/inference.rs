@@ -8,6 +8,19 @@ use crate::types::Type;
 use super::FunGeneralization;
 use super::conversions::{type_expr_to_infer, type_expr_to_infer_with_generics};
 
+/// Resolve a type annotation using the current function's type-param map if one
+/// is set on `ctx` (i.e. we are inside a generic function body), otherwise fall
+/// back to the plain `type_expr_to_infer`.  Call this instead of the bare
+/// `type_expr_to_infer(ann)` for any annotation that can appear inside a
+/// function body (let, mut, for-init, closure params).
+fn ann_to_infer(te: &TypeExpr, ctx: &InferContext) -> InferType {
+    if ctx.current_type_params.is_empty() {
+        type_expr_to_infer(te)
+    } else {
+        type_expr_to_infer_with_generics(te, &ctx.current_type_params)
+    }
+}
+
 /// Register the names of all direct `FunDecl`s in `decls` with fresh type
 /// variables so that forward references and mutual recursion work.
 pub(super) fn hoist_fun_decls(decls: &[Decl], ctx: &mut InferContext) {
@@ -42,7 +55,7 @@ fn infer_decl(
             let env_fvs = ctx.env_free_vars();
             let val_ty = infer_expr(&ld.value, ctx, fun_generalizations)?;
             if let Some(ann) = &ld.type_ann {
-                ctx.add_constraint(val_ty.clone(), type_expr_to_infer(ann), ld.span.clone());
+                ctx.add_constraint(val_ty.clone(), ann_to_infer(ann, ctx), ld.span.clone());
             }
             // Let-polymorphism: generalize unannotated closure-valued let bindings.
             // If the resolved type still has free variables, they are quantified into a
@@ -67,7 +80,7 @@ fn infer_decl(
         Decl::Mut(md) => {
             let val_ty = infer_expr(&md.value, ctx, fun_generalizations)?;
             if let Some(ann) = &md.type_ann {
-                ctx.add_constraint(val_ty.clone(), type_expr_to_infer(ann), md.span.clone());
+                ctx.add_constraint(val_ty.clone(), ann_to_infer(ann, ctx), md.span.clone());
             }
             ctx.bind_mono(&md.name, val_ty, true);
             Ok(InferType::unit())
@@ -126,12 +139,14 @@ fn infer_fun_decl(
         ctx.bind_mono(&param.name, pt.clone(), false);
     }
 
+    let saved_type_params = ctx.swap_type_params(generic_map);
     let saved_ret = ctx.push_return_type(ret_ty.clone());
     let body_ty = infer_block(&fun.body, ctx, fun_generalizations)?;
 
     ctx.add_constraint(body_ty, ret_ty.clone(), fun.body.span.clone());
 
     ctx.pop_return_type(saved_ret);
+    ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();
 
     let fun_ty = InferType::Fun(param_types, Box::new(ret_ty));
@@ -188,10 +203,12 @@ fn infer_impl_method(
     for (p, pt) in method.params.iter().zip(param_types.iter()) {
         ctx.bind_mono(&p.name, pt.clone(), p.mutable);
     }
+    let saved_type_params = ctx.swap_type_params(generic_map);
     let saved_ret = ctx.push_return_type(ret_ty.clone());
     let body_ty = infer_block(&method.body, ctx, fun_generalizations)?;
     ctx.add_constraint(body_ty, ret_ty.clone(), method.body.span.clone());
     ctx.pop_return_type(saved_ret);
+    ctx.swap_type_params(saved_type_params);
     ctx.pop_scope();
 
     let partial_subst = ctx.solve()?;
@@ -285,7 +302,7 @@ fn infer_stmt(
                     ForInit::Mut(md) => {
                         let val_ty = infer_expr(&md.value, ctx, fun_generalizations)?;
                         if let Some(ann) = &md.type_ann {
-                            ctx.add_constraint(val_ty.clone(), type_expr_to_infer(ann), md.span.clone());
+                            ctx.add_constraint(val_ty.clone(), ann_to_infer(ann, ctx), md.span.clone());
                         }
                         ctx.bind_mono(&md.name, val_ty, true);
                     }
@@ -598,10 +615,10 @@ fn infer_expr(
         }
         Expr::Closure { params, return_type, body, .. } => {
             let param_types: Vec<InferType> = params.iter().map(|p| {
-                if let Some(ann) = &p.type_ann { type_expr_to_infer(ann) } else { ctx.fresh_var() }
+                if let Some(ann) = &p.type_ann { ann_to_infer(ann, ctx) } else { ctx.fresh_var() }
             }).collect();
             let ret_ty = return_type.as_ref()
-                .map(type_expr_to_infer)
+                .map(|ann| ann_to_infer(ann, ctx))
                 .unwrap_or_else(|| ctx.fresh_var());
             ctx.push_scope();
             for (p, pt) in params.iter().zip(param_types.iter()) {

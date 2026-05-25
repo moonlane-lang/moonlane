@@ -1,0 +1,47 @@
+// Test: explicit type annotations using generic type params inside function bodies
+// Covers issue #128: T/U in body annotations must resolve to TypeVars, not Named types.
+
+fun collect_matching<T>(arr: T[], pred: fun(T) -> Bool) -> T[] {
+    mut result: T[] = [];
+    for (let x in arr) {
+        if (pred(x)) { array_push(result, x); }
+    }
+    result
+}
+
+fun map_to<T, U>(arr: T[], f: fun(T) -> U) -> U[] {
+    mut out: U[] = [];
+    for (let x in arr) { array_push(out, f(x)); }
+    out
+}
+
+fun wrap_pair<A, B>(a: A, b: B) -> A[] {
+    let items: A[] = [];
+    array_push(items, a);
+    items
+}
+
+fun main() {
+    let nums: Int[] = [1, 2, 3, 4, 5, 6];
+    let evens = collect_matching(nums, fun(x: Int) -> Bool { x % 2 == 0 });
+    assert(array_len(evens) == 3);
+    assert(evens[0] == 2);
+
+    let strs: String[] = ["a", "bb", "ccc", "dddd"];
+    let long = collect_matching(strs, fun(s: String) -> Bool { string_len(s) > 2 });
+    assert(array_len(long) == 2);
+
+    let squares = map_to(nums, fun(x: Int) -> Int { x * x });
+    assert(array_len(squares) == 6);
+    assert(squares[0] == 1);
+    assert(squares[5] == 36);
+
+    let bools = map_to(nums, fun(x: Int) -> Bool { x > 3 });
+    assert(array_len(bools) == 6);
+    assert(!bools[0]);
+    assert(bools[5]);
+
+    let wrapped = wrap_pair(42, true);
+    assert(array_len(wrapped) == 1);
+    assert(wrapped[0] == 42);
+}

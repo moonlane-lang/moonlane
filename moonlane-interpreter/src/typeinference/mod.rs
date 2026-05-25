@@ -536,6 +536,9 @@ pub struct InferContext {
     current_return_type: Option<InferType>,
     current_break_type:  Option<InferType>,
     registry: TypeRegistry,
+    /// Type-param name → TypeVar for the currently-being-inferred generic function.
+    /// Empty when inferring a non-generic function or at top level.
+    pub current_type_params: HashMap<String, TypeVar>,
 }
 
 impl InferContext {
@@ -551,6 +554,7 @@ impl InferContext {
             current_return_type: None,
             current_break_type:  None,
             registry,
+            current_type_params: HashMap::new(),
         }
     }
 
@@ -591,6 +595,12 @@ impl InferContext {
 
     pub fn fresh_type_var_raw(&mut self) -> TypeVar {
         self.var_gen.fresh()
+    }
+
+    /// Install a new type-param map for the duration of a generic function body.
+    /// Returns the previous map so it can be restored with a second call.
+    pub fn swap_type_params(&mut self, map: HashMap<String, TypeVar>) -> HashMap<String, TypeVar> {
+        std::mem::replace(&mut self.current_type_params, map)
     }
 
     /// Return a new generator whose counter starts immediately past all vars
