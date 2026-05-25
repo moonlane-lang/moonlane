@@ -1,0 +1,139 @@
+// Edge cases for user-defined From / as casts
+//
+//   zero value conversion,
+//   negative integer cast,
+//   large integer cast,
+//   fractional float cast,
+//   multiple From targets for the same source,
+//   chained casts: A → B → C,
+//   round-trip casts: A → B → A,
+//   built-in Int as Float (exact, negative, zero),
+//   built-in Float as Int (truncation, negative truncation, exact).
+
+aspect From<T> {
+    fun from(value: T) -> Self;
+}
+
+// ── Wrapper types ──────────────────────────────────────────────────────────────
+
+struct Meters    { value: Float }
+struct Feet      { value: Float }
+struct Inches    { value: Float }
+
+struct Kelvin    { degrees: Float }
+struct Celsius   { degrees: Float }
+struct Fahrenheit{ degrees: Float }
+
+// Meters ↔ Feet
+impl From<Meters> for Feet {
+    fun from(value: Meters) -> Feet {
+        Feet { value: value.value * 3.28084 }
+    }
+}
+impl From<Feet> for Meters {
+    fun from(value: Feet) -> Meters {
+        Meters { value: value.value / 3.28084 }
+    }
+}
+
+// Feet → Inches (chaining: Meters → Feet → Inches)
+impl From<Feet> for Inches {
+    fun from(value: Feet) -> Inches {
+        Inches { value: value.value * 12.0 }
+    }
+}
+
+// Celsius ↔ Kelvin
+impl From<Celsius> for Kelvin {
+    fun from(value: Celsius) -> Kelvin {
+        Kelvin { degrees: value.degrees + 273.15 }
+    }
+}
+impl From<Kelvin> for Celsius {
+    fun from(value: Kelvin) -> Celsius {
+        Celsius { degrees: value.degrees - 273.15 }
+    }
+}
+
+// Celsius ↔ Fahrenheit (multiple targets from Celsius)
+impl From<Celsius> for Fahrenheit {
+    fun from(value: Celsius) -> Fahrenheit {
+        Fahrenheit { degrees: value.degrees * 1.8 + 32.0 }
+    }
+}
+
+fun approx(a: Float, b: Float) -> Bool {
+    let d = a - b;
+    let abs_d = if (d < 0.0) { 0.0 - d } else { d };
+    abs_d < 0.01
+}
+
+fun main() {
+    // Zero value
+    let zero_m = Meters { value: 0.0 };
+    let zero_f = zero_m as Feet;
+    assert(zero_f.value == 0.0);
+
+    // Large value
+    let km = Meters { value: 1000.0 };
+    let km_ft = km as Feet;
+    assert(approx(km_ft.value, 3280.84));
+
+    // Negative value
+    let neg = Meters { value: -1.0 };
+    let neg_ft = neg as Feet;
+    assert(approx(neg_ft.value, -3.28084));
+
+    // Multiple From targets from same source type
+    let c100 = Celsius { degrees: 100.0 };
+    let k100 = c100 as Kelvin;
+    assert(approx(k100.degrees, 373.15));
+    let f100 = c100 as Fahrenheit;
+    assert(f100.degrees == 212.0);
+
+    // Chained casts: Meters → Feet → Inches
+    let one_m = Meters { value: 1.0 };
+    let ft = one_m as Feet;
+    let in_ = ft as Inches;
+    assert(approx(in_.value, 39.37)); // 1m ≈ 39.37 inches
+
+    // Round-trip: Meters → Feet → Meters
+    let orig = Meters { value: 5.0 };
+    let via_ft = orig as Feet;
+    let back = via_ft as Meters;
+    assert(approx(back.value, 5.0));
+
+    // Round-trip: Celsius → Kelvin → Celsius
+    let c37 = Celsius { degrees: 37.0 };
+    let k37 = c37 as Kelvin;
+    assert(approx(k37.degrees, 310.15));
+    let back_c = k37 as Celsius;
+    assert(approx(back_c.degrees, 37.0));
+
+    // absolute zero: 0 K → Celsius
+    let abs_zero = Kelvin { degrees: 0.0 };
+    let abs_c = abs_zero as Celsius;
+    assert(approx(abs_c.degrees, -273.15));
+
+    // built-in Int as Float: exact
+    let i0: Int = 0;
+    assert((i0 as Float) == 0.0);
+    let i1: Int = 1;
+    assert((i1 as Float) == 1.0);
+    let ineg: Int = -5;
+    assert((ineg as Float) == -5.0);
+    let big: Int = 1000000;
+    assert((big as Float) == 1000000.0);
+
+    // built-in Float as Int: truncation toward zero
+    let f3_9: Float = 3.9;
+    assert((f3_9 as Int) == 3);
+    let f3_1: Float = 3.1;
+    assert((f3_1 as Int) == 3);
+    let fexact: Float = 5.0;
+    assert((fexact as Int) == 5);
+    let fneg: Float = -2.7;
+    assert((fneg as Int) == -2); // truncation toward zero
+    let f0: Float = 0.0;
+    assert((f0 as Int) == 0);
+}

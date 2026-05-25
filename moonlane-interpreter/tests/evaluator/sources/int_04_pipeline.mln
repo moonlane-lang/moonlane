@@ -1,0 +1,189 @@
+// Integration Test 4 — Multi-stage Data Pipeline
+//
+// Feature coverage (v0.4):
+//   user aspect declaration (Transformable, Summarizable),
+//   From<LexError> for AppError and From<ParseError> for AppError,
+//   ? coercion across multiple error types → common AppError,
+//   user-defined Iterable<Int> (NumberList) with stateful scan,
+//   batch ? inside a for-in loop,
+//   result accumulation and error short-circuit.
+
+// ── Aspects ────────────────────────────────────────────────────────────────────
+
+aspect Transformable {
+    fun double(self) -> Int;
+    fun negate(self) -> Int;
+}
+
+aspect Summarizable {
+    fun summary(self) -> String;
+}
+
+aspect From<T> {
+    fun from(value: T) -> Self;
+}
+
+aspect Iterable<T> {
+    fun next(mut self) -> Perhaps<T>;
+}
+
+// ── Error types ────────────────────────────────────────────────────────────────
+
+struct LexError   { msg: String }
+struct ParseError { msg: String }
+struct AppError   { msg: String }
+
+impl From<LexError> for AppError {
+    fun from(value: LexError) -> AppError {
+        AppError { msg: string_concat("lex: ", value.msg) }
+    }
+}
+
+impl From<ParseError> for AppError {
+    fun from(value: ParseError) -> AppError {
+        AppError { msg: string_concat("parse: ", value.msg) }
+    }
+}
+
+// ── Data types ─────────────────────────────────────────────────────────────────
+
+struct Token  { kind: String, value: Int }
+struct Number { raw: Int }
+
+impl Transformable for Number {
+    fun double(self) -> Int { self.raw * 2 }
+    fun negate(self) -> Int { 0 - self.raw }
+}
+
+impl Summarizable for Number {
+    fun summary(self) -> String {
+        string_concat("Number(", string_concat(self.raw.to_string(), ")"))
+    }
+}
+
+// ── Iterable over a fixed array of ints ────────────────────────────────────────
+
+struct NumberList { data: Int[], pos: Int }
+
+impl NumberList {
+    fun new(data: Int[]) -> NumberList { NumberList { data: data, pos: 0 } }
+    fun len(self) -> Int { array_len(self.data) }
+}
+
+impl Iterable<Int> for NumberList {
+    fun next(mut self) -> Perhaps<Int> {
+        if (self.pos < array_len(self.data)) {
+            let v = self.data[self.pos];
+            self.pos = self.pos + 1;
+            Perhaps::Some { value: v }
+        } else {
+            nope
+        }
+    }
+}
+
+// ── Fallible token parser ──────────────────────────────────────────────────────
+
+fun lex_token(s: String) -> Result<Token, LexError> {
+    if (s == "1") { Result::Ok { value: Token { kind: "num", value: 1 } } }
+    else if (s == "2") { Result::Ok { value: Token { kind: "num", value: 2 } } }
+    else if (s == "3") { Result::Ok { value: Token { kind: "num", value: 3 } } }
+    else { Result::Err { error: LexError { msg: string_concat("unknown token: ", s) } } }
+}
+
+fun parse_number(t: Token) -> Result<Number, ParseError> {
+    if (t.kind == "num") {
+        Result::Ok { value: Number { raw: t.value } }
+    } else {
+        Result::Err { error: ParseError { msg: string_concat("expected num, got ", t.kind) } }
+    }
+}
+
+// ? coerces both LexError and ParseError → AppError
+fun pipeline_step(s: String) -> Result<Number, AppError> {
+    let tok = lex_token(s)?;
+    let num = parse_number(tok)?;
+    Result::Ok { value: num }
+}
+
+// ── main ───────────────────────────────────────────────────────────────────────
+
+fun main() {
+    // Aspect methods: Transformable
+    let n5 = Number { raw: 5 };
+    assert(n5.double() == 10);
+    assert(n5.negate() == -5);
+
+    // Aspect methods: Summarizable
+    assert(n5.summary() == "Number(5)");
+    let n0 = Number { raw: 0 };
+    assert(n0.summary() == "Number(0)");
+
+    // to_string on Int
+    assert(42.to_string() == "42");
+    assert(0.to_string() == "0");
+
+    // Iterable<Int>: sum of [1,2,3,4,5]
+    let list = NumberList::new([1, 2, 3, 4, 5]);
+    assert(list.len() == 5);
+    mut total = 0;
+    for (let x in list) { total += x; }
+    assert(total == 15);
+
+    // Empty NumberList: loop body never runs
+    mut ran = false;
+    let empty_ints: Int[] = [];
+    for (let _x in NumberList::new(empty_ints)) { ran = true; }
+    assert(!ran);
+
+    // ? success: "1" → Token → Number(1)
+    let r1 = pipeline_step("1");
+    match r1 {
+        Result::Ok  { value } => assert(value.raw == 1),
+        Result::Err { error } => assert(false),
+    };
+
+    // ? success: "3" → Number(3); aspect methods work on result
+    let r3 = pipeline_step("3");
+    match r3 {
+        Result::Ok  { value } => {
+            assert(value.raw == 3);
+            assert(value.double() == 6);
+            assert(value.summary() == "Number(3)");
+        },
+        Result::Err { error } => assert(false),
+    };
+
+    // ? failure: LexError coerced to AppError
+    let bad = pipeline_step("X");
+    match bad {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "lex: unknown token: X"),
+    };
+
+    // From<LexError> for AppError: direct conversion
+    let le = LexError { msg: "oops" };
+    let ae = le as AppError;
+    assert(ae.msg == "lex: oops");
+
+    // From<ParseError> for AppError: direct conversion
+    let pe = ParseError { msg: "bad" };
+    let ae2 = pe as AppError;
+    assert(ae2.msg == "parse: bad");
+
+    // Iterable with doubles accumulated
+    let list2 = NumberList::new([10, 20, 30]);
+    mut doubled_sum = 0;
+    for (let x in list2) { doubled_sum += x * 2; }
+    assert(doubled_sum == 120);
+
+    // built-in Int as Float
+    let i: Int = 9;
+    let f = i as Float;
+    assert(f == 9.0);
+
+    // built-in Float as Int (truncation)
+    let fl: Float = 7.8;
+    let ii = fl as Int;
+    assert(ii == 7);
+}

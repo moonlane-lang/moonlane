@@ -282,6 +282,29 @@ mod tests {
     #[test]
     fn int_battle() { check("int_02_battle.mln"); }
 
+    #[test]
+    fn int_aspects() { check("int_03_aspects.mln"); }
+
+    #[test]
+    fn int_pipeline() { check("int_04_pipeline.mln"); }
+
+    #[test]
+    fn int_aspects_combined() { check("int_05_aspects_combined.mln"); }
+
+    #[test]
+    fn int_display() { check("int_06_display.mln"); }
+
+    // ── Edge-case tests ───────────────────────────────────────────────────────
+
+    #[test]
+    fn iterable_edge_cases() { check("62_iterable_edge_cases.mln"); }
+
+    #[test]
+    fn from_edge_cases() { check("63_from_edge_cases.mln"); }
+
+    #[test]
+    fn propagate_error_edge_cases() { check("64_propagate_error_edge_cases.mln"); }
+
     // ── Negative tests ────────────────────────────────────────────────────────
 
     #[test]
@@ -351,4 +374,7 @@ mod tests {
 
     #[test]
     fn neg_missing_aspect_method() { check("neg_22_missing_aspect_method.mln"); }
+
+    #[test]
+    fn neg_cast_no_from() { check("neg_23_cast_no_from.mln"); }
 }

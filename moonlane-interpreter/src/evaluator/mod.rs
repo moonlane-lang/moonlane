@@ -180,6 +180,20 @@ impl Environment {
     }
 }
 
+// For `impl From<T> for U`, register the method as "U::from_T" rather than the
+// generic "U::from" so that multiple From impls on the same target type coexist.
+fn from_method_key(type_name: &str, method_name: &str, impl_block: &crate::typed_ast::TypedImplBlock) -> String {
+    if method_name == "from"
+        && impl_block.aspect_name.as_deref() == Some("From")
+        && !impl_block.aspect_type_args.is_empty()
+    {
+        if let crate::ast::TypeExpr::Named(src, _) = &impl_block.aspect_type_args[0] {
+            return format!("{type_name}::from_{src}");
+        }
+    }
+    format!("{type_name}::{method_name}")
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
@@ -195,7 +209,8 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
             TypedDecl::Impl(impl_block) => {
                 if let crate::ast::TypeExpr::Named(type_name, _) = &impl_block.target_type {
                     for method in &impl_block.methods {
-                        env.define(&format!("{}::{}", type_name, method.name), Value::Unit);
+                        let key = from_method_key(type_name, &method.name, impl_block);
+                        env.define(&key, Value::Unit);
                     }
                 }
             }
@@ -229,7 +244,7 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
                             FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
                             FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
                         };
-                        let key = format!("{}::{}", type_name, method.name);
+                        let key = from_method_key(type_name, &method.name, impl_block);
                         let captured = env.clone();
                         env.set(&key, Value::Closure(Rc::new(ClosureValue {
                             name:     Some(method.name.clone()),
@@ -1153,11 +1168,21 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
 
         TypedExpr::Cast { expr: inner, target_type, span, .. } => {
             let v = eval_expr(inner, env)?.into_value();
-            // Dispatch through From impl: look up "TypeName::from" in env.
+            // Dispatch through From impl: look up source-type-specific key first.
             if let crate::ast::TypeExpr::Named(target_name, _) = target_type {
-                let from_key = format!("{target_name}::from");
-                if let Some(from_fn) = env.get(&from_key) {
-                    return call_function(from_fn, vec![v], span);
+                let src_name = match &v {
+                    Value::Struct { name, .. } => Some(name.as_str()),
+                    Value::Int(_) => Some("Int"),
+                    Value::Float(_) => Some("Float"),
+                    Value::Bool(_) => Some("Bool"),
+                    Value::Str(_) => Some("String"),
+                    _ => None,
+                };
+                let from_fn = src_name
+                    .and_then(|s| env.get(&format!("{target_name}::from_{s}")))
+                    .or_else(|| env.get(&format!("{target_name}::from")));
+                if let Some(f) = from_fn {
+                    return call_function(f, vec![v], span);
                 }
             }
             // Identity cast fallback (same type, no from registered).

@@ -680,7 +680,11 @@ fn construct_expr(
                             Type::Named(n, _) => Some(n.as_str()),
                             _ => None,
                         };
-                        tgt.map(|t| format!("{t}::from"))
+                        match (tgt, &e1) {
+                            (Some(t), Type::Named(src, _)) => Some(format!("{t}::from_{src}")),
+                            (Some(t), _) => Some(format!("{t}::from")),
+                            _ => None,
+                        }
                     } else { None }
                 } else { None }
             } else { None };

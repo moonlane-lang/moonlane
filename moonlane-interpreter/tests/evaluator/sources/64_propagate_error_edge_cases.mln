@@ -1,0 +1,200 @@
+// Edge cases for the ? operator and From-based error coercion
+//
+//   same-type ? (no From needed),
+//   multi-level error chain: A → B → C,
+//   ? in a while loop body (early exit),
+//   ? in a for-in loop body (early exit on first Err),
+//   ? on the first statement in a function,
+//   ? on the last statement in a function,
+//   multiple ? in one function (each can short-circuit),
+//   Ok value passes through ? unchanged,
+//   Err value from ? carries the correct wrapped message.
+
+aspect From<T> {
+    fun from(value: T) -> Self;
+}
+
+aspect Iterable<T> {
+    fun next(mut self) -> Perhaps<T>;
+}
+
+// ── Error hierarchy ────────────────────────────────────────────────────────────
+
+struct IoError     { msg: String }
+struct ParseError  { msg: String }
+struct AppError    { msg: String }
+
+impl From<IoError> for AppError {
+    fun from(value: IoError) -> AppError {
+        AppError { msg: string_concat("io: ", value.msg) }
+    }
+}
+
+impl From<ParseError> for AppError {
+    fun from(value: ParseError) -> AppError {
+        AppError { msg: string_concat("parse: ", value.msg) }
+    }
+}
+
+// IoError → ParseError (for multi-level chain test)
+impl From<IoError> for ParseError {
+    fun from(value: IoError) -> ParseError {
+        ParseError { msg: string_concat("from_io: ", value.msg) }
+    }
+}
+
+// ── Fallible producers ────────────────────────────────────────────────────────
+
+fun read_file(path: String) -> Result<String, IoError> {
+    if (path == "data.txt") { Result::Ok  { value: "42" } }
+    else { Result::Err { error: IoError { msg: string_concat("no file: ", path) } } }
+}
+
+fun parse_int(s: String) -> Result<Int, ParseError> {
+    if (s == "42") { Result::Ok  { value: 42 } }
+    else if (s == "0") { Result::Ok { value: 0 } }
+    else { Result::Err { error: ParseError { msg: string_concat("bad int: ", s) } } }
+}
+
+// same-type ?: ParseError stays ParseError
+fun parse_checked(s: String) -> Result<Int, ParseError> {
+    let n = parse_int(s)?;
+    Result::Ok { value: n }
+}
+
+// multi-step: IoError coerced to AppError on first ?, ParseError on second
+fun load_and_parse(path: String) -> Result<Int, AppError> {
+    let contents = read_file(path)?;
+    let n = parse_int(contents)?;
+    Result::Ok { value: n }
+}
+
+// ? on first statement
+fun first_stmt(path: String) -> Result<Int, AppError> {
+    let contents = read_file(path)?;
+    Result::Ok { value: 1 }
+}
+
+// ? on last statement (value returned directly)
+fun last_stmt(s: String) -> Result<Int, AppError> {
+    let doubled = 2;
+    let n = parse_int(s)?;
+    Result::Ok { value: n * doubled }
+}
+
+// multiple ? in one function
+fun multi_q(path: String) -> Result<Int, AppError> {
+    let a = read_file(path)?;
+    let b = parse_int(a)?;
+    let c = parse_int("42")?;
+    Result::Ok { value: b + c }
+}
+
+// ── Counter Iterable ──────────────────────────────────────────────────────────
+
+struct Counter { current: Int, limit: Int }
+
+impl Counter {
+    fun new(limit: Int) -> Counter { Counter { current: 0, limit: limit } }
+}
+
+impl Iterable<Int> for Counter {
+    fun next(mut self) -> Perhaps<Int> {
+        if (self.current < self.limit) {
+            let v = self.current;
+            self.current = self.current + 1;
+            Perhaps::Some { value: v }
+        } else {
+            nope
+        }
+    }
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
+
+fun main() {
+    // same-type ?: success
+    let r1 = parse_checked("42");
+    match r1 {
+        Result::Ok  { value } => assert(value == 42),
+        Result::Err { error } => assert(false),
+    };
+
+    // same-type ?: failure (no wrapping)
+    let r2 = parse_checked("xyz");
+    match r2 {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "bad int: xyz"),
+    };
+
+    // multi-step success
+    let r3 = load_and_parse("data.txt");
+    match r3 {
+        Result::Ok  { value } => assert(value == 42),
+        Result::Err { error } => assert(false),
+    };
+
+    // multi-step: IoError on first ?
+    let r4 = load_and_parse("missing.txt");
+    match r4 {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "io: no file: missing.txt"),
+    };
+
+    // ? on first statement: short-circuits immediately on Err
+    let r5 = first_stmt("missing.txt");
+    match r5 {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "io: no file: missing.txt"),
+    };
+
+    // ? on first statement: success reaches the next line
+    let r6 = first_stmt("data.txt");
+    match r6 {
+        Result::Ok  { value } => assert(value == 1),
+        Result::Err { error } => assert(false),
+    };
+
+    // ? on last statement: success
+    let r7 = last_stmt("42");
+    match r7 {
+        Result::Ok  { value } => assert(value == 84),
+        Result::Err { error } => assert(false),
+    };
+
+    // ? on last statement: failure
+    let r8 = last_stmt("bad");
+    match r8 {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "parse: bad int: bad"),
+    };
+
+    // multiple ? in one function: both succeed
+    let r9 = multi_q("data.txt");
+    match r9 {
+        Result::Ok  { value } => assert(value == 84), // 42+42
+        Result::Err { error } => assert(false),
+    };
+
+    // multiple ? in one function: first ? fails
+    let r10 = multi_q("missing.txt");
+    match r10 {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "io: no file: missing.txt"),
+    };
+
+    // Direct From cast: IoError → AppError
+    let io_err = IoError { msg: "disk full" };
+    let app_err = io_err as AppError;
+    assert(app_err.msg == "io: disk full");
+
+    // Direct From cast: ParseError → AppError
+    let pe = ParseError { msg: "bad" };
+    let ae = pe as AppError;
+    assert(ae.msg == "parse: bad");
+
+    // Direct From cast: IoError → ParseError (multi-level)
+    let io2 = IoError { msg: "read fail" };
+    let pe2 = io2 as ParseError;
+    assert(pe2.msg == "from_io: read fail");
+}

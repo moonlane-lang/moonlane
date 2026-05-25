@@ -1,0 +1,10 @@
+// Negative test: casting to a type that has no From impl must be rejected.
+// TYPECHECK_ERROR[cannot cast `Foo` to `Bar`]
+
+struct Foo { x: Int }
+struct Bar { y: Int }
+
+fun main() {
+    let f = Foo { x: 1 };
+    let b = f as Bar; // no From<Foo> for Bar — type error
+}

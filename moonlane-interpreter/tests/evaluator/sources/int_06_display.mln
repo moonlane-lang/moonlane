@@ -1,0 +1,203 @@
+// Integration Test 6 — Display and Text Rendering
+//
+// Feature coverage (v0.4):
+//   to_string on all built-in Display types (Int, Float, Bool, String),
+//   print / println accept any Display type,
+//   Float whole-number formatting (5.0 → "5") vs fractional (3.14 → "3.14"),
+//   user aspect Printable with format() method,
+//   From<Int> for Score — user-defined wrap,
+//   From<Float> for Temperature — user-defined wrap,
+//   string_concat in combination with to_string,
+//   Iterable<String> (StringBag) — walk labels,
+//   ? with From in a display-building context.
+
+// ── Aspects ────────────────────────────────────────────────────────────────────
+
+aspect Printable {
+    fun format(self) -> String;
+}
+
+aspect From<T> {
+    fun from(value: T) -> Self;
+}
+
+aspect Iterable<T> {
+    fun next(mut self) -> Perhaps<T>;
+}
+
+// ── Wrapper types ──────────────────────────────────────────────────────────────
+
+struct Score       { points: Int }
+struct Temperature { celsius: Float }
+
+impl From<Int> for Score {
+    fun from(value: Int) -> Score { Score { points: value } }
+}
+
+impl From<Float> for Temperature {
+    fun from(value: Float) -> Temperature { Temperature { celsius: value } }
+}
+
+impl Printable for Score {
+    fun format(self) -> String {
+        string_concat("Score(", string_concat(self.points.to_string(), ")"))
+    }
+}
+
+impl Printable for Temperature {
+    fun format(self) -> String {
+        string_concat("Temp(", string_concat(self.celsius.to_string(), ")"))
+    }
+}
+
+// ── StringBag Iterable ─────────────────────────────────────────────────────────
+
+struct StringBag { items: String[], pos: Int }
+
+impl StringBag {
+    fun new(items: String[]) -> StringBag { StringBag { items: items, pos: 0 } }
+    fun len(self) -> Int { array_len(self.items) }
+}
+
+impl Iterable<String> for StringBag {
+    fun next(mut self) -> Perhaps<String> {
+        if (self.pos < array_len(self.items)) {
+            let v = self.items[self.pos];
+            self.pos = self.pos + 1;
+            Perhaps::Some { value: v }
+        } else {
+            nope
+        }
+    }
+}
+
+// ── Error + ? coercion ─────────────────────────────────────────────────────────
+
+struct FormatError { msg: String }
+struct RenderError { msg: String }
+
+impl From<FormatError> for RenderError {
+    fun from(value: FormatError) -> RenderError {
+        RenderError { msg: string_concat("fmt: ", value.msg) }
+    }
+}
+
+fun parse_score(s: String) -> Result<Score, FormatError> {
+    if (s == "100") { Result::Ok { value: Score { points: 100 } } }
+    else if (s == "0") { Result::Ok { value: Score { points: 0 } } }
+    else { Result::Err { error: FormatError { msg: string_concat("bad score: ", s) } } }
+}
+
+fun render_score(s: String) -> Result<String, RenderError> {
+    let sc = parse_score(s)?;
+    Result::Ok { value: sc.format() }
+}
+
+// ── main ───────────────────────────────────────────────────────────────────────
+
+fun main() {
+    // to_string on Int: multiple values
+    assert(0.to_string()    == "0");
+    assert(1.to_string()    == "1");
+    assert(42.to_string()   == "42");
+    assert(999.to_string()  == "999");
+    assert((-1).to_string() == "-1");
+
+    // to_string on Float: whole-number formatting
+    assert(0.0.to_string()   == "0");
+    assert(1.0.to_string()   == "1");
+    assert(5.0.to_string()   == "5");
+    assert(100.0.to_string() == "100");
+
+    // to_string on Float: fractional
+    assert(3.14.to_string()  == "3.14");
+    assert(0.5.to_string()   == "0.5");
+    assert(1.25.to_string()  == "1.25");
+
+    // to_string on Bool
+    assert(true.to_string()  == "true");
+    assert(false.to_string() == "false");
+
+    // to_string on String: identity
+    assert("hello".to_string()  == "hello");
+    assert("".to_string()       == "");
+    assert("world".to_string()  == "world");
+
+    // polymorphic print/println
+    print(0);
+    print(true);
+    print(3.14);
+    print("hi");
+    println(42);
+    println(false);
+    println(2.0);
+    println("done");
+
+    // From<Int> for Score
+    let seven: Int = 7;
+    let s7 = seven as Score;
+    assert(s7.points == 7);
+    assert(s7.format() == "Score(7)");
+
+    // From<Float> for Temperature
+    let boiling: Float = 100.0;
+    let t100 = boiling as Temperature;
+    assert(t100.celsius == 100.0);
+    assert(t100.format() == "Temp(100)");
+
+    let body_temp: Float = 37.5;
+    let t37 = body_temp as Temperature;
+    assert(t37.celsius == 37.5);
+    assert(t37.format() == "Temp(37.5)");
+
+    // Printable format on Score 0 and large value
+    let s0 = Score { points: 0 };
+    assert(s0.format() == "Score(0)");
+    let s1000 = Score { points: 1000 };
+    assert(s1000.format() == "Score(1000)");
+
+    // StringBag Iterable: concatenate labels
+    let bag = StringBag::new(["a", "b", "c"]);
+    assert(bag.len() == 3);
+    mut result = "";
+    for (let label in bag) {
+        result = string_concat(result, label);
+    }
+    assert(result == "abc");
+
+    // Empty StringBag
+    mut empty_ran = false;
+    let empty_strs: String[] = [];
+    for (let _label in StringBag::new(empty_strs)) { empty_ran = true; }
+    assert(!empty_ran);
+
+    // ? success path: "100" → Score(100)
+    let r1 = render_score("100");
+    match r1 {
+        Result::Ok  { value } => assert(value == "Score(100)"),
+        Result::Err { error } => assert(false),
+    };
+
+    // ? success path: "0" → Score(0)
+    let r2 = render_score("0");
+    match r2 {
+        Result::Ok  { value } => assert(value == "Score(0)"),
+        Result::Err { error } => assert(false),
+    };
+
+    // ? failure: FormatError coerced to RenderError via From
+    let r3 = render_score("bad");
+    match r3 {
+        Result::Ok  { value } => assert(false),
+        Result::Err { error } => assert(error.msg == "fmt: bad score: bad"),
+    };
+
+    // string_concat + to_string composition
+    let n: Int = 99;
+    let composed = string_concat("value=", n.to_string());
+    assert(composed == "value=99");
+
+    let f: Float = 1.5;
+    let composed2 = string_concat("f=", f.to_string());
+    assert(composed2 == "f=1.5");
+}

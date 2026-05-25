@@ -5,6 +5,16 @@
 //   SCREAMING_SNAKE_CASE = silent / atomic rules (pest built-ins or terminals)
 //   snake_case           = regular rules that produce pairs in the parse tree
 //   keywords are matched as atomic rules to avoid consuming identifier prefixes
+//
+// Ordering invariant:
+//   `expr_stmt` is tried before `return_stmt` and `break_stmt` in `stmt` so
+//   that identifiers whose names start with a keyword prefix (e.g. `break_sum`,
+//   `return_value`) are treated as expressions, not as control-flow statements.
+//   This works because `break` / `return` alone fail `ident`'s `!keyword` guard,
+//   so `expr_stmt` never mis-parses actual break/return statements.
+//
+//   Similarly, `stmt` is tried before `let_decl` / `mut_decl` in `decl` so
+//   that `let_x = 5;` and `mut_x = 5;` are assignments, not declarations.
 
 // ── Whitespace and comments ───────────────────────────────────────────────────
 
@@ -21,14 +31,14 @@ program = { SOI ~ decl* ~ EOI }
 // ── Declarations ──────────────────────────────────────────────────────────────
 
 decl = {
-    let_decl
-  | mut_decl
-  | fun_decl
+    fun_decl
   | struct_decl
   | enum_decl
   | impl_block
   | aspect_decl
-  | stmt
+  | stmt          // before let/mut so that let_x=5 and mut_x=5 are assignments
+  | let_decl
+  | mut_decl
 }
 
 let_decl    = { "let" ~ ident ~ (":" ~ type_expr)? ~ "=" ~ expr ~ ";" }
@@ -63,10 +73,10 @@ stmt = {
     while_stmt
   | for_stmt
   | for_in_stmt
+  | continue_stmt
+  | expr_stmt         // before return/break so break_sum/return_val parse as exprs
   | return_stmt
   | break_stmt
-  | continue_stmt
-  | expr_stmt
 }
 
 block      = { "{" ~ block_item* ~ expr? ~ "}" }
@@ -81,7 +91,7 @@ expr_stmt  = { expr ~ ";" }
 while_stmt = { "while" ~ "(" ~ expr ~ ")" ~ block }
 
 for_stmt   = { "for" ~ "(" ~ for_init ~ expr? ~ ";" ~ expr? ~ ")" ~ block }
-for_init   = { mut_decl | expr_stmt | ";" }
+for_init   = { expr_stmt | mut_decl | ";" }
 
 for_in_stmt  = { "for" ~ "(" ~ "let" ~ ident ~ "in" ~ expr ~ ")" ~ block }
 
