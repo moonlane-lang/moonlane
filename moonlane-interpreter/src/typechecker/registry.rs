@@ -8,7 +8,7 @@ use crate::typeinference::{
 };
 use crate::types::Type;
 
-use super::conversions::{infer_type_to_type, type_expr_to_infer};
+use super::conversions::{infer_type_to_type, type_expr_to_infer, type_expr_to_infer_with_generics};
 
 fn dbg_scheme(t: TypeVar) -> TypeScheme {
     TypeScheme {
@@ -68,21 +68,42 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
     // Hoist user-defined structs, enums, and impl method signatures.
     for decl in &program.decls {
         match decl {
-            Decl::Struct(sd) => {
+            Decl::Struct(sd) if sd.generics.is_empty() => {
                 let fields = sd.fields.iter()
                     .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
                     .collect();
                 registry.register_struct_fields(sd.name.clone(), fields);
             }
+            Decl::Struct(sd) => {
+                let mut gen_map: HashMap<String, TypeVar> = HashMap::new();
+                let mut type_params = vec![];
+                for gp in &sd.generics {
+                    let tv = gen.fresh();
+                    gen_map.insert(gp.name.clone(), tv);
+                    type_params.push(tv);
+                }
+                let fields = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map)))
+                    .collect();
+                registry.register_struct_fields(sd.name.clone(), fields);
+                registry.register_struct_type_params(sd.name.clone(), type_params);
+            }
             Decl::Enum(ed) => {
+                let mut gen_map: HashMap<String, TypeVar> = HashMap::new();
+                let mut type_params = vec![];
+                for gp in &ed.generics {
+                    let tv = gen.fresh();
+                    gen_map.insert(gp.name.clone(), tv);
+                    type_params.push(tv);
+                }
                 let variants = ed.variants.iter().map(|v| VariantInfo {
                     name: v.name.clone(),
                     fields: v.fields.iter()
-                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                        .map(|f| (f.name.clone(), type_expr_to_infer_with_generics(&f.type_ann, &gen_map)))
                         .collect(),
                 }).collect();
                 registry.register_enum(ed.name.clone(), EnumInfo {
-                    type_params: vec![],
+                    type_params,
                     variants,
                 });
             }
@@ -169,10 +190,12 @@ pub(super) fn register_builtin_poly_schemes(
 
 pub(super) fn build_concrete_struct_env(
     struct_env: &HashMap<String, Vec<(String, InferType)>>,
+    struct_type_params: &HashMap<String, Vec<TypeVar>>,
     subst: &crate::typeinference::Substitution,
 ) -> Result<HashMap<String, Vec<(String, Type)>>, MoonlaneError> {
     let dummy = Span::new(0, 0, "");
     struct_env.iter()
+        .filter(|(name, _)| !struct_type_params.contains_key(name.as_str()))
         .map(|(name, fields)| {
             let concrete = fields.iter()
                 .map(|(fname, fty)| Ok((fname.clone(), infer_type_to_type(&subst.apply(fty), &dummy)?)))

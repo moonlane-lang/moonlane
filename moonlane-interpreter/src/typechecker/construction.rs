@@ -16,6 +16,9 @@ struct ConstructCtx<'a> {
     scheme_env:   &'a SchemeEnv,
     env:          Vec<HashMap<String, Type>>,
     struct_scopes: Vec<HashMap<String, Vec<(String, Type)>>>,
+    /// Raw (InferType) fields and type params for generic structs, for field-type resolution.
+    generic_struct_raw: &'a HashMap<String, Vec<(String, InferType)>>,
+    generic_struct_type_params: &'a HashMap<String, Vec<TypeVar>>,
     method_env:   HashMap<String, HashMap<String, Type>>,
     enum_env:     &'a HashMap<String, EnumInfo>,
     /// Shared generator continued from Pass 1; keeps TypeVar identities globally unique.
@@ -31,6 +34,8 @@ impl<'a> ConstructCtx<'a> {
         subst:      &'a Substitution,
         scheme_env: &'a SchemeEnv,
         struct_env: HashMap<String, Vec<(String, Type)>>,
+        generic_struct_raw: &'a HashMap<String, Vec<(String, InferType)>>,
+        generic_struct_type_params: &'a HashMap<String, Vec<TypeVar>>,
         method_env: HashMap<String, HashMap<String, Type>>,
         enum_env:   &'a HashMap<String, EnumInfo>,
         gen:        TypeVarGenerator,
@@ -39,6 +44,8 @@ impl<'a> ConstructCtx<'a> {
             subst, scheme_env,
             env: vec![HashMap::new()],
             struct_scopes: vec![struct_env],  // global scope pre-pushed
+            generic_struct_raw,
+            generic_struct_type_params,
             method_env, enum_env, gen,
             current_return_ty: None,
             current_break_ty:  None,
@@ -107,11 +114,13 @@ pub(super) fn construct_program(
     subst:      &Substitution,
     scheme_env: &SchemeEnv,
     struct_env: HashMap<String, Vec<(String, Type)>>,
+    generic_struct_raw: &HashMap<String, Vec<(String, InferType)>>,
+    generic_struct_type_params: &HashMap<String, Vec<TypeVar>>,
     method_env: HashMap<String, HashMap<String, Type>>,
     enum_env:   &HashMap<String, EnumInfo>,
     gen:        TypeVarGenerator,
 ) -> Result<TypedProgram, MoonlaneError> {
-    let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, method_env, enum_env, gen);
+    let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, generic_struct_raw, generic_struct_type_params, method_env, enum_env, gen);
 
     // Hoist resolved function types so forward references work in Pass 2.
     for decl in &program.decls {
@@ -494,18 +503,33 @@ fn construct_expr(
         }
         Expr::FieldAccess { object, field, span } => {
             let typed_obj = construct_expr(object, None, ctx)?;
-            let struct_name = match typed_obj.ty() {
-                Type::Named(name, _) => name.clone(),
+            let (struct_name, type_args) = match typed_obj.ty() {
+                Type::Named(name, args) => (name.clone(), args.clone()),
                 t => return Err(MoonlaneError::internal(
                     format!("field access on non-struct type {t}")
                 )),
             };
-            let field_ty = ctx.get_struct_fields(&struct_name)
-                .and_then(|fs| fs.iter().find(|(n, _)| n == field))
-                .map(|(_, ty)| ty.clone())
-                .ok_or_else(|| MoonlaneError::internal(
-                    format!("no field `{field}` on `{struct_name}`")
-                ))?;
+            let field_ty = if let Some(type_params) = ctx.generic_struct_type_params.get(&struct_name) {
+                // Generic struct: look up raw InferType field, build remap, apply, convert.
+                let raw_fields = ctx.generic_struct_raw.get(&struct_name)
+                    .ok_or_else(|| MoonlaneError::internal(format!("missing raw fields for `{struct_name}`")))?;
+                let raw_ty = raw_fields.iter()
+                    .find(|(n, _)| n == field)
+                    .map(|(_, ty)| ty.clone())
+                    .ok_or_else(|| MoonlaneError::internal(format!("no field `{field}` on `{struct_name}`")))?;
+                let mut remap = Substitution::new();
+                for (&tp, arg) in type_params.iter().zip(type_args.iter()) {
+                    remap.bind(tp, type_to_infer(arg));
+                }
+                infer_type_to_type(&remap.apply(&raw_ty), span)?
+            } else {
+                ctx.get_struct_fields(&struct_name)
+                    .and_then(|fs| fs.iter().find(|(n, _)| n == field))
+                    .map(|(_, ty)| ty.clone())
+                    .ok_or_else(|| MoonlaneError::internal(
+                        format!("no field `{field}` on `{struct_name}`")
+                    ))?
+            };
             Ok(TypedExpr::FieldAccess {
                 object: Box::new(typed_obj),
                 field:  field.clone(),
@@ -555,7 +579,33 @@ fn construct_expr(
                 construct_enum_literal_ty(&path[0], &path[1], &typed_fields, expected_ty, span, ctx)?
             } else {
                 let type_name = path.last().unwrap();
-                Type::Named(type_name.clone(), vec![])
+                if let Some(type_params) = ctx.generic_struct_type_params.get(type_name) {
+                    // Generic struct: infer type args from the typed field values.
+                    let raw_fields = ctx.generic_struct_raw.get(type_name.as_str()).unwrap();
+                    let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
+                    for &tp in type_params {
+                        remap.entry(tp).or_insert_with(|| InferType::Var(tp));
+                    }
+                    // Match each field value type to its raw InferType param; resolve via subst.
+                    for (fname, fexpr) in &typed_fields {
+                        if let Some((_, raw_ty)) = raw_fields.iter().find(|(n, _)| n == fname) {
+                            if let InferType::Var(v) = raw_ty {
+                                if type_params.contains(v) {
+                                    remap.insert(*v, type_to_infer(&fexpr.ty()));
+                                }
+                            }
+                        }
+                    }
+                    let type_args: Vec<Type> = type_params.iter()
+                        .map(|tp| {
+                            let it = remap.get(tp).cloned().unwrap_or(InferType::Var(*tp));
+                            infer_type_to_type(&ctx.subst.apply(&it), span)
+                        })
+                        .collect::<Result<_, _>>()?;
+                    Type::Named(type_name.clone(), type_args)
+                } else {
+                    Type::Named(type_name.clone(), vec![])
+                }
             };
 
             Ok(TypedExpr::StructLiteral {

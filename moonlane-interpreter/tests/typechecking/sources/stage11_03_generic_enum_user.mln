@@ -1,0 +1,25 @@
+// Positive: user-defined generic enum with one type parameter.
+
+enum Maybe<T> {
+    Some { value: T },
+    None {},
+}
+
+fun wrap_int(n: Int) -> Maybe<Int> {
+    Maybe::Some { value: n }
+}
+
+fun wrap_bool(b: Bool) -> Maybe<Bool> {
+    Maybe::Some { value: b }
+}
+
+fun unwrap_or(m: Maybe<Int>, default: Int) -> Int {
+    match m {
+        Maybe::Some { value } => value,
+        _                     => default,
+    }
+}
+
+fun use_none() -> Maybe<Int> {
+    Maybe::None
+}

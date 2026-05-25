@@ -1,0 +1,32 @@
+enum Maybe<T> {
+    Some { value: T },
+    None {},
+}
+
+fun unwrap_or_int(m: Maybe<Int>, default: Int) -> Int {
+    match m {
+        Maybe::Some { value } => value,
+        _                     => default,
+    }
+}
+
+fun unwrap_or_bool(m: Maybe<Bool>, default: Bool) -> Bool {
+    match m {
+        Maybe::Some { value } => value,
+        _                     => default,
+    }
+}
+
+fun main() {
+    let some_int = Maybe::Some { value: 42 };
+    assert(unwrap_or_int(some_int, 0) == 42);
+
+    let none_int: Maybe<Int> = Maybe::None;
+    assert(unwrap_or_int(none_int, 99) == 99);
+
+    let some_bool = Maybe::Some { value: true };
+    assert(unwrap_or_bool(some_bool, false));
+
+    let none_bool: Maybe<Bool> = Maybe::None;
+    assert(!unwrap_or_bool(none_bool, false));
+}

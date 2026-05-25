@@ -430,6 +430,8 @@ pub struct EnumInfo {
 /// Created by `build_registry` and injected into `InferContext` before inference begins.
 pub struct TypeRegistry {
     struct_env:         HashMap<String, Vec<(String, InferType)>>,
+    /// Ordered type-parameter TypeVars per generic struct (absent for non-generic structs).
+    struct_type_params: HashMap<String, Vec<TypeVar>>,
     /// Tracks which struct names were registered in each lexical scope so they
     /// can be removed on scope exit. Empty when outside any scoped block.
     struct_scope_stack: Vec<Vec<String>>,
@@ -441,6 +443,7 @@ impl TypeRegistry {
     pub fn new() -> Self {
         Self {
             struct_env:         HashMap::new(),
+            struct_type_params: HashMap::new(),
             struct_scope_stack: Vec::new(),
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
@@ -470,12 +473,20 @@ impl TypeRegistry {
         self.method_env.entry(type_name).or_default().insert(method_name, fun_ty);
     }
 
+    pub fn register_struct_type_params(&mut self, name: String, type_params: Vec<TypeVar>) {
+        self.struct_type_params.insert(name, type_params);
+    }
+
     pub fn register_enum(&mut self, name: String, info: EnumInfo) {
         self.enum_env.insert(name, info);
     }
 
     pub fn struct_fields(&self, name: &str) -> Option<&Vec<(String, InferType)>> {
         self.struct_env.get(name)
+    }
+
+    pub fn struct_type_params_for(&self, name: &str) -> Option<&Vec<TypeVar>> {
+        self.struct_type_params.get(name)
     }
 
     pub fn method_type(&self, type_name: &str, method_name: &str) -> Option<&InferType> {
@@ -488,6 +499,10 @@ impl TypeRegistry {
 
     pub(crate) fn raw_struct_env(&self) -> &HashMap<String, Vec<(String, InferType)>> {
         &self.struct_env
+    }
+
+    pub(crate) fn raw_struct_type_params(&self) -> &HashMap<String, Vec<TypeVar>> {
+        &self.struct_type_params
     }
 
     pub(crate) fn raw_method_env(&self) -> &HashMap<String, HashMap<String, InferType>> {
@@ -541,6 +556,14 @@ impl InferContext {
 
     pub fn register_struct_fields(&mut self, name: String, fields: Vec<(String, InferType)>) {
         self.registry.register_struct_fields(name, fields);
+    }
+
+    pub fn register_struct_type_params(&mut self, name: String, type_params: Vec<TypeVar>) {
+        self.registry.register_struct_type_params(name, type_params);
+    }
+
+    pub fn get_struct_type_params(&self, name: &str) -> Option<&Vec<TypeVar>> {
+        self.registry.struct_type_params_for(name)
     }
 
     pub fn push_struct_scope(&mut self) { self.registry.push_struct_scope(); }

@@ -548,6 +548,33 @@ mod tests {
         check_file(&format!("{}/limit_02_let_closure_mono.mln", test_dir()));
     }
 
+    // ── Stage 11: generic structs ─────────────────────────────────────────────
+
+    #[test]
+    fn stage11_generic_struct_basic() {
+        check_file(&format!("{}/stage11_01_generic_struct_basic.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage11_generic_struct_two_params() {
+        check_file(&format!("{}/stage11_02_generic_struct_two_params.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage11_generic_enum_user() {
+        check_file(&format!("{}/stage11_03_generic_enum_user.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage11_generic_nested() {
+        check_file(&format!("{}/stage11_04_generic_nested.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage11_neg_generic_struct_field_conflict() {
+        check_file(&format!("{}/stage11_neg_01_generic_struct_field_conflict.mln", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]

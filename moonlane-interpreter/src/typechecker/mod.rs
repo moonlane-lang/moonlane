@@ -46,10 +46,13 @@ pub fn check(program: Program) -> Result<TypedProgram, MoonlaneError> {
     registry::register_builtin_poly_schemes(&mut scheme_env, &mut gen);
 
     // Build concrete environments for Pass 2.
-    let concrete_struct_env = registry::build_concrete_struct_env(ctx.registry().raw_struct_env(), &subst)?;
+    let concrete_struct_env = registry::build_concrete_struct_env(ctx.registry().raw_struct_env(), ctx.registry().raw_struct_type_params(), &subst)?;
     let concrete_method_env = registry::build_concrete_method_env(ctx.registry().raw_method_env(), &subst)?;
     let enum_env = ctx.registry().raw_enum_env();
 
+    let raw_struct_env = ctx.registry().raw_struct_env();
+    let raw_struct_type_params = ctx.registry().raw_struct_type_params();
+
     // Pass 2: re-derive concrete types and build TypedAST.
-    construction::construct_program(&program, &subst, &scheme_env, concrete_struct_env, concrete_method_env, enum_env, gen)
+    construction::construct_program(&program, &subst, &scheme_env, concrete_struct_env, raw_struct_env, raw_struct_type_params, concrete_method_env, enum_env, gen)
 }

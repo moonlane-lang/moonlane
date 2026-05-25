@@ -1,0 +1,18 @@
+// Positive: generic struct with two type parameters.
+
+struct Pair<A, B> {
+    first: A,
+    second: B,
+}
+
+fun make_pair(a: Int, b: Bool) -> Pair<Int, Bool> {
+    Pair { first: a, second: b }
+}
+
+fun get_first(p: Pair<Int, Bool>) -> Int {
+    p.first
+}
+
+fun get_second(p: Pair<Int, Bool>) -> Bool {
+    p.second
+}

@@ -453,20 +453,32 @@ fn infer_expr(
                 "cannot infer struct type for field access; add a type annotation",
                 span,
             ))?;
+            let type_args = if let InferType::Named(_, args) = &obj_ty { args.clone() } else { vec![] };
             let fields = ctx.get_struct_fields(&struct_name)
                 .ok_or_else(|| MoonlaneError::type_error(
                     TypeErrorCode::T0003,
                     format!("unknown type `{struct_name}`"),
                     span,
-                ))?;
-            fields.iter()
+                ))?
+                .clone();
+            let raw_ty = fields.iter()
                 .find(|(n, _)| n == field)
                 .map(|(_, ty)| ty.clone())
                 .ok_or_else(|| MoonlaneError::type_error(
                     TypeErrorCode::T0003,
                     format!("no field `{field}` on `{struct_name}`"),
                     span,
-                ))
+                ))?;
+            // For generic structs, substitute declared type params with the resolved args.
+            if let Some(type_params) = ctx.get_struct_type_params(&struct_name).cloned() {
+                let mut remap = Substitution::new();
+                for (&tp, arg) in type_params.iter().zip(type_args.iter()) {
+                    remap.bind(tp, arg.clone());
+                }
+                Ok(remap.apply(&raw_ty))
+            } else {
+                Ok(raw_ty)
+            }
         }
         Expr::MethodCall { receiver, method, args, span } => {
             let recv_ty = infer_expr(receiver, ctx, fun_generalizations)?;
@@ -838,15 +850,31 @@ fn infer_struct_literal(
             span,
         ))?
         .clone();
+    // For generic structs, create fresh type vars and remap declared TypeVars.
+    let type_params = ctx.get_struct_type_params(&struct_name).cloned();
+    let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
+    if let Some(ref params) = type_params {
+        for &tp in params {
+            remap.insert(tp, ctx.fresh_var());
+        }
+    }
+    let apply_remap = |ty: &InferType| -> InferType {
+        if remap.is_empty() { return ty.clone(); }
+        match ty {
+            InferType::Var(v) => remap.get(v).cloned().unwrap_or_else(|| ty.clone()),
+            other => other.clone(),
+        }
+    };
     for (name, expr) in fields {
-        let decl_ty = expected_fields.iter()
+        let raw_ty = expected_fields.iter()
             .find(|(n, _)| n == name)
-            .map(|(_, ty)| ty.clone())
+            .map(|(_, ty)| ty)
             .ok_or_else(|| MoonlaneError::type_error(
                 TypeErrorCode::T0003,
                 format!("no field `{name}` on `{struct_name}`"),
                 span,
             ))?;
+        let decl_ty = apply_remap(raw_ty);
         let expr_ty = infer_expr(expr, ctx, fun_generalizations)?;
         ctx.add_constraint(expr_ty, decl_ty, span.clone());
     }
@@ -859,7 +887,9 @@ fn infer_struct_literal(
             ));
         }
     }
-    Ok(InferType::Named(struct_name, vec![]))
+    let type_args: Vec<InferType> = type_params.as_deref().unwrap_or(&[])
+        .iter().map(|tp| remap[tp].clone()).collect();
+    Ok(InferType::Named(struct_name, type_args))
 }
 
 fn infer_field_assign_type(
@@ -878,6 +908,7 @@ fn infer_field_assign_type(
             target_span,
         )
     })?;
+    let type_args = if let InferType::Named(_, args) = &obj_ty { args.clone() } else { vec![] };
     let fields = ctx.get_struct_fields(&struct_name)
         .ok_or_else(|| MoonlaneError::type_error(
             TypeErrorCode::T0003,
@@ -885,14 +916,23 @@ fn infer_field_assign_type(
             target_span,
         ))?
         .clone();
-    fields.iter()
+    let raw_ty = fields.iter()
         .find(|(n, _)| n == field)
         .map(|(_, ty)| ty.clone())
         .ok_or_else(|| MoonlaneError::type_error(
             TypeErrorCode::T0003,
             format!("no field `{field}` on `{struct_name}`"),
             target_span,
-        ))
+        ))?;
+    if let Some(type_params) = ctx.get_struct_type_params(&struct_name).cloned() {
+        let mut remap = Substitution::new();
+        for (&tp, arg) in type_params.iter().zip(type_args.iter()) {
+            remap.bind(tp, arg.clone());
+        }
+        Ok(remap.apply(&raw_ty))
+    } else {
+        Ok(raw_ty)
+    }
 }
 
 fn infer_enum_variant_pattern(

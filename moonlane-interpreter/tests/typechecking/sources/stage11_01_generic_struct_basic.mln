@@ -1,0 +1,17 @@
+// Positive: generic struct instantiation with a single type parameter.
+
+struct Box<T> {
+    value: T,
+}
+
+fun make_int_box(v: Int) -> Box<Int> {
+    Box { value: v }
+}
+
+fun make_bool_box(v: Bool) -> Box<Bool> {
+    Box { value: v }
+}
+
+fun unbox_int(b: Box<Int>) -> Int {
+    b.value
+}

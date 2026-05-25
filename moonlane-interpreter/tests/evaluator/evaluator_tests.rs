@@ -253,6 +253,15 @@ mod tests {
     #[test]
     fn let_polymorphism() { check("52_let_polymorphism.mln"); }
 
+    #[test]
+    fn generic_struct() { check("53_generic_struct.mln"); }
+
+    #[test]
+    fn generic_enum_user() { check("54_generic_enum_user.mln"); }
+
+    #[test]
+    fn generic_nested() { check("55_generic_nested.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]

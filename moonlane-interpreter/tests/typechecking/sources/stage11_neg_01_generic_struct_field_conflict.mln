@@ -1,0 +1,10 @@
+// Negative: passing a value of wrong type for the generic field,
+// then using it where a different type is expected.
+
+struct Box<T> {
+    value: T,
+}
+
+fun bad() -> Box<Int> { // ERROR[T0001]
+    Box { value: true }
+}
