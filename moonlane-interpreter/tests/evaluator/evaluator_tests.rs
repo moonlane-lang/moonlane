@@ -262,6 +262,9 @@ mod tests {
     #[test]
     fn generic_nested() { check("55_generic_nested.mln"); }
 
+    #[test]
+    fn aspect_dispatch() { check("58_aspect_dispatch.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]
@@ -336,4 +339,7 @@ mod tests {
 
     #[test]
     fn neg_generic_type_conflict() { check("neg_21_generic_type_conflict.mln"); }
+
+    #[test]
+    fn neg_missing_aspect_method() { check("neg_22_missing_aspect_method.mln"); }
 }

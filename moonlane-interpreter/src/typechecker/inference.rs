@@ -75,13 +75,29 @@ fn infer_decl(
         Decl::Fun(fd) => { infer_fun_decl(fd, ctx, fun_generalizations)?; Ok(InferType::unit()) }
         Decl::Struct(_) | Decl::Enum(_) | Decl::Aspect(_) => Ok(InferType::unit()),
         Decl::Impl(ib) => {
-            if ib.aspect_name.is_some() {
-                return Err(MoonlaneError::internal("aspect impl blocks not yet supported"));
-            }
             let target_name = match &ib.target_type {
-                TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
+                TypeExpr::Named(name, _) => name.clone(),
                 _ => return Err(MoonlaneError::internal("generic impl blocks not yet supported")),
             };
+            // Verify the impl provides every method the aspect declares.
+            if let Some(aspect_name) = &ib.aspect_name {
+                if let Some(required) = ctx.aspect_methods(aspect_name).cloned() {
+                    let provided: std::collections::HashSet<&str> =
+                        ib.methods.iter().map(|m| m.name.as_str()).collect();
+                    for req in &required {
+                        if !provided.contains(req.as_str()) {
+                            return Err(MoonlaneError::type_error(
+                                TypeErrorCode::T0003,
+                                format!(
+                                    "`{}` does not implement `{}::{}` required by aspect `{}`",
+                                    target_name, target_name, req, aspect_name
+                                ),
+                                &ib.span,
+                            ));
+                        }
+                    }
+                }
+            }
             for method in &ib.methods {
                 infer_impl_method(method, &target_name, ctx, fun_generalizations)?;
             }

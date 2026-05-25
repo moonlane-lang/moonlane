@@ -1,0 +1,78 @@
+// End-to-end test for aspect declaration, impl, and method dispatch.
+
+aspect Describable {
+    fun describe(self) -> String;
+}
+
+aspect Scalable {
+    fun scale(self, factor: Int) -> Int;
+}
+
+struct Circle {
+    radius: Int,
+}
+
+struct Rectangle {
+    width: Int,
+    height: Int,
+}
+
+impl Circle {
+    fun new(r: Int) -> Circle {
+        return Circle { radius: r };
+    }
+    fun area(self) -> Int {
+        return self.radius * self.radius;
+    }
+}
+
+impl Rectangle {
+    fun new(w: Int, h: Int) -> Rectangle {
+        return Rectangle { width: w, height: h };
+    }
+}
+
+impl Describable for Circle {
+    fun describe(self) -> String {
+        return string_concat("Circle(r=", string_concat(int_to_string(self.radius), ")"));
+    }
+}
+
+impl Describable for Rectangle {
+    fun describe(self) -> String {
+        return string_concat("Rect(", string_concat(int_to_string(self.width), string_concat("x", string_concat(int_to_string(self.height), ")"))));
+    }
+}
+
+impl Scalable for Circle {
+    fun scale(self, factor: Int) -> Int {
+        return self.radius * factor;
+    }
+}
+
+impl Scalable for Rectangle {
+    fun scale(self, factor: Int) -> Int {
+        return self.width * self.height * factor;
+    }
+}
+
+fun main() {
+    let c = Circle::new(5);
+    let r = Rectangle::new(3, 4);
+
+    // Aspect method dispatch on Circle
+    assert(c.describe() == "Circle(r=5)");
+    assert(c.scale(2) == 10);
+
+    // Aspect method dispatch on Rectangle
+    assert(r.describe() == "Rect(3x4)");
+    assert(r.scale(3) == 36);
+
+    // Non-aspect method still works alongside aspect methods
+    assert(c.area() == 25);
+
+    // Default method via aspect (aspect method on a second instance)
+    let c2 = Circle::new(10);
+    assert(c2.describe() == "Circle(r=10)");
+    assert(c2.scale(5) == 50);
+}

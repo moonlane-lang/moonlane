@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Decl, Program, Span, TypeExpr};
+use crate::ast::{Decl, Program, Span, TypeExpr, AspectDecl};
 use crate::error::MoonlaneError;
 use crate::typeinference::{
     EnumInfo, InferContext, InferType, TypeRegistry, TypeScheme, TypeVar, TypeVarGenerator,
@@ -107,38 +107,55 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     variants,
                 });
             }
-            Decl::Impl(ib) if ib.aspect_name.is_none() => {
+            Decl::Aspect(ad) => {
+                register_aspect_decl(ad, &mut registry);
+            }
+            Decl::Impl(ib) => {
                 let target_name = match &ib.target_type {
-                    TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
+                    TypeExpr::Named(name, _) => name.clone(),
                     _ => continue,
                 };
-                for method in &ib.methods {
-                    let mut param_types = vec![];
-                    for p in &method.params {
-                        let pt = if p.name == "self" {
-                            InferType::Named(target_name.clone(), vec![])
-                        } else if let Some(ann) = &p.type_ann {
-                            type_expr_to_infer(ann)
-                        } else {
-                            InferType::Var(gen.fresh())
-                        };
-                        param_types.push(pt);
-                    }
-                    let ret_ty = method.return_type.as_ref()
-                        .map(type_expr_to_infer)
-                        .unwrap_or_else(InferType::unit);
-                    registry.register_method(
-                        target_name.clone(),
-                        method.name.clone(),
-                        InferType::Fun(param_types, Box::new(ret_ty)),
-                    );
-                }
+                register_impl_methods(ib.methods.iter(), &target_name, gen, &mut registry);
             }
             _ => {}
         }
     }
 
     registry
+}
+
+fn register_aspect_decl(ad: &AspectDecl, registry: &mut TypeRegistry) {
+    let method_names = ad.methods.iter().map(|m| m.name.clone()).collect();
+    registry.register_aspect(ad.name.clone(), method_names);
+}
+
+fn register_impl_methods<'a>(
+    methods: impl Iterator<Item = &'a crate::ast::FunDecl>,
+    target_name: &str,
+    gen: &mut TypeVarGenerator,
+    registry: &mut TypeRegistry,
+) {
+    for method in methods {
+        let mut param_types = vec![];
+        for p in &method.params {
+            let pt = if p.name == "self" {
+                InferType::Named(target_name.to_string(), vec![])
+            } else if let Some(ann) = &p.type_ann {
+                type_expr_to_infer(ann)
+            } else {
+                InferType::Var(gen.fresh())
+            };
+            param_types.push(pt);
+        }
+        let ret_ty = method.return_type.as_ref()
+            .map(type_expr_to_infer)
+            .unwrap_or_else(InferType::unit);
+        registry.register_method(
+            target_name.to_string(),
+            method.name.clone(),
+            InferType::Fun(param_types, Box::new(ret_ty)),
+        );
+    }
 }
 
 pub(super) fn register_builtins(ctx: &mut InferContext) {

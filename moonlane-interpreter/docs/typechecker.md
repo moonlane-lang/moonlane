@@ -257,7 +257,7 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 ### v0.4 — Aspects
 
-1. Add `impl_env: HashMap<(String, String), Vec<MethodInfo>>` (type × aspect → methods) or extend `TypeRegistry` with aspect-impl storage.
+1. ~~Add `impl_env` / extend `TypeRegistry` with aspect-impl storage~~ — **done**: `TypeRegistry` now carries `aspect_env: HashMap<String, Vec<String>>` (aspect name → required method names). Aspect declarations register their methods; `impl Aspect for Type` blocks are validated for completeness against this registry during inference.
 2. Replace the provisional `as` cast with a `From<S>` aspect check.
 3. Replace the provisional `?` error type match with a `From<E>` coercion lookup.
 4. Upgrade `for-in` from Array/Range only to an `Iterable<T>` aspect check (#11).

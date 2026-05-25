@@ -1,0 +1,14 @@
+// TYPECHECK_ERROR[does not implement]
+aspect Greet {
+    fun greet(self) -> String;
+    fun farewell(self) -> String;
+}
+
+struct Person { name: Int }
+
+impl Greet for Person {
+    fun greet(self) -> String { return "hello"; }
+    // Missing `farewell` — should be a typecheck error.
+}
+
+fun main() { }

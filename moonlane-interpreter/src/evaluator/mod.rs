@@ -682,6 +682,12 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                     None => Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
                 }
             } else {
+                // Check env first (e.g. "Circle::new" for static methods);
+                // fall back to unit enum variant construction only if not found.
+                let key = segments.join("::");
+                if let Some(val) = env.get(&key) {
+                    return Ok(Signal::Value(val));
+                }
                 let name    = segments[segments.len() - 2].clone();
                 let variant = segments[segments.len() - 1].clone();
                 Ok(Signal::Value(Value::Enum { name, variant, fields: HashMap::new() }))
@@ -1026,6 +1032,12 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                     )),
                 }
             } else {
+                // Check env first (e.g. "Circle::new" for static methods);
+                // fall back to unit enum variant construction only if not found.
+                let key = segments.join("::");
+                if let Some(val) = env.get(&key) {
+                    return Ok(Signal::Value(val));
+                }
                 let name    = segments[segments.len() - 2].clone();
                 let variant = segments[segments.len() - 1].clone();
                 Ok(Signal::Value(Value::Enum {

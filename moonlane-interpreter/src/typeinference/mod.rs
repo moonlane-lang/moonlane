@@ -435,8 +435,11 @@ pub struct TypeRegistry {
     /// Tracks which struct names were registered in each lexical scope so they
     /// can be removed on scope exit. Empty when outside any scoped block.
     struct_scope_stack: Vec<Vec<String>>,
-    method_env: HashMap<String, HashMap<String, InferType>>,
-    enum_env:   HashMap<String, EnumInfo>,
+    method_env:  HashMap<String, HashMap<String, InferType>>,
+    enum_env:    HashMap<String, EnumInfo>,
+    /// aspect name → ordered list of method names the aspect declares.
+    /// Used to verify impl blocks are complete.
+    aspect_env:  HashMap<String, Vec<String>>,
 }
 
 impl TypeRegistry {
@@ -447,6 +450,7 @@ impl TypeRegistry {
             struct_scope_stack: Vec::new(),
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
+            aspect_env:         HashMap::new(),
         }
     }
 
@@ -495,6 +499,14 @@ impl TypeRegistry {
 
     pub fn enum_info(&self, name: &str) -> Option<&EnumInfo> {
         self.enum_env.get(name)
+    }
+
+    pub fn register_aspect(&mut self, name: String, methods: Vec<String>) {
+        self.aspect_env.insert(name, methods);
+    }
+
+    pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
+        self.aspect_env.get(name)
     }
 
     pub(crate) fn raw_struct_env(&self) -> &HashMap<String, Vec<(String, InferType)>> {
@@ -583,6 +595,10 @@ impl InferContext {
 
     pub fn get_enum(&self, name: &str) -> Option<&EnumInfo> {
         self.registry.enum_info(name)
+    }
+
+    pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
+        self.registry.aspect_methods(name)
     }
 
     pub fn registry(&self) -> &TypeRegistry {

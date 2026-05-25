@@ -241,9 +241,6 @@ fn construct_fun_decl(fun: &FunDecl, ctx: &mut ConstructCtx) -> Result<TypedDecl
 }
 
 fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDecl, MoonlaneError> {
-    if ib.aspect_name.is_some() {
-        return Err(MoonlaneError::not_implemented("aspect impl blocks not yet supported"));
-    }
     let target_name = match &ib.target_type {
         TypeExpr::Named(name, _) => name.clone(),
         _ => return Err(MoonlaneError::not_implemented("generic impl blocks not yet supported")),
