@@ -76,14 +76,87 @@ cargo test --test typeinference_tests
 cargo test --test typechecking_tests
 ```
 
-## Example
+## Examples
+
+**Algebraic types and pattern matching**
 
 ```moonlane
-fun factorial(n: Int) -> Int {
-    if (n <= 1) { 1 } else { n * factorial(n - 1) }
+enum Shape {
+    Circle    { radius: Float },
+    Rectangle { width: Float, height: Float },
 }
 
-let result = factorial(5);
+fun area(s: Shape) -> Float {
+    match s {
+        Shape::Circle { radius }           => 3.14159 * radius * radius,
+        Shape::Rectangle { width, height } => width * height,
+    }
+}
+```
+
+**Generics**
+
+```moonlane
+fun first<T>(items: T[]) -> Perhaps<T> {
+    if (array_len(items) == 0) { Perhaps::Nope {} }
+    else { Perhaps::Some { value: items[0] } }
+}
+```
+
+**Aspects**
+
+```moonlane
+aspect Summary {
+    fun summarize(self) -> String;
+}
+
+struct Article { title: String, author: String }
+struct Tweet   { content: String }
+
+impl Summary for Article {
+    fun summarize(self) -> String { self.title + " — " + self.author }
+}
+impl Summary for Tweet {
+    fun summarize(self) -> String { self.content }
+}
+```
+
+**Error propagation with `From`-based coercion**
+
+```moonlane
+enum IoError  { FileNotFound {} }
+enum AppError { Io { msg: String } }
+
+impl From<IoError> for AppError {
+    fun from(e: IoError) -> AppError { AppError::Io { msg: "file not found" } }
+}
+
+fun load_config() -> Result<String, AppError> {
+    let data = read_file("config.toml")?;  // IoError coerced to AppError via From
+    Result::Ok { value: data }
+}
+```
+
+**User-defined iteration**
+
+```moonlane
+struct Counter { current: Int, max: Int }
+
+impl Iterable<Int> for Counter {
+    fun next(mut self) -> Perhaps<Int> {
+        if (self.current >= self.max) { Perhaps::Nope {} }
+        else {
+            self.current = self.current + 1;
+            Perhaps::Some { value: self.current }
+        }
+    }
+}
+
+fun main() {
+    for (let n in Counter { current: 0, max: 5 }) {
+        println(n);  // 1 2 3 4 5
+    }
+}
 ```
 
 ## Project Structure
