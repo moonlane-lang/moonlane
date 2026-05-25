@@ -487,34 +487,39 @@ fn eval_for_in(
             format!("for-in: `{type_name}` does not implement Iterable (no `next` method)"), span)
     })?;
 
-    // Hold the iterator in an Rc so mutations inside next are visible across calls.
-    let iter_cell = Rc::new(RefCell::new(iterable));
+    let mut iter_val = iterable;
     loop {
-        let iter_val = iter_cell.borrow().clone();
-        let result = call_function(next_fn.clone(), vec![iter_val], span)?.into_value();
-        match result {
+        let (result_sig, updated_self) = call_function_mut_self(next_fn.clone(), vec![iter_val.clone()], span)?;
+        iter_val = updated_self;
+        let result = result_sig.into_value();
+        let maybe_item: Option<Value> = match result {
+            Value::Perhaps(None) => None,
+            Value::Perhaps(Some(v)) => Some(*v),
             Value::Enum { ref name, ref variant, ref fields } if name == "Perhaps" => {
                 match variant.as_str() {
-                    "Nope" => break,
-                    "Some" => {
-                        let item = fields.get("value").cloned().ok_or_else(|| {
-                            MoonlaneError::internal("Iterable::next: Perhaps::Some missing `value`")
-                        })?;
-                        env.push_scope();
-                        env.define(binding, item);
-                        let sig = eval_block(body, env)?;
-                        env.pop_scope();
-                        match sig {
-                            Signal::Value(_) | Signal::Continue => {}
-                            Signal::Break(_)        => break,
-                            Signal::Return(v)       => return Ok(Signal::Return(v)),
-                            Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
-                        }
-                    }
+                    "Nope" => None,
+                    "Some" => Some(fields.get("value").cloned().ok_or_else(|| {
+                        MoonlaneError::internal("Iterable::next: Perhaps::Some missing `value`")
+                    })?),
                     _ => return Err(MoonlaneError::internal("Iterable::next: unexpected Perhaps variant")),
                 }
             }
             _ => return Err(MoonlaneError::internal("Iterable::next: expected Perhaps value")),
+        };
+        match maybe_item {
+            None => break,
+            Some(item) => {
+                env.push_scope();
+                env.define(binding, item);
+                let sig = eval_block(body, env)?;
+                env.pop_scope();
+                match sig {
+                    Signal::Value(_) | Signal::Continue => {}
+                    Signal::Break(_)        => break,
+                    Signal::Return(v)       => return Ok(Signal::Return(v)),
+                    Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+                }
+            }
         }
     }
     Ok(Signal::Value(Value::Unit))
@@ -1560,6 +1565,48 @@ fn call_function(func: Value, args: Vec<Value>, span: &Span) -> Result<Signal, M
             format!("call: expected a closure or builtin, got {:?}", std::mem::discriminant(&other)),
             span,
         ))),
+    }
+}
+
+/// Like `call_function` but also returns the updated `self` binding after the call.
+/// Used by the for-in loop so that `mut self` mutations in `next()` persist across iterations.
+fn call_function_mut_self(func: Value, args: Vec<Value>, span: &Span) -> Result<(Signal, Value), MoonlaneError> {
+    match func {
+        Value::Closure(rc) => {
+            let closure = (*rc).clone();
+            let self_param_name = closure.params.first().map(|p| p.name.clone());
+            let fn_name = closure.name.clone().unwrap_or_else(|| "<closure>".to_string());
+            push_frame(fn_name, span.clone());
+            let mut call_env = closure.captured.clone();
+            call_env.push_scope();
+            for (param, val) in closure.params.iter().zip(args.iter()) {
+                call_env.define(&param.name, val.clone());
+            }
+            let result = match &closure.body {
+                ClosureBody::Typed(b)   => eval_block(b, &mut call_env),
+                ClosureBody::Untyped(b) => eval_untyped_block(b, &mut call_env),
+            };
+            let updated_self = self_param_name
+                .and_then(|n| call_env.get(&n))
+                .unwrap_or(Value::Unit);
+            let result = result.map_err(attach_stack);
+            pop_frame();
+            let sig = result?;
+            let sig = match sig {
+                Signal::Return(v) => Signal::Value(v),
+                Signal::PropagateErr(e) => Signal::Value(Value::Enum {
+                    name:    "Result".to_string(),
+                    variant: "Err".to_string(),
+                    fields:  { let mut m = HashMap::new(); m.insert("error".to_string(), e); m },
+                }),
+                other => other,
+            };
+            Ok((sig, updated_self))
+        }
+        other => {
+            let sig = call_function(other, args, span)?;
+            Ok((sig, Value::Unit))
+        }
     }
 }
 

@@ -265,6 +265,15 @@ mod tests {
     #[test]
     fn aspect_dispatch() { check("58_aspect_dispatch.mln"); }
 
+    #[test]
+    fn iterable_aspect() { check("59_iterable_aspect.mln"); }
+
+    #[test]
+    fn from_cast() { check("60_from_cast.mln"); }
+
+    #[test]
+    fn propagate_error_coercion() { check("61_propagate_error_coercion.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]

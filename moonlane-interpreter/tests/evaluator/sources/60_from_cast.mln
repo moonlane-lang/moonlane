@@ -1,0 +1,34 @@
+// User-defined From aspect — `as` cast dispatches through TypeName::from.
+
+aspect From<T> {
+    fun from(value: T) -> Self;
+}
+
+struct Celsius {
+    degrees: Float,
+}
+
+struct Fahrenheit {
+    degrees: Float,
+}
+
+impl From<Celsius> for Fahrenheit {
+    fun from(value: Celsius) -> Fahrenheit {
+        return Fahrenheit { degrees: value.degrees * 1.8 + 32.0 };
+    }
+}
+
+fun main() {
+    let c = Celsius { degrees: 100.0 };
+    let f = c as Fahrenheit;
+    assert(f.degrees == 212.0);
+
+    // Built-in From impls: Int <-> Float
+    let n: Int = 3;
+    let x = n as Float;
+    assert(x == 3.0);
+
+    let y: Float = 7.9;
+    let z = y as Int;
+    assert(z == 7);
+}

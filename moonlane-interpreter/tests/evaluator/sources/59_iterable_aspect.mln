@@ -1,0 +1,36 @@
+// User-defined Iterable via aspect — for-in dispatches through next().
+
+aspect Iterable {
+    fun next(self) -> Perhaps<Int>;
+}
+
+struct Counter {
+    current: Int,
+    limit:   Int,
+}
+
+impl Counter {
+    fun new(limit: Int) -> Counter {
+        return Counter { current: 0, limit: limit };
+    }
+}
+
+impl Iterable<Int> for Counter {
+    fun next(mut self) -> Perhaps<Int> {
+        if (self.current < self.limit) {
+            let val = self.current;
+            self.current = self.current + 1;
+            return Perhaps::Some { value: val };
+        }
+        return nope;
+    }
+}
+
+fun main() {
+    mut sum = 0;
+    let c = Counter::new(5);
+    for (let x in c) {
+        sum += x;
+    }
+    assert(sum == 10); // 0+1+2+3+4
+}

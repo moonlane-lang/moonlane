@@ -376,7 +376,22 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Moon
             let iterable = construct_expr(&fi.iterable, None, ctx)?;
             let elem_ty = match iterable.ty() {
                 Type::Array(elem) => *elem.clone(),
-                Type::Named(name, args) if name == "Range" && args.len() == 1 => Type::Int,
+                Type::Named(name, _) if name == "Range" => Type::Int,
+                Type::Named(type_name, _) => {
+                    // User-defined Iterable: derive elem type from next() -> Perhaps<T>.
+                    let next_ret = ctx.method_env.get(type_name.as_str())
+                        .and_then(|m| m.get("next"))
+                        .and_then(|ty| if let Type::Fun(_, ret) = ty { Some(ret.as_ref()) } else { None })
+                        .cloned();
+                    match next_ret {
+                        Some(Type::Perhaps(elem)) => *elem,
+                        Some(Type::Named(n, mut args)) if n == "Perhaps" && args.len() == 1 =>
+                            args.remove(0),
+                        _ => return Err(MoonlaneError::internal(
+                            format!("for-in: `{type_name}` has no `next() -> Perhaps<T>` method")
+                        )),
+                    }
+                }
                 _ => return Err(MoonlaneError::internal("for-in over non-iterable type")),
             };
             ctx.push_scope();
