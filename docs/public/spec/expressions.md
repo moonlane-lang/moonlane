@@ -36,7 +36,7 @@ Arms with blocks follow the same rules as function bodies: the block's tail expr
 let desc: String = match shape {
     Shape::Circle { radius } => {
         let area = radius * radius;
-        int_to_string(area as Int)
+        (area as Int).to_string()
     },
     Shape::Rectangle { width, height } => "rectangle",
 };
@@ -59,8 +59,8 @@ let desc: String = match shape {
 ```moonlane
 // enum destructuring
 match shape {
-    Shape::Circle { radius } => println(float_to_string(radius)),
-    Shape::Rectangle { width, height } => println(float_to_string(width)),
+    Shape::Circle { radius } => println(radius),
+    Shape::Rectangle { width, height } => println(width),
 }
 
 // literal and guard
@@ -154,8 +154,8 @@ for (let i in 0..10) { ... }    // 0, 1, ..., 9
 for (let i in 0..=10) { ... }   // 0, 1, ..., 10
 ```
 
-> **v0.1:** Only `T[]` and `Range` are supported as iterables. User-defined
-> `Iterable<T>` implementations are a v0.2 feature (requires the aspect system).
+> **v0.1–v0.3:** Only `T[]` and `Range` are supported as iterables. User-defined
+> `Iterable<T>` implementations are a v0.4 feature.
 
 ### Loop
 

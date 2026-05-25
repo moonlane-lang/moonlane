@@ -16,22 +16,68 @@ Panics are triggered by:
 
 These are available globally without any `use` declaration:
 
-| Name              | Signature                           | Description                              |
-|-------------------|-------------------------------------|------------------------------------------|
-| `print`           | `(s: String)`                       | Print to stdout, no newline              |
-| `println`         | `(s: String)`                       | Print to stdout with newline             |
-| `print_int`       | `(n: Int)`                          | Print an Int to stdout, no newline       |
-| `println_int`     | `(n: Int)`                          | Print an Int to stdout with newline      |
-| `print_float`     | `(f: Float)`                        | Print a Float to stdout, no newline      |
-| `println_float`   | `(f: Float)`                        | Print a Float to stdout with newline     |
-| `int_to_string`   | `(n: Int) -> String`                | Decimal string representation of an Int |
-| `float_to_string` | `(n: Float) -> String`              | String representation of a Float        |
-| `bool_to_string`  | `(b: Bool) -> String`               | `"true"` or `"false"`                   |
-| `string_len`      | `(s: String) -> Int`                | Number of characters in a string        |
-| `string_concat`   | `(a: String, b: String) -> String`  | Concatenate two strings (also via `+`)  |
-| `array_push`      | `(arr: T[], value: T)`              | Append a value (mutates the array)      |
-| `array_len`       | `(arr: T[]) -> Int`                 | Number of elements in an array          |
-| `clock`           | `() -> Int`                         | Unix timestamp in milliseconds          |
-| `assert`          | `(cond: Bool)`                      | Panic with `"assertion failed"` if `cond` is `false` |
-| `assert_msg`      | `(cond: Bool, msg: String)`         | Panic with `msg` if `cond` is `false`   |
-| `dbg`             | `<T>(v: T) -> T`                    | Print `[dbg] <value>` to stderr and return the value unchanged |
+| Name              | Signature                            | Description                              |
+|-------------------|--------------------------------------|------------------------------------------|
+| `print`           | `<T: Display>(v: T)`                 | Print to stdout, no newline              |
+| `println`         | `<T: Display>(v: T)`                 | Print to stdout with newline             |
+| `string_len`      | `(s: String) -> Int`                 | Number of characters in a string        |
+| `string_concat`   | `(a: String, b: String) -> String`   | Concatenate two strings (also via `+`)  |
+| `array_push`      | `(arr: T[], value: T)`               | Append a value (mutates the array)      |
+| `array_len`       | `(arr: T[]) -> Int`                  | Number of elements in an array          |
+| `clock`           | `() -> Int`                          | Unix timestamp in milliseconds          |
+| `assert`          | `(cond: Bool)`                       | Panic with `"assertion failed"` if `cond` is `false` |
+| `assert_msg`      | `(cond: Bool, msg: String)`          | Panic with `msg` if `cond` is `false`   |
+| `dbg`             | `<T>(v: T) -> T`                     | Print `[dbg] <value>` to stderr and return the value unchanged |
+
+**Deprecated in v0.4** (use `.to_string()` and `print`/`println` instead):
+
+| Name              | Replacement                           |
+|-------------------|---------------------------------------|
+| `print_int`       | `print(n)` (polymorphic via Display)  |
+| `println_int`     | `println(n)`                          |
+| `print_float`     | `print(f)`                            |
+| `println_float`   | `println(f)`                          |
+| `int_to_string`   | `n.to_string()`                       |
+| `float_to_string` | `f.to_string()`                       |
+| `bool_to_string`  | `b.to_string()`                       |
+
+## Built-in Aspects
+
+The following aspects are pre-implemented for built-in types:
+
+### Display
+
+```moonlane
+aspect Display {
+    fun to_string(self) -> String;
+}
+```
+
+`Int`, `Float`, `Bool`, and `String` implement `Display`. `.to_string()` returns the canonical string representation. `print` and `println` accept any `Display` type.
+
+### Iterable\<T\>
+
+```moonlane
+aspect Iterable<T> {
+    fun next(mut self) -> Perhaps<T>;
+}
+```
+
+`T[]` (array) and `Range` (from `..` / `..=`) implement `Iterable<T>`. User-defined types may implement it to be usable in `for-in`.
+
+### From\<S\>
+
+```moonlane
+aspect From<S> {
+    fun from(value: S) -> Self;
+}
+```
+
+`Int` implements `From<Float>` (truncating cast) and `Float` implements `From<Int>`. The `as` operator desugars to `T::from(value)`. User-defined types may implement `From<S>` to enable `as` casts and `?` error coercion.
+
+## String Methods
+
+| Method        | Signature         | Description                        |
+|---------------|-------------------|------------------------------------|
+| `.len()`      | `() -> Int`       | Number of characters in the string |
+| `.to_string()`| `() -> String`    | Returns the string itself          |

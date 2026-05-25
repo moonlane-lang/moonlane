@@ -521,16 +521,6 @@ impl TypeRegistry {
             .push(type_args);
     }
 
-    /// Returns all type-arg vectors registered for `(target, aspect)`.
-    pub fn lookup_aspect_impl(&self, target: &str, aspect: &str) -> Option<&Vec<Vec<Type>>> {
-        self.impl_aspect_env.get(&(target.to_string(), aspect.to_string()))
-    }
-
-    /// Returns true if `target` has at least one `impl Aspect<_>` registered.
-    pub fn has_aspect_impl(&self, target: &str, aspect: &str) -> bool {
-        self.impl_aspect_env.contains_key(&(target.to_string(), aspect.to_string()))
-    }
-
     /// Checks `(target, "From")` for a impl with first type-arg matching `source`.
     pub fn has_from_impl(&self, target: &str, source: &Type) -> bool {
         self.impl_aspect_env
@@ -641,10 +631,6 @@ impl InferContext {
 
     pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
         self.registry.aspect_methods(name)
-    }
-
-    pub fn has_aspect_impl(&self, target: &str, aspect: &str) -> bool {
-        self.registry.has_aspect_impl(target, aspect)
     }
 
     pub fn has_from_impl(&self, target: &str, source: &Type) -> bool {

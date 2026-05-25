@@ -254,17 +254,19 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 ## Known Limitations
 
-### `as` Cast — Widening Only (Provisional)
+### `as` Cast — Via `From<S>` Aspect (v0.4)
 
-`Int as Float` (widening) and identity casts are supported. Narrowing (`Float as Int`) and cross-type casts are rejected. v0.4 (#12) replaces the fixed-case check with a `From<S>` aspect lookup.
+`as` is now desugared to a `From<S>` aspect check. Built-in impls cover `Int ↔ Float`. User-defined types may implement `From<S>` to enable `as` casts. Casting between types with no `From` impl is a typecheck error.
 
 ---
 
 ## Extension Points
 
-### v0.4 — Aspects
+### v0.4 — Aspects (shipped)
 
-1. ~~Add `impl_env` / extend `TypeRegistry` with aspect-impl storage~~ — **done**: `TypeRegistry` now carries `aspect_env: HashMap<String, Vec<String>>` (aspect name → required method names). Aspect declarations register their methods; `impl Aspect for Type` blocks are validated for completeness against this registry during inference.
-2. Replace the provisional `as` cast with a `From<S>` aspect check.
-3. Replace the provisional `?` error type match with a `From<E>` coercion lookup.
-4. Upgrade `for-in` from Array/Range only to an `Iterable<T>` aspect check (#11).
+All four v0.4 extension points are done:
+
+1. ~~Add `impl_env` / extend `TypeRegistry` with aspect-impl storage~~ — **done**: `TypeRegistry` carries `aspect_env: HashMap<String, Vec<String>>` (aspect name → required method names) and `impl_aspect_env: HashMap<(target, aspect), Vec<Vec<Type>>>` (impl type-arg lists).
+2. ~~Replace the provisional `as` cast with a `From<S>` aspect check~~ — **done**: `construct_cast` calls `has_from_impl(target, source)` and errors with `cannot cast` if no impl is registered.
+3. ~~Replace the provisional `?` error type match with a `From<E>` coercion lookup~~ — **done**: `construction.rs` emits a `PropagateError` node carrying the `from_key` when `E1 ≠ E2`; the evaluator calls the impl at runtime.
+4. ~~Upgrade `for-in` from Array/Range only to an `Iterable<T>` aspect check~~ — **done**: inference pass checks `iterable_elem_type` and falls back to Array/Range for built-in types.

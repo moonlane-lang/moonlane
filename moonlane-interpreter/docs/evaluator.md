@@ -109,6 +109,10 @@ Each binding is stored as an `Rc<RefCell<Value>>`. This has two consequences:
 **Pass 1a — Define placeholders:**
 Every top-level `Fun` and `Impl` method is bound to `Value::Unit` in the root environment. This ensures the names exist before any closure is created, so closures formed in Pass 1b can capture them via shared `Rc`s.
 
+Impl methods are registered under a structured key computed by `impl_method_key()`:
+- Ordinary impl methods: `"TypeName::method_name"`
+- `impl From<S> for T` methods: `"T::From<S>::from"` (disambiguates multiple `From` impls on the same target)
+
 **Pass 1b — Create closures:**
 Every top-level `Fun` and `Impl` method clones the full current environment and creates a `Value::Closure`. The clone captures the `Rc`s from Pass 1a, not copies of `Value::Unit`. `env.set()` then mutates those `Rc`s in place.
 
@@ -204,9 +208,9 @@ The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics fo
 
 ## Extension Points
 
-### v0.4 — Aspects / `?` coercion
+### v0.4 — Aspects / `?` coercion (shipped)
 
-`PropagateError` currently requires `Value::Enum { name: "Result", .. }`. Upgrading `?` to use `From<E>` coercion (spec [The ? Operator](../../docs/public/spec/functions.md#the--operator)) requires looking up a `From` impl at the call site and applying the conversion before wrapping.
+`PropagateError` now supports `From<E>` coercion: after matching `Result::Err`, the evaluator looks up the `"Target::From<Source>::from"` key in the impl environment and calls it if the error types differ. Identity coercion (same types) skips the lookup.
 
 ### Rewrite
 

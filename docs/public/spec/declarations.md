@@ -170,10 +170,10 @@ impl Shape {
 
 ## Aspects
 
-> **v0.2 feature.** The aspect system is not available in v0.1. Built-in aspect-dependent
+> **v0.4 feature.** The aspect system is not available in v0.1–v0.3. Built-in aspect-dependent
 > behaviour (`as` for `Int ↔ Float`, `?` with exact error match, `for-in` over arrays
 > and ranges) is available in v0.1 as hardcoded special cases. User-defined aspects,
-> `impl Aspect for Type`, and aspect bounds are v0.2.
+> `impl Aspect for Type`, and aspect bounds are v0.4.
 
 ```moonlane
 aspect Printable {
@@ -190,7 +190,7 @@ aspect Comparable {
 ```moonlane
 impl Printable for Point {
     fun print(self) {
-        println("(" + float_to_string(self.x) + ", " + float_to_string(self.y) + ")");
+        println("(" + self.x.to_string() + ", " + self.y.to_string() + ")");
     }
 }
 ```

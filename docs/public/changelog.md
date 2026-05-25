@@ -4,6 +4,27 @@ title: "Moonlane Language Changelog"
 
 # Changelog
 
+## v0.4
+
+Aspects and upgraded builtins. Shipped by Sprint 6 (`sprint/6`).
+
+**New language features:**
+- Aspect declarations — `aspect Foo { fun method(self) -> T; }`
+- `impl Aspect for Type` blocks with method dispatch via `.method()` syntax
+- `Iterable<T>` aspect — user-defined types usable in `for-in` loops
+- `From<S>` aspect — `as` cast desugars to `T::from(value)`; user-defined casts for any type pair
+- `Display` aspect — `.to_string()` on `Int`, `Float`, `Bool`, `String`; `print`/`println` polymorphic via Display
+- `?` operator now supports cross-type error coercion: if the function's error type `E2` implements `From<E1>`, `?` calls `E2::from(e)` automatically
+
+**Builtin changes:**
+- `print(v)` and `println(v)` are now polymorphic (`<T: Display>`) — accept any Display type
+- `Int::from(f: Float)` and `Float::from(n: Int)` built-in From impls replace the hardcoded `as` special case
+- Deprecated: `print_int`, `println_int`, `print_float`, `println_float`, `int_to_string`, `float_to_string`, `bool_to_string` (use `.to_string()` and polymorphic `print`/`println`)
+
+**Bug fixes:**
+- Keyword-prefix identifiers (`break_sum`, `return_value`, `let_x`) now parse correctly as identifiers
+- Multiple `impl From<X> for Y` blocks with different source types now dispatch independently
+
 ## v0.3
 
 Generics and type-inference improvements. Shipped by Sprint 5 (`sprint/5`).
