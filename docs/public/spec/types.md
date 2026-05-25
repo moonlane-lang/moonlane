@@ -179,9 +179,9 @@ Because `as` desugars to `From`, user-defined types become castable by implement
 
 ## Generics
 
-> **v0.2 feature.** User-defined generic functions and types are not available in v0.1.
-> Built-in generic types (`Perhaps<T>`, `Result<T, E>`, `T[]`) are supported in v0.1 as
-> special cases in the type system.
+> **v0.3 feature.** User-defined generic functions and types are available from v0.3.
+> Built-in generic types (`Perhaps<T>`, `Result<T, E>`, `T[]`) were supported as
+> special cases from v0.1.
 
 Types and functions can be parameterized with `<T>` syntax.
 

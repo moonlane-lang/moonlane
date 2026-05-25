@@ -1,7 +1,7 @@
 # Typechecker Implementation Notes
 
-> Status: v0.1 complete.  
-> Extension points for v0.3 (generics and aspects) are called out inline.
+> Status: v0.3 complete (generics, monomorphization, let-polymorphism).  
+> Extension points for v0.4 (aspects) are called out inline.
 
 ---
 
@@ -146,7 +146,7 @@ Struct and enum declarations follow **lexical scope rules** matching Rust's mode
 ```
 InferContext {
     mono_env: Vec<HashMap<String, (InferType, bool)>>  // scope stack, innermost last
-    poly_env: HashMap<String, TypeScheme>               // flat, top-level polymorphic bindings
+    poly_env: Vec<HashMap<String, TypeScheme>>           // scope stack, mirrors mono_env
     constraints: Vec<Constraint>                        // accumulated equality constraints
     var_gen: TypeVarGenerator                           // globally unique TypeVar allocator
     registry: TypeRegistry                              // pre-built struct/enum/method registries
@@ -209,7 +209,9 @@ When a call site resolves to a polymorphic callee (present in `scheme_env` but n
 
 ### Polymorphic Function Bodies
 
-Functions with quantified type variables in their scheme are stored as `FunBody::Generic(untyped_block)` rather than `FunBody::Typed(typed_block)`. This is a placeholder for v0.3 monomorphization — not a working generic dispatch mechanism.
+Functions with quantified type variables in their scheme are stored as `FunBody::Generic(untyped_block)` rather than `FunBody::Typed(typed_block)`. At each call site the evaluator re-runs the construction pass on the untyped block at the concrete call-site types, producing a `TypedBlock` that is evaluated normally. This is the monomorphization mechanism.
+
+`let`-bound unannotated closures generalised to polymorphic schemes are stored as `TypedExpr::GenericClosure { params, body: Block, .. }` and evaluated to `ClosureBody::Untyped(block)`. The evaluator re-runs construction per call, mirroring the function case.
 
 ### Exhaustive Match Checking
 
@@ -234,7 +236,8 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 | Field | Type | Content |
 |---|---|---|
-| `struct_env` | `HashMap<String, Vec<(String, InferType)>>` | struct name → field list |
+| `struct_env` | `HashMap<String, Vec<(String, InferType)>>` | struct name → field list (TypeVars for generic params) |
+| `struct_type_params` | `HashMap<String, Vec<TypeVar>>` | generic struct name → ordered type-param TypeVars (absent for non-generic structs) |
 | `method_env` | `HashMap<String, HashMap<String, InferType>>` | type name → method name → fun type |
 | `enum_env` | `HashMap<String, EnumInfo>` | enum name → variant list + type params |
 
@@ -252,14 +255,7 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 ## Extension Points
 
-### v0.3 — Generics
-
-1. Change `struct_env` to carry type params (`StructInfo { type_params: Vec<TypeVar>, fields: … }`). Field lookup must instantiate type params with fresh vars (same pattern already used for `EnumInfo`).
-2. Remove the `!fun.generics.is_empty()` error guard in `infer_fun_decl` and `infer_impl_method`. Implement proper generic function inference.
-3. Replace `FunBody::Generic(untyped_block)` with monomorphization.
-4. `let_polymorphism` (#10) is partially in place via `generalize/instantiate` — main work is generic structs and the monomorphization engine (#9).
-
-### v0.3 — Aspects
+### v0.4 — Aspects
 
 1. Add `impl_env: HashMap<(String, String), Vec<MethodInfo>>` (type × aspect → methods) or extend `TypeRegistry` with aspect-impl storage.
 2. Replace the provisional `as` cast with a `From<S>` aspect check.

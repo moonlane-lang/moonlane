@@ -4,6 +4,23 @@ title: "Moonlane Language Changelog"
 
 # Changelog
 
+## v0.3
+
+Generics and type-inference improvements. Shipped by Sprint 5 (`sprint/5`).
+
+**New language features:**
+- User-defined generic functions — `fun id<T>(x: T) -> T` — monomorphised at each call site
+- User-defined generic structs — `struct Box<T> { value: T }`, `struct Pair<A, B> { ... }`
+- User-defined generic enums — `enum Maybe<T> { Some { value: T }, None {} }`
+- Let-polymorphism — unannotated `let`-bound closures are generalised to polymorphic schemes (`let id = fun(x) { x }` works at `Int`, `Bool`, and `String` in the same scope)
+- Braceless `if` body — `if (c) expr` and `if (c) a else b` (RFC-0022)
+- `struct` and `enum` declarations are allowed inside function bodies
+
+**Type-inference improvements:**
+- `expected_ty` propagates into match arm bodies — bare `[]` and `nope` resolve without ascription when the surrounding return type is known
+- Callee parameter types propagate into argument construction — `find(words, nope)` resolves without ascription when the parameter type is `Perhaps<String>`
+- Lvalue path assignment — `obj.field = val` and `arr[i] = val` work on non-bare receivers (e.g. `get_foo().bar = 1`)
+
 ## v0.2
 
 Evaluator improvements, DX features, and language quality fixes. Shipped by Sprint 3 (`sprint/3`).
@@ -38,7 +55,7 @@ Initial language version. Implemented by the tree-walk interpreter.
 - Functions: first-class values, closures with mutable capture, `?` operator (exact error type match only)
 - Structs: literals, field access, methods (`impl`), `mut self`, associated functions
 - Enums: unit and struct-like variants, `impl` blocks
-- Built-in generic types: `Perhaps<T>`, `Result<T, E>`, `Array<T>` / `T[]` (as special cases; user-defined generics are v0.2)
+- Built-in generic types: `Perhaps<T>`, `Result<T, E>`, `Array<T>` / `T[]` (as special cases; user-defined generics are v0.3)
 - Exhaustive pattern matching: all pattern kinds (see [Pattern Kinds](spec/expressions.md#pattern-kinds))
 - Control flow: `if`/`else`, `while`, `for`, `for-in` (arrays and ranges only), `loop`, `break`/`continue`, `return`
 - Type casting: `as` for `Int ↔ Float`
@@ -46,7 +63,7 @@ Initial language version. Implemented by the tree-walk interpreter.
 - Tuples
 - Built-in functions (see [Built-in Functions](spec/runtime.md#built-in-functions))
 
-**Not included (v0.2+):**
+**Not included (v0.3+):**
 - User-defined generic functions and types (see [Generics](spec/types.md#generics))
 - User-defined aspects and `impl Aspect for Type` (see [Aspects](spec/declarations.md#aspects))
 - `From`-based `?` coercion across different error types (see [The ? Operator](spec/functions.md#the--operator))

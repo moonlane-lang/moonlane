@@ -581,7 +581,8 @@ fn construct_expr(
                 let type_name = path.last().unwrap();
                 if let Some(type_params) = ctx.generic_struct_type_params.get(type_name) {
                     // Generic struct: infer type args from the typed field values.
-                    let raw_fields = ctx.generic_struct_raw.get(type_name.as_str()).unwrap();
+                    let raw_fields = ctx.generic_struct_raw.get(type_name.as_str())
+                        .ok_or_else(|| MoonlaneError::internal(format!("missing raw fields for `{type_name}`")))?;
                     let mut remap: HashMap<TypeVar, InferType> = HashMap::new();
                     for &tp in type_params {
                         remap.entry(tp).or_insert_with(|| InferType::Var(tp));

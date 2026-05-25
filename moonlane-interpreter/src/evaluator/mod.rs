@@ -27,7 +27,7 @@ fn snapshot_stack() -> Vec<FrameInfo> {
 fn attach_stack(err: MoonlaneError) -> MoonlaneError {
     err.with_stack(snapshot_stack())
 }
-use crate::ast::{Block, Decl, Expr, LetDecl, MutDecl, Stmt};
+use crate::ast::{Block, Decl, Expr, Stmt};
 use crate::typed_ast::{FunBody, TypedBlock, TypedDecl, TypedExpr, TypedForInit, TypedProgram, TypedStmt};
 
 // ── Runtime values ────────────────────────────────────────────────────────────
@@ -1197,7 +1197,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
         }
 
         TypedExpr::Assign { target, op, value, span, .. } => {
-            use crate::ast::{AssignOp, AssignTarget, Expr};
+            use crate::ast::{AssignOp, AssignTarget};
             let rhs = eval_expr(value, env)?.into_value();
             match target {
                 AssignTarget::Ident(name, _) => {

@@ -182,15 +182,15 @@ Anonymous closures appear as `<closure>`. The call stack is cleared at the start
 
 - `Value::Builtin(_, f)` — calls the function pointer directly.
 - `Value::Closure(rc)` — clones the captured environment, pushes a parameter scope, evaluates the body, and converts `Signal::Return` to `Signal::Value` at the boundary. `Signal::PropagateErr` is also converted: it wraps the error value in `Value::Enum { name: "Result", variant: "Err", .. }` and returns `Signal::Value` of that — so the `?` error appears as a `Result::Err` value to the caller.
-- `Value::Unit` — panics with "generic function not supported in v0.1". Top-level generic functions have `FunBody::Generic` and are registered as `Value::Unit` (Pass 1a, never overwritten in 1b). This is the v0.3 (generics) placeholder.
+- `Value::Closure(rc)` where `rc.body` is `ClosureBody::Untyped(block)` — a polymorphic generic function or let-bound closure. The evaluator re-runs the construction pass on the untyped block at the concrete argument types, producing a `TypedBlock` that is evaluated immediately. This is the monomorphization path.
 
 ---
 
 ## Known Limitations
 
-### Generic functions — not callable
+### Generic function dispatch — re-constructs on each call
 
-Generic functions produce `Value::Unit` and calling them panics. This is intentional until v0.3 (generics). No test calls a generic function at the value level.
+Generic functions and let-polymorphic closures re-run the construction pass at every call site. This is correct but not optimal: for hot generic functions, monomorphization at a higher level (pre-compiling all instantiation sites) would be faster. Acceptable for the tree-walk interpreter.
 
 ### `Perhaps` and `YoloResult` variants unused
 
@@ -204,11 +204,7 @@ The PoC's `Rc<RefCell<Value>>` environment gives closures reference semantics fo
 
 ## Extension Points
 
-### v0.3 — Generics
-
-Replace the `FunBody::Generic` early-return in `eval_decl` with monomorphization. At call time, specialize the untyped body against the concrete argument types (requires a mini type-check pass or a pre-monomorphized TypedAST).
-
-### v0.3 — Aspects / `?` coercion
+### v0.4 — Aspects / `?` coercion
 
 `PropagateError` currently requires `Value::Enum { name: "Result", .. }`. Upgrading `?` to use `From<E>` coercion (spec [The ? Operator](../../docs/public/spec/functions.md#the--operator)) requires looking up a `From` impl at the call site and applying the conversion before wrapping.
 

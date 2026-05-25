@@ -558,10 +558,6 @@ impl InferContext {
         self.registry.register_struct_fields(name, fields);
     }
 
-    pub fn register_struct_type_params(&mut self, name: String, type_params: Vec<TypeVar>) {
-        self.registry.register_struct_type_params(name, type_params);
-    }
-
     pub fn get_struct_type_params(&self, name: &str) -> Option<&Vec<TypeVar>> {
         self.registry.struct_type_params_for(name)
     }
