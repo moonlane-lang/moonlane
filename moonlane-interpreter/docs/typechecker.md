@@ -126,7 +126,9 @@ Three hoisting steps run before Pass 1:
 2. `build_registry` (via `TypeRegistry`) — registers `Perhaps<T>` and `Result<T,E>` with their type params as fresh type variables, user-defined enum variants, struct field types, and method signatures.
 3. `hoist_fun_decls` — walks top-level `FunDecl`s and pre-registers each with a fresh type variable in `ctx.mono_env`. Enables forward references and mutual recursion.
 
-`hoist_fun_decls` is also called at block entry in `infer_block`, so nested functions support forward references within their block. Struct/enum hoisting is top-level only — correct, since v0.1 has no nested type declarations.
+`hoist_fun_decls` is also called at block entry in `infer_block`, so nested functions support forward references within their block.
+
+Struct and enum declarations are registered globally by `build_registry`, regardless of where they appear in the source. `build_registry` recursively walks all function bodies (and nested blocks — `While`, `For`, `ForIn`) in addition to the top-level declaration list, so a `struct` declared inside a function body is registered in the same global `TypeRegistry` as a top-level `struct`. This means locally-declared structs are **visible across the entire compilation unit**, not just the enclosing function. There is currently no scope concept in the registry.
 
 ---
 
