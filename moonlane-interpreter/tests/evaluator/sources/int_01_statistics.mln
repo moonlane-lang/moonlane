@@ -101,9 +101,9 @@ impl Stats {
     }
 
     fun to_str(self) -> String {
-        let part1 = string_concat("n=",     int_to_string(self.count));
-        let part2 = string_concat(" mean=", float_to_string(self.mean));
-        let part3 = string_concat(" min=",  float_to_string(self.min));
+        let part1 = string_concat("n=",     self.count.to_string());
+        let part2 = string_concat(" mean=", self.mean.to_string());
+        let part3 = string_concat(" min=",  self.min.to_string());
         string_concat(string_concat(part1, part2), part3)
     }
 }

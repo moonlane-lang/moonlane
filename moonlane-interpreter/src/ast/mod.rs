@@ -105,17 +105,19 @@ pub struct EnumDecl {
 
 #[derive(Debug, Clone)]
 pub struct ImplBlock {
-    pub aspect_name: Option<String>,
-    pub target_type: TypeExpr,
-    pub methods:     Vec<FunDecl>,
-    pub span:        Span,
+    pub aspect_name:      Option<String>,
+    pub aspect_type_args: Vec<TypeExpr>,
+    pub target_type:      TypeExpr,
+    pub methods:          Vec<FunDecl>,
+    pub span:             Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct AspectDecl {
-    pub name:    String,
-    pub methods: Vec<AspectMethod>,
-    pub span:    Span,
+    pub name:     String,
+    pub generics: Vec<String>,
+    pub methods:  Vec<AspectMethod>,
+    pub span:     Span,
 }
 
 

@@ -34,7 +34,7 @@ pub fn check(program: Program) -> Result<TypedProgram, MoonlaneError> {
     inference::infer_program(&program, &mut ctx, &mut fun_generalizations)?;
     let subst = ctx.solve()?;
 
-    // Build SchemeEnv from user functions, then add polymorphic built-in schemes.
+    // Build SchemeEnv from user functions, then add all built-in schemes.
     // Hand off the generator so all remaining TypeVar allocations are globally unique.
     let mut gen = ctx.split_gen();
     let mut scheme_env: SchemeEnv = HashMap::new();
@@ -43,7 +43,7 @@ pub fn check(program: Program) -> Result<TypedProgram, MoonlaneError> {
         let scheme = generalize(resolved, &fg.env_fvs);
         scheme_env.insert(fg.name, scheme);
     }
-    registry::register_builtin_poly_schemes(&mut scheme_env, &mut gen);
+    registry::register_builtin_schemes(&mut scheme_env, &mut gen);
 
     // Build concrete environments for Pass 2.
     let concrete_struct_env = registry::build_concrete_struct_env(ctx.registry().raw_struct_env(), ctx.registry().raw_struct_type_params(), &subst)?;

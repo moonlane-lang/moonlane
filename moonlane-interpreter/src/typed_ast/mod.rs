@@ -84,17 +84,19 @@ pub struct TypedEnumDecl {
 
 #[derive(Debug, Clone)]
 pub struct TypedImplBlock {
-    pub aspect_name: Option<String>,
-    pub target_type: TypeExpr,
-    pub methods:     Vec<TypedFunDecl>,
-    pub span:        Span,
+    pub aspect_name:      Option<String>,
+    pub aspect_type_args: Vec<TypeExpr>,
+    pub target_type:      TypeExpr,
+    pub methods:          Vec<TypedFunDecl>,
+    pub span:             Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedAspectDecl {
-    pub name:    String,
-    pub methods: Vec<AspectMethod>,
-    pub span:    Span,
+    pub name:     String,
+    pub generics: Vec<String>,
+    pub methods:  Vec<AspectMethod>,
+    pub span:     Span,
 }
 
 // ── Typed Statements ──────────────────────────────────────────────────────────
@@ -256,9 +258,11 @@ pub enum TypedExpr {
         span: Span,
     },
     PropagateError {
-        expr: Box<TypedExpr>,
-        ty: Type,
-        span: Span,
+        expr:      Box<TypedExpr>,
+        /// When E1 != E2, holds the env key for the coercion function (e.g. "AppError::from").
+        coercion:  Option<String>,
+        ty:        Type,
+        span:      Span,
     },
 }
 

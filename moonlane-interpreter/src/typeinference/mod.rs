@@ -105,6 +105,7 @@ impl InferType {
     pub fn unit() -> Self { InferType::Concrete(Type::Unit) }
     pub fn never() -> Self { InferType::Never }
     pub fn var(v: TypeVar) -> Self { InferType::Var(v) }
+    pub fn is_var(&self) -> bool { matches!(self, InferType::Var(_)) }
 }
 
 impl std::fmt::Display for InferType {
@@ -440,6 +441,9 @@ pub struct TypeRegistry {
     /// aspect name → ordered list of method names the aspect declares.
     /// Used to verify impl blocks are complete.
     aspect_env:  HashMap<String, Vec<String>>,
+    /// (target_type_name, aspect_name) → list of type-arg vectors, one per registered impl.
+    /// E.g. ("Int", "From") → [[Type::Float]] means `impl From<Float> for Int`.
+    impl_aspect_env: HashMap<(String, String), Vec<Vec<Type>>>,
 }
 
 impl TypeRegistry {
@@ -451,6 +455,7 @@ impl TypeRegistry {
             method_env:         HashMap::new(),
             enum_env:           HashMap::new(),
             aspect_env:         HashMap::new(),
+            impl_aspect_env:    HashMap::new(),
         }
     }
 
@@ -507,6 +512,39 @@ impl TypeRegistry {
 
     pub fn aspect_methods(&self, name: &str) -> Option<&Vec<String>> {
         self.aspect_env.get(name)
+    }
+
+    pub fn register_aspect_impl(&mut self, target: String, aspect: String, type_args: Vec<Type>) {
+        self.impl_aspect_env
+            .entry((target, aspect))
+            .or_default()
+            .push(type_args);
+    }
+
+    /// Returns all type-arg vectors registered for `(target, aspect)`.
+    pub fn lookup_aspect_impl(&self, target: &str, aspect: &str) -> Option<&Vec<Vec<Type>>> {
+        self.impl_aspect_env.get(&(target.to_string(), aspect.to_string()))
+    }
+
+    /// Returns true if `target` has at least one `impl Aspect<_>` registered.
+    pub fn has_aspect_impl(&self, target: &str, aspect: &str) -> bool {
+        self.impl_aspect_env.contains_key(&(target.to_string(), aspect.to_string()))
+    }
+
+    /// Checks `(target, "From")` for a impl with first type-arg matching `source`.
+    pub fn has_from_impl(&self, target: &str, source: &Type) -> bool {
+        self.impl_aspect_env
+            .get(&(target.to_string(), "From".to_string()))
+            .map(|impls| impls.iter().any(|args| args.first() == Some(source)))
+            .unwrap_or(false)
+    }
+
+    /// Returns the element type registered for `(target, "Iterable")`, if any.
+    pub fn iterable_elem_type(&self, target: &str) -> Option<&Type> {
+        self.impl_aspect_env
+            .get(&(target.to_string(), "Iterable".to_string()))
+            .and_then(|impls| impls.first())
+            .and_then(|args| args.first())
     }
 
     pub(crate) fn raw_struct_env(&self) -> &HashMap<String, Vec<(String, InferType)>> {
@@ -605,8 +643,24 @@ impl InferContext {
         self.registry.aspect_methods(name)
     }
 
+    pub fn has_aspect_impl(&self, target: &str, aspect: &str) -> bool {
+        self.registry.has_aspect_impl(target, aspect)
+    }
+
+    pub fn has_from_impl(&self, target: &str, source: &Type) -> bool {
+        self.registry.has_from_impl(target, source)
+    }
+
+    pub fn iterable_elem_type(&self, target: &str) -> Option<&Type> {
+        self.registry.iterable_elem_type(target)
+    }
+
     pub fn registry(&self) -> &TypeRegistry {
         &self.registry
+    }
+
+    pub fn registry_mut(&mut self) -> &mut TypeRegistry {
+        &mut self.registry
     }
 
     pub fn fresh_type_var_raw(&mut self) -> TypeVar {

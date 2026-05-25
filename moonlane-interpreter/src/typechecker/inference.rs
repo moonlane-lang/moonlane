@@ -339,34 +339,41 @@ fn infer_stmt(
         Stmt::ForIn(fi) => {
             let iter_ty = infer_expr(&fi.iterable, ctx, fun_generalizations)?;
             let elem_ty = ctx.fresh_var();
-            let iter_var = ctx.fresh_var();
             let partial = ctx.solve()?;
             let resolved_iter = partial.apply(&iter_ty);
             match &resolved_iter {
                 InferType::Array(elem) => {
                     ctx.add_constraint(elem_ty.clone(), *elem.clone(), fi.span.clone());
                 }
-                InferType::Named(name, args) if name == "Range" && args.len() == 1 => {
-                    ctx.add_constraint(elem_ty.clone(), InferType::int(), fi.span.clone());
-                }
                 InferType::Var(_) => {
+                    // Unknown type — constrain to Array as default.
                     ctx.add_constraint(iter_ty, InferType::Array(Box::new(elem_ty.clone())), fi.span.clone());
                 }
                 _ => {
-                    return Err(MoonlaneError::type_error(
-                        TypeErrorCode::T0001,
-                        format!("expected array or range in for-in, got `{resolved_iter}`"),
-                        &fi.span,
-                    ));
+                    // Look up the type name in the Iterable registry.
+                    let type_name = infer_type_name(&resolved_iter)
+                        .map(ToOwned::to_owned);
+                    let elem_from_registry = type_name.as_deref()
+                        .and_then(|name| ctx.iterable_elem_type(name))
+                        .cloned();
+                    match elem_from_registry {
+                        Some(t) => {
+                            ctx.add_constraint(elem_ty.clone(), InferType::Concrete(t), fi.span.clone());
+                        }
+                        None => {
+                            return Err(MoonlaneError::type_error(
+                                TypeErrorCode::T0001,
+                                format!("type `{resolved_iter}` does not implement `Iterable<T>`"),
+                                &fi.span,
+                            ));
+                        }
+                    }
                 }
             }
-            let iter_var_span = fi.span.clone();
-            let _ = iter_var;
             ctx.push_scope();
             ctx.bind_mono(&fi.binding, elem_ty, false);
             infer_block(&fi.body, ctx, fun_generalizations)?;
             ctx.pop_scope();
-            let _ = iter_var_span;
             Ok(InferType::unit())
         }
     }
@@ -561,16 +568,21 @@ fn infer_expr(
             let target_ty = type_expr_to_infer(target_type);
             let source_resolved = ctx.solve()?.apply(&source_ty);
             let target_resolved = ctx.solve()?.apply(&target_ty);
-            let valid = matches!(
-                (&source_resolved, &target_resolved),
-                (InferType::Concrete(Type::Int),   InferType::Concrete(Type::Float))
-                | (InferType::Concrete(Type::Int),   InferType::Concrete(Type::Int))
-                | (InferType::Concrete(Type::Float), InferType::Concrete(Type::Float))
-            );
+            // Identity casts always allowed.
+            if source_resolved == target_resolved {
+                return Ok(target_ty);
+            }
+            // Check via From aspect registry: target must implement From<source>.
+            let source_concrete = infer_to_type_for_from(&source_resolved);
+            let target_name = infer_type_name(&target_resolved);
+            let valid = match (source_concrete.as_ref(), target_name) {
+                (Some(src_t), Some(tgt)) => ctx.has_from_impl(tgt, src_t),
+                _ => false,
+            };
             if !valid {
                 return Err(MoonlaneError::type_error(
                     TypeErrorCode::T0007,
-                    format!("cannot cast `{source_resolved}` to `{target_resolved}` — only `Int as Float` and identity casts are supported"),
+                    format!("cannot cast `{source_resolved}` to `{target_resolved}` — no `impl From<{source_resolved}> for {target_resolved}` found"),
                     span,
                 ));
             }
@@ -649,20 +661,45 @@ fn infer_expr(
         }
         Expr::PropagateError { expr, span } => {
             let inner_ty = infer_expr(expr, ctx, fun_generalizations)?;
-            let ok_var  = ctx.fresh_var();
-            let err_var = ctx.fresh_var();
+            let ok_var   = ctx.fresh_var();
+            let err_var  = ctx.fresh_var();
             ctx.add_constraint(
                 inner_ty,
                 InferType::Named("Result".to_string(), vec![ok_var.clone(), err_var.clone()]),
                 span.clone(),
             );
             if let Some(fn_ret) = ctx.current_return_type().cloned() {
-                let fn_ok_var = ctx.fresh_var();
+                let fn_ok_var  = ctx.fresh_var();
+                let fn_err_var = ctx.fresh_var();
                 ctx.add_constraint(
                     fn_ret,
-                    InferType::Named("Result".to_string(), vec![fn_ok_var, err_var]),
+                    InferType::Named("Result".to_string(), vec![fn_ok_var, fn_err_var.clone()]),
                     span.clone(),
                 );
+                // Resolve both error vars. If concretely different, check From;
+                // if still unknown, unify them (handles unannotated functions).
+                let partial = ctx.solve()?;
+                let e1 = partial.apply(&err_var);
+                let e2 = partial.apply(&fn_err_var);
+                if e1 == e2 || e1.is_var() || e2.is_var() {
+                    ctx.add_constraint(err_var, fn_err_var, span.clone());
+                } else {
+                    // Concrete different types — require E2: From<E1>.
+                    let src = infer_to_type_for_from(&e1);
+                    let tgt = infer_type_name(&e2);
+                    let ok = match (src.as_ref(), tgt) {
+                        (Some(s), Some(t)) => ctx.has_from_impl(t, s),
+                        _ => false,
+                    };
+                    if !ok {
+                        return Err(MoonlaneError::type_error(
+                            TypeErrorCode::T0001,
+                            format!("cannot use `?` here: `{}` does not implement `From<{}>` for error coercion", e2, e1),
+                            span,
+                        ));
+                    }
+                    // Don't unify — let construction emit the coercion call.
+                }
             }
             Ok(ok_var)
         }
@@ -1019,4 +1056,27 @@ fn infer_enum_variant_pattern(
         ctx.bind_mono(field_name, field_ty, false);
     }
     Ok(())
+}
+
+// ── Helpers for From/Iterable dispatch ───────────────────────────────────────
+
+/// Extract a concrete `Type` from an `InferType` for use in From-impl lookups.
+fn infer_to_type_for_from(ty: &InferType) -> Option<Type> {
+    match ty {
+        InferType::Concrete(t) => Some(t.clone()),
+        InferType::Named(name, _) => Some(Type::Named(name.clone(), vec![])),
+        _ => None,
+    }
+}
+
+/// Extract the type name string from an `InferType` for registry lookups.
+fn infer_type_name(ty: &InferType) -> Option<&str> {
+    match ty {
+        InferType::Concrete(Type::Int)   => Some("Int"),
+        InferType::Concrete(Type::Float) => Some("Float"),
+        InferType::Concrete(Type::Bool)  => Some("Bool"),
+        InferType::Concrete(Type::Str)   => Some("String"),
+        InferType::Named(name, _)        => Some(name.as_str()),
+        _ => None,
+    }
 }

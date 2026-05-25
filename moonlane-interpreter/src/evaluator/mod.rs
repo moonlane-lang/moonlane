@@ -443,32 +443,78 @@ fn eval_for_in(
     span:     &Span,
     env:      &mut Environment,
 ) -> Result<Signal, MoonlaneError> {
-    let items: Vec<Value> = match iterable {
-        Value::Array(rc) => rc.borrow().clone(),
-        Value::Struct { ref name, ref fields } if name == "Range" => {
+    // Fast path for built-in sequence types.
+    let fast_items: Option<Vec<Value>> = match &iterable {
+        Value::Array(rc) => Some(rc.borrow().clone()),
+        Value::Struct { name, fields } if name == "Range" => {
             let s = range_field(fields, "start", span)?;
             let e = range_field(fields, "end",   span)?;
-            (s..e).map(Value::Int).collect()
+            Some((s..e).map(Value::Int).collect())
         }
-        Value::Struct { ref name, ref fields } if name == "RangeInclusive" => {
+        Value::Struct { name, fields } if name == "RangeInclusive" => {
             let s = range_field(fields, "start", span)?;
             let e = range_field(fields, "end",   span)?;
-            (s..=e).map(Value::Int).collect()
+            Some((s..=e).map(Value::Int).collect())
         }
-        _ => return Err(MoonlaneError::panic(RuntimeErrorCode::R0011, "for-in: expected Array or Range", span)),
+        _ => None,
     };
 
-    for item in items {
-        // Push a scope for the loop variable, then eval_block pushes its own inner scope.
-        env.push_scope();
-        env.define(binding, item);
-        let sig = eval_block(body, env)?;
-        env.pop_scope();
-        match sig {
-            Signal::Value(_) | Signal::Continue => {}
-            Signal::Break(_)        => break,
-            Signal::Return(v)       => return Ok(Signal::Return(v)),
-            Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+    if let Some(items) = fast_items {
+        for item in items {
+            env.push_scope();
+            env.define(binding, item);
+            let sig = eval_block(body, env)?;
+            env.pop_scope();
+            match sig {
+                Signal::Value(_) | Signal::Continue => {}
+                Signal::Break(_)        => break,
+                Signal::Return(v)       => return Ok(Signal::Return(v)),
+                Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+            }
+        }
+        return Ok(Signal::Value(Value::Unit));
+    }
+
+    // User-defined Iterable: dispatch through TypeName::next.
+    let type_name = match &iterable {
+        Value::Struct { name, .. } => name.clone(),
+        _ => return Err(MoonlaneError::panic(RuntimeErrorCode::R0011,
+            "for-in: expected Array, Range, or Iterable value", span)),
+    };
+    let next_key = format!("{type_name}::next");
+    let next_fn = env.get(&next_key).ok_or_else(|| {
+        MoonlaneError::panic(RuntimeErrorCode::R0011,
+            format!("for-in: `{type_name}` does not implement Iterable (no `next` method)"), span)
+    })?;
+
+    // Hold the iterator in an Rc so mutations inside next are visible across calls.
+    let iter_cell = Rc::new(RefCell::new(iterable));
+    loop {
+        let iter_val = iter_cell.borrow().clone();
+        let result = call_function(next_fn.clone(), vec![iter_val], span)?.into_value();
+        match result {
+            Value::Enum { ref name, ref variant, ref fields } if name == "Perhaps" => {
+                match variant.as_str() {
+                    "Nope" => break,
+                    "Some" => {
+                        let item = fields.get("value").cloned().ok_or_else(|| {
+                            MoonlaneError::internal("Iterable::next: Perhaps::Some missing `value`")
+                        })?;
+                        env.push_scope();
+                        env.define(binding, item);
+                        let sig = eval_block(body, env)?;
+                        env.pop_scope();
+                        match sig {
+                            Signal::Value(_) | Signal::Continue => {}
+                            Signal::Break(_)        => break,
+                            Signal::Return(v)       => return Ok(Signal::Return(v)),
+                            Signal::PropagateErr(v) => return Ok(Signal::PropagateErr(v)),
+                        }
+                    }
+                    _ => return Err(MoonlaneError::internal("Iterable::next: unexpected Perhaps variant")),
+                }
+            }
+            _ => return Err(MoonlaneError::internal("Iterable::next: expected Perhaps value")),
         }
     }
     Ok(Signal::Value(Value::Unit))
@@ -1100,23 +1146,17 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
             Ok(Signal::Value(result))
         }
 
-        TypedExpr::Cast { expr: inner, target_type, span: _, .. } => {
-            // v0.1: only `Int as Float` (widening) and identity casts reach here —
-            // the typechecker rejects all other forms before evaluation.
-            // TODO(Epic 004, task 0002): replace with From<S> trait dispatch.
+        TypedExpr::Cast { expr: inner, target_type, span, .. } => {
             let v = eval_expr(inner, env)?.into_value();
-            let result = match (&v, target_type) {
-                (Value::Int(n), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => {
-                    Value::Float(*n as f64)
+            // Dispatch through From impl: look up "TypeName::from" in env.
+            if let crate::ast::TypeExpr::Named(target_name, _) = target_type {
+                let from_key = format!("{target_name}::from");
+                if let Some(from_fn) = env.get(&from_key) {
+                    return call_function(from_fn, vec![v], span);
                 }
-                // Identity casts
-                (Value::Int(_),   crate::ast::TypeExpr::Named(t, _)) if t == "Int"   => v,
-                (Value::Float(_), crate::ast::TypeExpr::Named(t, _)) if t == "Float" => v,
-                _ => return Err(MoonlaneError::internal(
-                    "cast: unsupported coercion (should have been caught by typechecker)",
-                )),
-            };
-            Ok(Signal::Value(result))
+            }
+            // Identity cast fallback (same type, no from registered).
+            Ok(Signal::Value(v))
         }
 
         TypedExpr::TupleAccess { object, index, span, .. } => {
@@ -1343,6 +1383,10 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
             // User-defined struct/enum methods — looked up by "TypeName::method".
             let type_name = match &recv_val {
                 Value::Struct { name, .. } | Value::Enum { name, .. } => name.clone(),
+                Value::Int(_)   => "Int".to_string(),
+                Value::Float(_) => "Float".to_string(),
+                Value::Bool(_)  => "Bool".to_string(),
+                Value::Str(_)   => "String".to_string(),
                 _ => return Err(MoonlaneError::panic(
                     RuntimeErrorCode::R0009,
                     format!("method `{method}` not found on this value"), span,
@@ -1386,7 +1430,7 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
             }))))
         }
 
-        TypedExpr::PropagateError { expr, span, .. } => {
+        TypedExpr::PropagateError { expr, coercion, span, .. } => {
             let val = eval_expr(expr, env)?.into_value();
             match val {
                 Value::YoloResult(Ok(v))  => Ok(Signal::Value(*v)),
@@ -1403,11 +1447,15 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                             let e = fields.get("error").cloned().ok_or_else(|| {
                                 MoonlaneError::internal("Result::Err: missing `error` field")
                             })?;
-                            Ok(Signal::PropagateErr(e))
+                            // Apply From coercion if needed.
+                            let coerced = if let Some(key) = coercion {
+                                if let Some(from_fn) = env.get(key) {
+                                    call_function(from_fn, vec![e], span)?.into_value()
+                                } else { e }
+                            } else { e };
+                            Ok(Signal::PropagateErr(coerced))
                         }
-                        v => Err(MoonlaneError::internal(
-                            format!("?: unknown Result variant `{v}`"),
-                        )),
+                        v => Err(MoonlaneError::internal(format!("?: unknown Result variant `{v}`"))),
                     }
                 }
                 _ => Err(MoonlaneError::panic(RuntimeErrorCode::R0012, "?: expected a Result value", span)),
@@ -1691,49 +1739,87 @@ fn eval_binop(op: &BinOp, lv: Value, rv: Value, span: &Span) -> Result<Signal, M
 
 // ── Built-in functions ────────────────────────────────────────────────────────
 
+fn value_to_display_string(v: &Value) -> Option<String> {
+    match v {
+        Value::Int(n)   => Some(n.to_string()),
+        Value::Float(f) => Some(format_float(*f)),
+        Value::Bool(b)  => Some(if *b { "true" } else { "false" }.to_string()),
+        Value::Str(s)   => Some(s.clone()),
+        _ => None,
+    }
+}
+
+fn format_float(f: f64) -> String {
+    if f.fract() == 0.0 && f.is_finite() {
+        format!("{}", f as i64)
+    } else {
+        f.to_string()
+    }
+}
+
 fn register_builtins(env: &mut Environment) {
-    // Each builtin is a named function value pre-loaded into the root environment.
-    // Signatures match the spec's built-in function table.
+    // print/println dispatch through Display (to_string) for any type.
+    env.define("print", Value::Builtin("print".to_string(), |args, span| {
+        let s = match args.first() {
+            Some(v) => value_to_display_string(v).ok_or_else(|| {
+                MoonlaneError::panic(RuntimeErrorCode::R0009, "print: value does not implement Display", span)
+            })?,
+            None => return Err(MoonlaneError::internal("print: expected one argument")),
+        };
+        print!("{s}");
+        Ok(Value::Unit)
+    }));
 
-    env.define("print", Value::Builtin("print".to_string(), |args, _span| {
-        if let Some(Value::Str(s)) = args.first() {
-            print!("{}", s);
-            Ok(Value::Unit)
-        } else {
-            Err(MoonlaneError::internal("print: expected String argument"))
+    env.define("println", Value::Builtin("println".to_string(), |args, span| {
+        let s = match args.first() {
+            Some(v) => value_to_display_string(v).ok_or_else(|| {
+                MoonlaneError::panic(RuntimeErrorCode::R0009, "println: value does not implement Display", span)
+            })?,
+            None => return Err(MoonlaneError::internal("println: expected one argument")),
+        };
+        println!("{s}");
+        Ok(Value::Unit)
+    }));
+
+    // to_string() methods for built-in Display types.
+    env.define("Int::to_string", Value::Builtin("Int::to_string".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Int(n)) => Ok(Value::Str(n.to_string())),
+            _ => Err(MoonlaneError::internal("Int::to_string: expected Int")),
+        }
+    }));
+    env.define("Float::to_string", Value::Builtin("Float::to_string".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Float(f)) => Ok(Value::Str(format_float(*f))),
+            _ => Err(MoonlaneError::internal("Float::to_string: expected Float")),
+        }
+    }));
+    env.define("Bool::to_string", Value::Builtin("Bool::to_string".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Bool(b)) => Ok(Value::Str(if *b { "true" } else { "false" }.to_string())),
+            _ => Err(MoonlaneError::internal("Bool::to_string: expected Bool")),
+        }
+    }));
+    env.define("String::to_string", Value::Builtin("String::to_string".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Str(s)) => Ok(Value::Str(s.clone())),
+            _ => Err(MoonlaneError::internal("String::to_string: expected String")),
         }
     }));
 
-    env.define("println", Value::Builtin("println".to_string(), |args, _span| {
-        if let Some(Value::Str(s)) = args.first() {
-            println!("{}", s);
-            Ok(Value::Unit)
-        } else {
-            Err(MoonlaneError::internal("println: expected String argument"))
+    // From impls for numeric conversions.
+    env.define("Int::from", Value::Builtin("Int::from".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Float(f)) => Ok(Value::Int(*f as i64)),
+            Some(Value::Int(n))   => Ok(Value::Int(*n)),
+            _ => Err(MoonlaneError::internal("Int::from: expected Float")),
         }
     }));
-
-    env.define("int_to_string", Value::Builtin("int_to_string".to_string(), |args, _span| {
-        if let Some(Value::Int(n)) = args.first() {
-            Ok(Value::Str(n.to_string()))
-        } else {
-            Err(MoonlaneError::internal("int_to_string: expected Int argument"))
-        }
-    }));
-
-    env.define("float_to_string", Value::Builtin("float_to_string".to_string(), |args, _span| {
-        if let Some(Value::Float(f)) = args.first() {
-            Ok(Value::Str(f.to_string()))
-        } else {
-            Err(MoonlaneError::internal("float_to_string: expected Float argument"))
-        }
-    }));
-
-    env.define("bool_to_string", Value::Builtin("bool_to_string".to_string(), |args, _span| {
-        if let Some(Value::Bool(b)) = args.first() {
-            Ok(Value::Str(if *b { "true" } else { "false" }.to_string()))
-        } else {
-            Err(MoonlaneError::internal("bool_to_string: expected Bool argument"))
+    env.define("Float::from", Value::Builtin("Float::from".to_string(), |args, _span| {
+        match args.first() {
+            Some(Value::Int(n))   => Ok(Value::Float(*n as f64)),
+            Some(Value::Float(f)) => Ok(Value::Float(*f)),
+            _ => Err(MoonlaneError::internal("Float::from: expected Int")),
         }
     }));
 
@@ -1780,42 +1866,6 @@ fn register_builtins(env: &mut Environment) {
             .unwrap_or_default()
             .as_millis() as i64;
         Ok(Value::Int(ms))
-    }));
-
-    env.define("print_int", Value::Builtin("print_int".to_string(), |args, _span| {
-        if let Some(Value::Int(n)) = args.first() {
-            print!("{}", n);
-            Ok(Value::Unit)
-        } else {
-            Err(MoonlaneError::internal("print_int: expected Int argument"))
-        }
-    }));
-
-    env.define("println_int", Value::Builtin("println_int".to_string(), |args, _span| {
-        if let Some(Value::Int(n)) = args.first() {
-            println!("{}", n);
-            Ok(Value::Unit)
-        } else {
-            Err(MoonlaneError::internal("println_int: expected Int argument"))
-        }
-    }));
-
-    env.define("print_float", Value::Builtin("print_float".to_string(), |args, _span| {
-        if let Some(Value::Float(f)) = args.first() {
-            print!("{}", f);
-            Ok(Value::Unit)
-        } else {
-            Err(MoonlaneError::internal("print_float: expected Float argument"))
-        }
-    }));
-
-    env.define("println_float", Value::Builtin("println_float".to_string(), |args, _span| {
-        if let Some(Value::Float(f)) = args.first() {
-            println!("{}", f);
-            Ok(Value::Unit)
-        } else {
-            Err(MoonlaneError::internal("println_float: expected Float argument"))
-        }
     }));
 
     env.define("assert", Value::Builtin("assert".to_string(), |args, span| {

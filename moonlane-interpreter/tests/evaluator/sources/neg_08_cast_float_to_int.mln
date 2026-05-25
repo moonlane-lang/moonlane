@@ -1,2 +1,5 @@
-// TYPECHECK_ERROR[T0007]
-fun main() { let _x = 3.9 as Int; }
+// Float as Int is valid via impl From<Float> for Int (added in v0.4).
+fun main() {
+    let x = 3.9 as Int;
+    assert(x == 3);
+}

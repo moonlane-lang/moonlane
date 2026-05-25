@@ -1,6 +1,5 @@
-// Stage 8: print_int, println_int, print_float, println_float builtins.
-
-print_int(42);
-println_int(0);
-print_float(3.14);
-println_float(0.0);
+// Stage 8: print/println accept any Display type (polymorphic in v0.4).
+print(42);
+println(0);
+print(3.14);
+println(0.0);

@@ -1,14 +1,12 @@
 fun main() {
-    // int_to_string
-    assert(int_to_string(0)   == "0");
-    assert(int_to_string(42)  == "42");
-    assert(int_to_string(-7)  == "-7");
-    // float_to_string
-    assert(float_to_string(1.5) == "1.5");
-    assert(float_to_string(0.0) == "0");
-    // bool_to_string
-    assert(bool_to_string(true)  == "true");
-    assert(bool_to_string(false) == "false");
+    // to_string method
+    assert(0.to_string()     == "0");
+    assert(42.to_string()    == "42");
+    assert((-7).to_string()  == "-7");
+    assert(1.5.to_string()   == "1.5");
+    assert(0.0.to_string()   == "0");
+    assert(true.to_string()  == "true");
+    assert(false.to_string() == "false");
     // string_len
     assert(string_len("")        == 0);
     assert(string_len("hello")   == 5);

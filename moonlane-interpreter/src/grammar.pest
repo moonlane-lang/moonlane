@@ -44,9 +44,9 @@ enum_decl   = { "enum" ~ ident ~ generic_params? ~ "{" ~ enum_variants ~ "}" }
 enum_variants = { (enum_variant ~ ",")* ~ enum_variant? }
 enum_variant  = { ident ~ ("{" ~ struct_fields ~ "}")? }
 
-impl_block  = { "impl" ~ (type_path ~ "for")? ~ type_expr ~ "{" ~ fun_decl* ~ "}" }
+impl_block  = { "impl" ~ (named_type ~ "for")? ~ type_expr ~ "{" ~ fun_decl* ~ "}" }
 
-aspect_decl  = { "aspect" ~ ident ~ "{" ~ aspect_method* ~ "}" }
+aspect_decl  = { "aspect" ~ ident ~ generic_params? ~ "{" ~ aspect_method* ~ "}" }
 aspect_method = { "fun" ~ ident ~ generic_params? ~ "(" ~ param_list? ~ ")" ~ ("->" ~ type_expr)? ~ (block | ";") }
 
 // ── Parameters ────────────────────────────────────────────────────────────────

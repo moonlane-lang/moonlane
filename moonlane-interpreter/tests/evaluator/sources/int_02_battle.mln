@@ -76,8 +76,8 @@ impl Fighter {
     // Short string representation: "Name[hp/max_hp]".
     fun summary(self) -> String {
         let part1 = string_concat(self.name, "[");
-        let part2 = string_concat(int_to_string(self.hp), "/");
-        let part3 = string_concat(int_to_string(self.max_hp), "]");
+        let part2 = string_concat(self.hp.to_string(), "/");
+        let part3 = string_concat(self.max_hp.to_string(), "]");
         string_concat(part1, string_concat(part2, part3))
     }
 }
@@ -110,7 +110,7 @@ fun describe_action(action: Action) -> String {
         Action::Attack          => "attacks",
         Action::Defend          => "defends",
         Action::Heal { amount } => {
-            string_concat("heals for ", int_to_string(amount))
+            string_concat("heals for ", amount.to_string())
         },
     }
 }
@@ -144,7 +144,7 @@ fun defender_strategy(actor: Fighter, target: Fighter) -> Action {
 
 // "R<n> | <f1 summary> vs <f2 summary>"
 fun format_round(round: Int, f1: Fighter, f2: Fighter) -> String {
-    let prefix = string_concat("R", int_to_string(round));
+    let prefix = string_concat("R", round.to_string());
     let mid    = string_concat(f1.summary(), " vs ");
     string_concat(string_concat(prefix, " | "), string_concat(mid, f2.summary()))
 }

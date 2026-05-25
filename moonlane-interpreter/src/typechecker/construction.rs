@@ -50,26 +50,17 @@ impl<'a> ConstructCtx<'a> {
             current_return_ty: None,
             current_break_ty:  None,
         };
-        let str_ty   = Type::Str;
-        let int_ty   = Type::Int;
-        let float_ty = Type::Float;
-        let bool_ty  = Type::Bool;
-        let unit_ty  = Type::Unit;
-        let mono = |params, ret| Type::Fun(params, Box::new(ret));
-        ctx.bind("print",           mono(vec![str_ty.clone()], unit_ty.clone()));
-        ctx.bind("println",         mono(vec![str_ty.clone()], unit_ty.clone()));
-        ctx.bind("print_int",       mono(vec![int_ty.clone()], unit_ty.clone()));
-        ctx.bind("println_int",     mono(vec![int_ty.clone()], unit_ty.clone()));
-        ctx.bind("print_float",     mono(vec![float_ty.clone()], unit_ty.clone()));
-        ctx.bind("println_float",   mono(vec![float_ty.clone()], unit_ty.clone()));
-        ctx.bind("int_to_string",   mono(vec![int_ty.clone()], str_ty.clone()));
-        ctx.bind("float_to_string", mono(vec![float_ty],       str_ty.clone()));
-        ctx.bind("bool_to_string",  mono(vec![bool_ty.clone()], str_ty.clone()));
-        ctx.bind("string_len",      mono(vec![str_ty.clone()], int_ty.clone()));
-        ctx.bind("string_concat",   mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
-        ctx.bind("clock",           mono(vec![], int_ty.clone()));
-        ctx.bind("assert",          mono(vec![bool_ty.clone()], unit_ty.clone()));
-        ctx.bind("assert_msg",      mono(vec![bool_ty, str_ty.clone()], unit_ty.clone()));
+        // Derive concrete types for all monomorphic entries in scheme_env.
+        // Both builtins and user functions are populated here — no second registration site.
+        let dummy = Span::new(0, 0, "");
+        for (name, scheme) in scheme_env {
+            if scheme.quantified_vars.is_empty() {
+                let resolved = subst.apply(&scheme.ty);
+                if let Ok(ty) = infer_type_to_type(&resolved, &dummy) {
+                    ctx.env.last_mut().unwrap().insert(name.clone(), ty);
+                }
+            }
+        }
         ctx
     }
 
@@ -101,6 +92,9 @@ impl<'a> ConstructCtx<'a> {
     fn pop_return_type(&mut self, prev: Option<Type>) {
         self.current_return_ty = prev;
     }
+    fn current_return_type(&self) -> Option<&Type> {
+        self.current_return_ty.as_ref()
+    }
     fn push_break_type(&mut self, ty: Option<Type>) -> Option<Type> {
         std::mem::replace(&mut self.current_break_ty, ty)
     }
@@ -121,17 +115,6 @@ pub(super) fn construct_program(
     gen:        TypeVarGenerator,
 ) -> Result<TypedProgram, MoonlaneError> {
     let mut ctx = ConstructCtx::new(subst, scheme_env, struct_env, generic_struct_raw, generic_struct_type_params, method_env, enum_env, gen);
-
-    // Hoist resolved function types so forward references work in Pass 2.
-    for decl in &program.decls {
-        if let Decl::Fun(fd) = decl {
-            if let Some(scheme) = scheme_env.get(&fd.name) {
-                if let Ok(ty) = infer_type_to_type(&scheme.ty, &fd.span) {
-                    ctx.bind(&fd.name, ty);
-                }
-            }
-        }
-    }
 
     let mut out = vec![];
     for decl in &program.decls {
@@ -198,7 +181,8 @@ fn construct_decl(decl: &Decl, ctx: &mut ConstructCtx) -> Result<TypedDecl, Moon
         })),
         Decl::Impl(ib)   => construct_impl_decl(ib, ctx),
         Decl::Aspect(td) => Ok(TypedDecl::Aspect(TypedAspectDecl {
-            name: td.name.clone(), methods: td.methods.clone(), span: td.span.clone(),
+            name: td.name.clone(), generics: td.generics.clone(),
+            methods: td.methods.clone(), span: td.span.clone(),
         })),
         Decl::Stmt(stmt) => Ok(TypedDecl::Stmt(construct_stmt(stmt, ctx)?)),
     }
@@ -249,8 +233,9 @@ fn construct_impl_decl(ib: &ImplBlock, ctx: &mut ConstructCtx) -> Result<TypedDe
         .map(|m| construct_impl_method(m, &target_name, ctx))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(TypedDecl::Impl(TypedImplBlock {
-        aspect_name: ib.aspect_name.clone(),
-        target_type: ib.target_type.clone(),
+        aspect_name:      ib.aspect_name.clone(),
+        aspect_type_args: ib.aspect_type_args.clone(),
+        target_type:      ib.target_type.clone(),
         methods,
         span: ib.span.clone(),
     }))
@@ -664,12 +649,32 @@ fn construct_expr(
         }
         Expr::PropagateError { expr, span } => {
             let typed_expr = construct_expr(expr, None, ctx)?;
-            let ty = match typed_expr.ty() {
-                Type::Result(ok, _) => *ok.clone(),
-                Type::Named(name, args) if name == "Result" && args.len() == 2 => args[0].clone(),
+            let (ok_ty, e1) = match typed_expr.ty() {
+                Type::Result(ok, err) => (*ok.clone(), *err.clone()),
+                Type::Named(name, args) if name == "Result" && args.len() == 2 =>
+                    (args[0].clone(), args[1].clone()),
                 _ => return Err(MoonlaneError::internal("? on non-Result value")),
             };
-            Ok(TypedExpr::PropagateError { expr: Box::new(typed_expr), ty, span: span.clone() })
+            // Determine if a From coercion is needed (E1 != E2).
+            let coercion = if let Some(ret_ty) = ctx.current_return_type() {
+                let e2 = match ret_ty {
+                    Type::Result(_, err) => Some(*err.clone()),
+                    Type::Named(name, args) if name == "Result" && args.len() == 2 => Some(args[1].clone()),
+                    _ => None,
+                };
+                if let Some(e2) = e2 {
+                    if e1 != e2 {
+                        let tgt = match &e2 {
+                            Type::Named(n, _) => Some(n.as_str()),
+                            _ => None,
+                        };
+                        tgt.map(|t| format!("{t}::from"))
+                    } else { None }
+                } else { None }
+            } else { None };
+            Ok(TypedExpr::PropagateError {
+                expr: Box::new(typed_expr), coercion, ty: ok_ty, span: span.clone(),
+            })
         }
         Expr::Match(m) => construct_match(m, expected_ty, ctx),
         Expr::Ascribe { expr, ann, span } => {

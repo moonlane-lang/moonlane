@@ -40,11 +40,37 @@ fn array_len_scheme(t: TypeVar) -> TypeScheme {
     }
 }
 
+fn print_scheme(t: TypeVar) -> TypeScheme {
+    TypeScheme {
+        quantified_vars: vec![t],
+        ty: InferType::Fun(
+            vec![InferType::Var(t)],
+            Box::new(InferType::unit()),
+        ),
+    }
+}
+
+fn register_builtin_aspect_impls(registry: &mut TypeRegistry) {
+    use crate::types::Type;
+    // Iterable impls for built-in sequence types
+    registry.register_aspect_impl("Range".into(),          "Iterable".into(), vec![Type::Int]);
+    registry.register_aspect_impl("RangeInclusive".into(), "Iterable".into(), vec![Type::Int]);
+    // From impls for numeric conversions
+    registry.register_aspect_impl("Int".into(),   "From".into(), vec![Type::Float]);
+    registry.register_aspect_impl("Float".into(), "From".into(), vec![Type::Int]);
+    // Display impls for built-in types (used by to_string method dispatch)
+    registry.register_aspect_impl("Int".into(),    "Display".into(), vec![]);
+    registry.register_aspect_impl("Float".into(),  "Display".into(), vec![]);
+    registry.register_aspect_impl("Bool".into(),   "Display".into(), vec![]);
+    registry.register_aspect_impl("String".into(), "Display".into(), vec![]);
+}
+
 /// Build the `TypeRegistry` from the program's declarations and built-in types.
 /// Allocates TypeVars from `gen`; the caller must pass the same `gen` to
 /// `InferContext::new` so that all TypeVar IDs are globally unique.
 pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> TypeRegistry {
     let mut registry = TypeRegistry::new();
+    register_builtin_aspect_impls(&mut registry);
 
     // Register built-in generic enums.
     let t = gen.fresh();
@@ -116,6 +142,20 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     _ => continue,
                 };
                 register_impl_methods(ib.methods.iter(), &target_name, gen, &mut registry);
+                // Track which aspects this type implements (with concrete type args).
+                if let Some(aspect_name) = &ib.aspect_name {
+                    let type_args: Vec<crate::types::Type> = ib.aspect_type_args.iter()
+                        .filter_map(|te| {
+                            use super::conversions::type_expr_to_infer;
+                            match type_expr_to_infer(te) {
+                                InferType::Concrete(t) => Some(t),
+                                InferType::Named(n, _) => Some(crate::types::Type::Named(n, vec![])),
+                                _ => None,
+                            }
+                        })
+                        .collect();
+                    registry.register_aspect_impl(target_name.clone(), aspect_name.clone(), type_args);
+                }
             }
             _ => {}
         }
@@ -167,23 +207,40 @@ pub(super) fn register_builtins(ctx: &mut InferContext) {
 
     let mono = |params, ret| TypeScheme::mono(InferType::Fun(params, Box::new(ret)));
 
-    ctx.bind_poly("print",           mono(vec![str_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("println",         mono(vec![str_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("print_int",       mono(vec![int_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("println_int",     mono(vec![int_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("print_float",     mono(vec![float_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("println_float",   mono(vec![float_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("int_to_string",   mono(vec![int_ty.clone()], str_ty.clone()));
-    ctx.bind_poly("float_to_string", mono(vec![float_ty],       str_ty.clone()));
-    ctx.bind_poly("bool_to_string",  mono(vec![bool_ty.clone()], str_ty.clone()));
-    ctx.bind_poly("string_len",      mono(vec![str_ty.clone()], int_ty.clone()));
-    ctx.bind_poly("string_concat",   mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
-    ctx.bind_poly("clock",           mono(vec![], int_ty.clone()));
-    ctx.bind_poly("assert",          mono(vec![bool_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("assert_msg",      mono(vec![bool_ty, str_ty.clone()], unit_ty.clone()));
+    // print/println accept any Display type (polymorphic; bound not enforced at compile time).
+    let t = ctx.fresh_type_var_raw();
+    ctx.bind_poly("print", print_scheme(t));
+    let t = ctx.fresh_type_var_raw();
+    ctx.bind_poly("println", print_scheme(t));
+
+    ctx.bind_poly("string_len",    mono(vec![str_ty.clone()], int_ty.clone()));
+    ctx.bind_poly("string_concat", mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
+    ctx.bind_poly("clock",         mono(vec![], int_ty.clone()));
+    ctx.bind_poly("assert",        mono(vec![bool_ty.clone()], unit_ty.clone()));
+    ctx.bind_poly("assert_msg",    mono(vec![bool_ty.clone(), str_ty.clone()], unit_ty.clone()));
+
+    // to_string() method on built-in types (via Display aspect).
+    for type_name in &["Int", "Float", "Bool", "String"] {
+        let self_ty = match *type_name {
+            "Int"    => int_ty.clone(),
+            "Float"  => float_ty.clone(),
+            "Bool"   => bool_ty.clone(),
+            "String" => str_ty.clone(),
+            _ => unreachable!(),
+        };
+        ctx.register_method(type_name.to_string(), "to_string".to_string(),
+            InferType::Fun(vec![self_ty], Box::new(str_ty.clone())));
+    }
 
     ctx.register_method("String".to_string(), "len".to_string(),
         InferType::Fun(vec![str_ty.clone()], Box::new(int_ty.clone())));
+
+    // Also register the Display aspect so `impl Display for Foo` completeness check works.
+    ctx.registry_mut().register_aspect("Display".into(), vec!["to_string".into()]);
+    // Iterable aspect: for-in completeness
+    ctx.registry_mut().register_aspect("Iterable".into(), vec!["next".into()]);
+    // From aspect: cast completeness
+    ctx.registry_mut().register_aspect("From".into(), vec!["from".into()]);
 
     let t = ctx.fresh_type_var_raw();
     ctx.bind_poly("array_push", array_push_scheme(t));
@@ -193,16 +250,40 @@ pub(super) fn register_builtins(ctx: &mut InferContext) {
     ctx.bind_poly("dbg", dbg_scheme(t));
 }
 
-pub(super) fn register_builtin_poly_schemes(
+/// Single source of truth for all builtin function signatures.
+/// Populates `scheme_env` with both polymorphic and monomorphic builtins.
+/// The construction pass auto-derives its concrete types from this; no second
+/// registration site is needed.
+pub(super) fn register_builtin_schemes(
     scheme_env: &mut HashMap<String, TypeScheme>,
     gen: &mut TypeVarGenerator,
 ) {
+    let mono = |params: Vec<InferType>, ret: InferType| {
+        TypeScheme::mono(InferType::Fun(params, Box::new(ret)))
+    };
+    let str_ty   = InferType::str();
+    let int_ty   = InferType::int();
+    let bool_ty  = InferType::bool();
+    let unit_ty  = InferType::unit();
+
+    // Polymorphic builtins — each call site gets a fresh instantiation.
+    let t = gen.fresh();
+    scheme_env.insert("print".into(), print_scheme(t));
+    let t = gen.fresh();
+    scheme_env.insert("println".into(), print_scheme(t));
     let t = gen.fresh();
     scheme_env.insert("array_push".into(), array_push_scheme(t));
     let t = gen.fresh();
     scheme_env.insert("array_len".into(), array_len_scheme(t));
     let t = gen.fresh();
     scheme_env.insert("dbg".into(), dbg_scheme(t));
+
+    // Monomorphic builtins.
+    scheme_env.insert("string_len".into(),    mono(vec![str_ty.clone()], int_ty.clone()));
+    scheme_env.insert("string_concat".into(), mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
+    scheme_env.insert("clock".into(),         mono(vec![], int_ty.clone()));
+    scheme_env.insert("assert".into(),        mono(vec![bool_ty.clone()], unit_ty.clone()));
+    scheme_env.insert("assert_msg".into(),    mono(vec![bool_ty, str_ty], unit_ty));
 }
 
 pub(super) fn build_concrete_struct_env(

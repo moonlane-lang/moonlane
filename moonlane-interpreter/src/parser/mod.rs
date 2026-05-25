@@ -182,17 +182,16 @@ fn parse_enum_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<
 
 fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result<ImplBlock, MoonlaneError> {
     let span = Span::of(&pair, filename);
-    let inner       = pair.into_inner();
+    let inner = pair.into_inner();
     let mut aspect_name = None;
+    let mut aspect_type_args = vec![];
     let target_type;
-    let mut methods     = vec![];
+    let mut methods = vec![];
 
-    // Grammar: "impl" ~ (type_path ~ "for")? ~ type_expr ~ "{" ~ fun_decl* ~ "}"
-    // Children: optionally [type_path, type_expr], or just [type_expr], then fun_decls.
-    // type_path and type_expr both start with ident, so we peek at the sequence.
+    // Grammar: "impl" ~ (named_type ~ "for")? ~ type_expr ~ "{" ~ fun_decl* ~ "}"
+    // Children: optionally [named_type, type_expr], or just [type_expr], then fun_decls.
     let mut collected: Vec<pest::iterators::Pair<Rule>> = inner.collect();
 
-    // Separate fun_decls from the front (type_path / type_expr) pairs
     let fun_start = collected.iter().position(|p| p.as_rule() == Rule::fun_decl)
         .unwrap_or(collected.len());
     let type_pairs: Vec<_> = collected.drain(..fun_start).collect();
@@ -205,15 +204,23 @@ fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result
             target_type = Some(parse_type_expr(type_pairs.into_iter().next().unwrap(), filename)?);
         }
         2 => {
-            // `impl Trait for Type { ... }`
+            // `impl Aspect<T> for Type { ... }`
             let mut it = type_pairs.into_iter();
-            let trait_pair = it.next().unwrap();
-            // type_path is `ident ~ ("::" ~ ident)*`
-            let path: Vec<String> = trait_pair.into_inner()
-                .filter(|p| p.as_rule() == Rule::ident)
-                .map(|p| p.as_str().to_string())
-                .collect();
-            aspect_name = Some(path.join("::"));
+            let aspect_pair = it.next().unwrap(); // named_type rule
+            // named_type = { ident ~ ("<" ~ type_args ~ ">")? }
+            let mut inner_pairs = aspect_pair.into_inner();
+            let name_ident = inner_pairs.next().unwrap();
+            aspect_name = Some(name_ident.as_str().to_string());
+            // Collect generic type args if present
+            for p in inner_pairs {
+                if p.as_rule() == Rule::type_args {
+                    for arg in p.into_inner() {
+                        if arg.as_rule() == Rule::type_expr {
+                            aspect_type_args.push(parse_type_expr(arg, filename)?);
+                        }
+                    }
+                }
+            }
             target_type = Some(parse_type_expr(it.next().unwrap(), filename)?);
         }
         n => return Err(MoonlaneError::internal(format!("impl_block: unexpected {n} type pairs"))),
@@ -225,7 +232,7 @@ fn parse_impl_block(pair: pest::iterators::Pair<Rule>, filename: &str) -> Result
         }
     }
 
-    Ok(ImplBlock { aspect_name, target_type: target_type.unwrap(), methods, span })
+    Ok(ImplBlock { aspect_name, aspect_type_args, target_type: target_type.unwrap(), methods, span })
 }
 
 
@@ -1109,13 +1116,23 @@ fn parse_aspect_decl(pair: pest::iterators::Pair<Rule>, filename: &str) -> Resul
     let name = inner.next()
         .ok_or_else(|| MoonlaneError::internal("aspect_decl: expected name"))?
         .as_str().to_string();
+    let mut generics = vec![];
     let mut methods = vec![];
     for p in inner {
-        if p.as_rule() == Rule::aspect_method {
-            methods.push(parse_aspect_method(p, filename)?);
+        match p.as_rule() {
+            Rule::generic_params => {
+                for gp in p.into_inner() {
+                    if gp.as_rule() == Rule::generic_param {
+                        let pname = gp.into_inner().next().map(|i| i.as_str().to_string()).unwrap_or_default();
+                        generics.push(pname);
+                    }
+                }
+            }
+            Rule::aspect_method => { methods.push(parse_aspect_method(p, filename)?); }
+            _ => {}
         }
     }
-    Ok(AspectDecl { name, methods, span })
+    Ok(AspectDecl { name, generics, methods, span })
 }
 
 
