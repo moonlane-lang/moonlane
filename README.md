@@ -14,7 +14,7 @@ The mechanism is opt-in linear types instead of mandatory ownership. The goal is
 
 ## What?
 
-### Available now (v0.1)
+### Available now (v0.2)
 
 - **Strong static typing** with local type inference (Hindley-Milner)
 - **Algebraic data types** — structs and enums with data-carrying variants
