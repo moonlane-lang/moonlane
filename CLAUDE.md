@@ -105,7 +105,7 @@ Use the `gh` CLI to manage issues:
 ```bash
 gh issue list                                          # list open tasks
 gh issue list --state closed                           # list done tasks
-gh issue list --milestone "Epic 002 - Evaluator"       # filter by milestone
+gh issue list --milestone "v0.3"                       # filter by milestone
 gh issue view <number>                                 # read a task
 gh issue create --title "..." --label "..." --milestone "..."  # create a task
 gh issue close <number>                                # mark done
@@ -115,7 +115,7 @@ gh issue edit <number> --add-label "status:in-progress"        # mark in-progres
 
 **Labels:** `evaluator`, `generics`, `aspects`, `integration`, `tooling`, `dx`, `migration`, `docs`, `typechecker`, `type-inference`, `architecture`, `priority:low/medium/high`, `status:backlog`, `status:in-progress`, `archived`
 
-**Milestones:** Epic 001–005 (implementation groupings) and version milestones (`v0.2`, `v0.3`, …). See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the full model.
+**Milestones:** Version milestones (`v0.2`, `v0.3`, …). See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the full model.
 
 ### Docs and Decisions
 
@@ -145,7 +145,7 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly �
 - **GitHub Projects v2** (https://github.com/users/Vladastos/projects/1) is the source of truth for task status and planning
 - Issues are the unit of work; the project board is the canonical status view
 - Before creating a task, search first: `gh issue list --search "keyword"` to avoid duplicates
-- Apply labels and a milestone when creating: `--label "evaluator" --milestone "Epic 002 - Evaluator"`
+- Apply labels and a milestone when creating: `--label "evaluator" --milestone "v0.3"`
 - Use `gh issue edit <number> --add-label "status:in-progress"` when starting a task — update the project Status field to **In Progress** as well
 - **Task state changes require no commit** — the project board is the source of truth, not files in the repo
 - **The main repo only gets a commit when actual code is written**
@@ -195,13 +195,6 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly �
 The language is at **v0.2** (tree-walk interpreter complete). The next release is **v0.3**, which adds generics and aspects.
 
 Check open tasks: `gh issue list --milestone "v0.2"`.
-
-**Epic status:**
-- **Epic 001** (Typechecker and Typed AST) — complete
-- **Epic 002** (Evaluator) — complete
-- **Epic 003** (Generics and Monomorphization) — issues #5–#10 → v0.2
-- **Epic 004** (Aspects and Method Dispatch) — issues #11–#13 → v0.2
-- **Epic 005** (Typechecker Integration) — issue #14 → v0.2
 
 See [`docs/internal/versioning.md`](docs/internal/versioning.md) for the versioning model.
 
