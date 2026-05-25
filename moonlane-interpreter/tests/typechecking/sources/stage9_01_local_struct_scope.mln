@@ -1,0 +1,8 @@
+// Positive: local struct is visible anywhere within its declaring block,
+// including after its definition site and in nested expressions.
+
+fun use_local_struct() -> Int {
+    struct Pair { a: Int, b: Int }
+    let p = Pair { a: 10, b: 32 };
+    p.a + p.b
+}

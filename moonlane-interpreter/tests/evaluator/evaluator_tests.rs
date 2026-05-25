@@ -217,6 +217,9 @@ mod tests {
     #[test]
     fn lvalue_paths() { check("45_lvalue_paths.mln"); }
 
+    #[test]
+    fn local_struct_scope() { check("46_local_struct_scope.mln"); }
+
     // ── Integration tests ─────────────────────────────────────────────────────
 
     #[test]

@@ -492,6 +492,18 @@ mod tests {
         check_file(&format!("{}/stage8_07_ascription_nope_arg_bare.mln", test_dir()));
     }
 
+    // ── Stage 9: local struct scope ───────────────────────────────────────────
+
+    #[test]
+    fn stage9_local_struct_scope() {
+        check_file(&format!("{}/stage9_01_local_struct_scope.mln", test_dir()));
+    }
+
+    #[test]
+    fn stage9_neg_local_struct_not_exported() {
+        check_file(&format!("{}/stage9_neg_01_local_struct_not_exported.mln", test_dir()));
+    }
+
     // ── Known-limitation tests ─────────────────────────────────────────────────
 
     #[test]

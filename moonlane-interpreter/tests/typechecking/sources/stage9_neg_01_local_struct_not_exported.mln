@@ -1,0 +1,11 @@
+// Negative: a struct declared inside a function body must not be visible
+// in a different function's body.
+
+fun declare_it() {
+    struct Local { x: Int }
+}
+
+fun use_it() -> Int {
+    let v = Local { x: 1 };  // ERROR[T0003]
+    v.x
+}
