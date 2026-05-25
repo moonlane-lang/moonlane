@@ -105,8 +105,6 @@ The dual-mode commitment, combined with the linear type system design, opens spe
 
 The most achievable near-term contribution is formalizing the linear type system (Claim 1) — the inference rules are already described in prose in RFC-0024 and translating them to formal notation is the primary work.
 
-See `docs/internal/research.md` for the full analysis: prior work map, per-claim prerequisites, explicit non-claims, and a publication strategy.
-
 ---
 
 ## What This Vision Does Not Mean
