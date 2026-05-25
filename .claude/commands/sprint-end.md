@@ -10,14 +10,16 @@ Close a sprint: run the mandatory quality gate, then build and publish the sprin
 
 ## Step 1 — Fetch sprint context
 
-Read the kickoff issue to get the sprint goal and planned issue list:
+Read the kickoff issue to get the sprint goal, planned issue list, and milestone:
 ```bash
-gh issue list --repo moonlane-lang/moonlane --search "Sprint $ARGUMENTS Kickoff" --state all --json number,title,body
+gh issue list --repo moonlane-lang/moonlane --search "Sprint $ARGUMENTS Kickoff" --state all --json number,title,body,milestone
 ```
+
+Identify the **milestone** (e.g. `v0.3`) from the kickoff issue's milestone field — every issue created during sprint-end must use this same milestone.
 
 Categorise all planned issues as completed (closed) or carried over (still open):
 ```bash
-gh issue list --repo moonlane-lang/moonlane --milestone "v0.X" --state open --json number,title
+gh issue list --repo moonlane-lang/moonlane --milestone "<milestone>" --state open --json number,title
 ```
 
 ---
@@ -118,7 +120,33 @@ For every failing gate from Step 2: fix the issue, commit to the sprint branch, 
 
 ---
 
-## Step 4 — Move carried-over issues to backlog
+## Step 4 — Integration tests (language version sprints only)
+
+**If this sprint ships a language version milestone** (i.e. the milestone is a version tag such as `v0.3`):
+
+Write comprehensive integration tests that exercise the **complete feature set** of that version — not just features added this sprint. These tests must:
+- Live in `moonlane-interpreter/tests/evaluator/sources/` as `int_NN_<name>.mln`
+- Be self-asserting (`assert(...)`)
+- Cover all combinations of new features interacting (generics + closures, structs + enums, etc.)
+- Use idiomatic Moonlane: type annotations where expected, explicit braces where required
+
+After writing the tests, run them:
+```bash
+cargo test int_
+```
+
+**Examine every failure and inconsistency found.** For each:
+- If it is a bug: fix it, add a regression test, commit.
+- If it exposes a spec ambiguity: note it and open a tracking issue.
+- If it reveals a limitation that is out of scope for this version: document it in the relevant `docs/*.md` Known Limitations section and open a tracking issue for the next version.
+
+Report a summary of: tests written, failures found, fixes made, issues opened.
+
+Do not proceed to Step 5 until all integration tests pass.
+
+---
+
+## Step 5 — Move carried-over issues to backlog
 
 For each issue that is still open and was planned for this sprint:
 ```bash
@@ -129,13 +157,13 @@ gh issue edit <N> --repo moonlane-lang/moonlane \
 
 ---
 
-## Step 5 — Update the kickoff issue
+## Step 6 — Update the kickoff issue
 
 Edit the kickoff issue body to reflect what was actually completed vs. deferred (use checkboxes: `[x]` for done, `[ ]` for carried over). This is the factual record of the sprint.
 
 ---
 
-## Step 6 — Gather epic and spec notes
+## Step 7 — Gather epic and spec notes
 
 Epic progress — for each milestone touched this sprint:
 ```bash
@@ -149,12 +177,16 @@ git log main..HEAD --oneline -- docs/
 
 ---
 
-## Step 7 — Create the sprint review issue
+## Step 8 — Create the sprint review issue
+
+Use the **same milestone** as the kickoff issue:
 
 ```bash
 gh issue create \
   --repo moonlane-lang/moonlane \
   --title "Sprint $ARGUMENTS Review" \
+  --milestone "<milestone>" \
+  --label "sprint:review" \
   --body "$(cat <<'EOF'
 ## Sprint Goal
 <goal from kickoff issue>
@@ -170,6 +202,9 @@ All gates passed. ✅
 
 ### Spec / doc fixes
 <list any spec or doc corrections made during gate checks, or "None">
+
+### Integration tests (if version sprint)
+<summary: N tests written, M failures found, K fixed, issues opened — or "N/A">
 
 ## Completed
 <- [x] #N Title for each closed issue>
@@ -193,7 +228,7 @@ Note the issue number returned — needed for the PR.
 
 ---
 
-## Step 8 — Open the pull request
+## Step 9 — Open the pull request
 
 ```bash
 gh pr create \
@@ -214,27 +249,30 @@ Both `Closes` lines are required — on merge, GitHub automatically closes both 
 
 ---
 
-## Step 9 — Hand off to user
+## Step 10 — Hand off to user
 
 > **Sprint $ARGUMENTS quality gate passed and PR is open.**
 >
 > - All 7 quality gates: ✅
 > - Review issue: #<N> — add **Next Sprint Seeds** if you have ideas.
 > - **Merge the PR** on GitHub — this automatically closes the review and kickoff issues.
-> - After merging, pull `main` and create the release tag:
+> - After the merge is confirmed, pull `main` and create the release tag:
 >   ```bash
 >   git pull origin main
 >   git tag -a v<X.Y> -m "v<X.Y>: <sprint theme>" && git push origin v<X.Y>
 >   ```
 > - Delete the `sprint/$ARGUMENTS` branch on GitHub.
 
-The tag must point to `main` after the merge — not the sprint branch. The tag name must match the version in `docs/public/changelog.md`.
+**The tag must be created on `main` after the PR is merged — never on the sprint branch, and never before the merge.**
+The tag name must match the version in `docs/public/changelog.md`.
 
 ---
 
 ## Notes
 
-- Do not create the PR until every quality gate in Step 2 passes. This is enforced by the skill structure — Step 3 must be completed before Step 8.
+- Do not create the PR until every quality gate in Step 2 passes. This is enforced by the skill structure — Step 3 must be completed before Step 9.
+- Do not create the release tag — instruct the user to create it after merging. The tag must point to `main`.
 - A sprint with 0 completed issues still produces a review issue — record why in Completed.
 - If spec ambiguities surfaced (visible in Gate 5 or Spec Notes), prompt the user to open a `/new-rfc`.
 - The sprint branch must not be deleted until after the PR is merged.
+- All issues created during sprint-end (review issue, any tracking issues) must carry the sprint's milestone.
