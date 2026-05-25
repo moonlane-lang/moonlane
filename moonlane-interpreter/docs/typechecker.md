@@ -151,8 +151,11 @@ InferContext {
     var_gen: TypeVarGenerator                           // globally unique TypeVar allocator
     registry: TypeRegistry                              // pre-built struct/enum/method registries
     current_return_type / current_break_type            // context for return/break inference
+    current_type_params: HashMap<String, TypeVar>       // active generic param map (see below)
 }
 ```
+
+**`current_type_params` invariant:** set to the enclosing generic function's `name → TypeVar` map for the duration of `infer_fun_decl` / `infer_impl_method` body inference, and restored to the caller's map afterward via `swap_type_params`. Empty at top level and inside non-generic functions. All type annotations inside a function body (`let`, `mut`, `for`-init, closure params) must resolve through `ann_to_infer(ann, ctx)` rather than the bare `type_expr_to_infer(ann)` so that param names resolve to their TypeVars instead of `Type::Named`.
 
 `poly_env` takes precedence over `mono_env` in `ctx.lookup()`. Poly entries are automatically instantiated with fresh type variables on each lookup (let-polymorphism).
 
@@ -212,6 +215,10 @@ When a call site resolves to a polymorphic callee (present in `scheme_env` but n
 Functions with quantified type variables in their scheme are stored as `FunBody::Generic(untyped_block)` rather than `FunBody::Typed(typed_block)`. At each call site the evaluator re-runs the construction pass on the untyped block at the concrete call-site types, producing a `TypedBlock` that is evaluated normally. This is the monomorphization mechanism.
 
 `let`-bound unannotated closures generalised to polymorphic schemes are stored as `TypedExpr::GenericClosure { params, body: Block, .. }` and evaluated to `ClosureBody::Untyped(block)`. The evaluator re-runs construction per call, mirroring the function case.
+
+### Closure Body Expected Type
+
+`Expr::Closure` construction passes `return_type.as_ref().map(|_| &ret_ty)` as the `expected_tail_ty` for `construct_block`. This is necessary so that enum variant literals with unmentioned type params (e.g. `Result::Ok { value }` in a `fun() -> Result<T,E>`) can resolve the unbound type argument from the annotation hint rather than failing with T0002. Closures without an explicit return annotation pass `None`.
 
 ### Exhaustive Match Checking
 

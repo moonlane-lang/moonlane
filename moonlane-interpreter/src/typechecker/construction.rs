@@ -651,9 +651,8 @@ fn construct_expr(
             for (p, ty) in params.iter().zip(param_types.iter()) {
                 ctx.bind(&p.name, ty.clone());
             }
-            // Pass the declared return type as the expected tail type so enum
-            // variant literals with unmentioned type params (e.g. Result::Ok)
-            // can fall back to the annotation for unresolved type arguments.
+            // Without this, unmentioned type params in variant literals (e.g. the
+            // E in Result::Ok inside a fun()->Result<T,E>) have no hint and fail T0002.
             let body_expected = return_type.as_ref().map(|_| &ret_ty);
             let typed_body = construct_block(body, body_expected, ctx)?;
             ctx.pop_scope();

@@ -8,16 +8,16 @@ use crate::types::Type;
 use super::FunGeneralization;
 use super::conversions::{type_expr_to_infer, type_expr_to_infer_with_generics};
 
-/// Resolve a type annotation using the current function's type-param map if one
-/// is set on `ctx` (i.e. we are inside a generic function body), otherwise fall
-/// back to the plain `type_expr_to_infer`.  Call this instead of the bare
-/// `type_expr_to_infer(ann)` for any annotation that can appear inside a
-/// function body (let, mut, for-init, closure params).
+/// Resolve a type annotation, substituting any name that matches the current
+/// function's generic type params with the corresponding TypeVar rather than
+/// producing a Named type.  Must be used for all annotations inside function
+/// bodies; bare `type_expr_to_infer` ignores the param map.
 fn ann_to_infer(te: &TypeExpr, ctx: &InferContext) -> InferType {
-    if ctx.current_type_params.is_empty() {
+    let params = ctx.type_params();
+    if params.is_empty() {
         type_expr_to_infer(te)
     } else {
-        type_expr_to_infer_with_generics(te, &ctx.current_type_params)
+        type_expr_to_infer_with_generics(te, params)
     }
 }
 
