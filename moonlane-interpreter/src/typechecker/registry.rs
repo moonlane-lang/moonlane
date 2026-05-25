@@ -86,6 +86,7 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
                     variants,
                 });
             }
+            Decl::Fun(f) => register_structs_in_block(&f.body, &mut registry),
             Decl::Impl(ib) if ib.trait_name.is_none() => {
                 let target_name = match &ib.target_type {
                     TypeExpr::Named(name, args) if args.is_empty() => name.clone(),
@@ -118,6 +119,43 @@ pub(super) fn build_registry(program: &Program, gen: &mut TypeVarGenerator) -> T
     }
 
     registry
+}
+
+/// Recursively register any struct/enum declarations found inside a block.
+/// Structs declared in function bodies are registered globally (the registry
+/// has no scope concept), so they are visible across the whole compilation unit.
+fn register_structs_in_block(block: &crate::ast::Block, registry: &mut TypeRegistry) {
+    use crate::ast::{Decl, Stmt};
+    for decl in &block.stmts {
+        match decl {
+            Decl::Struct(sd) => {
+                let fields = sd.fields.iter()
+                    .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                    .collect();
+                registry.register_struct_fields(sd.name.clone(), fields);
+            }
+            Decl::Enum(ed) => {
+                let variants = ed.variants.iter().map(|v| crate::typeinference::VariantInfo {
+                    name: v.name.clone(),
+                    fields: v.fields.iter()
+                        .map(|f| (f.name.clone(), type_expr_to_infer(&f.type_ann)))
+                        .collect(),
+                }).collect();
+                registry.register_enum(ed.name.clone(), crate::typeinference::EnumInfo {
+                    type_params: vec![],
+                    variants,
+                });
+            }
+            Decl::Fun(f) => register_structs_in_block(&f.body, registry),
+            Decl::Stmt(s) => match s {
+                Stmt::While(w)  => register_structs_in_block(&w.body, registry),
+                Stmt::For(f)    => register_structs_in_block(&f.body, registry),
+                Stmt::ForIn(f)  => register_structs_in_block(&f.body, registry),
+                _ => {}
+            },
+            _ => {}
+        }
+    }
 }
 
 pub(super) fn register_builtins(ctx: &mut InferContext) {

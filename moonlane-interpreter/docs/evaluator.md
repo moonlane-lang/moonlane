@@ -188,10 +188,6 @@ Anonymous closures appear as `<closure>`. The call stack is cleared at the start
 
 ## Known Limitations
 
-### Struct declarations must be top-level
-
-`struct` declarations inside function bodies are silently rejected at typecheck time with `T0003: unknown struct`. All struct definitions must appear at the top level of the source file. This affects test authoring and user programs that want locally-scoped struct types.
-
 ### Generic functions — not callable
 
 Generic functions produce `Value::Unit` and calling them panics. This is intentional until v0.3 (generics). No test calls a generic function at the value level.

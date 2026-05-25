@@ -1,12 +1,13 @@
 // Regression: field and index assignment must work with chained field access,
 // not just bare identifiers (#110).
 
-struct Point     { x: Int, y: Int }
-struct Line      { start: Point, end: Point }
-struct Container { items: Int[] }
-
 fun main() {
-    // Chained field assignment: a.b.c = val
+    // Struct declarations inside function bodies (#125).
+    struct Point     { x: Int, y: Int }
+    struct Line      { start: Point, end: Point }
+    struct Container { items: Int[] }
+
+    // Chained field assignment: a.b.c = val (#110)
     mut ln = Line { start: Point { x: 0, y: 0 }, end: Point { x: 10, y: 10 } };
     ln.start.x = 5;
     ln.start.y = 7;
@@ -16,7 +17,7 @@ fun main() {
     assert(ln.end.x   == 20);
     assert(ln.end.y   == 10);  // unchanged
 
-    // Index assignment via a field-access receiver: a.field[i] = val
+    // Index assignment via a field-access receiver: a.field[i] = val (#110)
     mut c = Container { items: [1, 2, 3] };
     c.items[1] = 99;
     assert(c.items[1] == 99);
