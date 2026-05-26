@@ -20,15 +20,6 @@ pub enum Type {
     Result(Box<Type>, Box<Type>),
 }
 
-impl Type {
-    pub fn is_numeric(&self) -> bool {
-        matches!(self, Type::Int | Type::Float)
-    }
-
-    pub fn is_unit(&self) -> bool {
-        matches!(self, Type::Unit)
-    }
-}
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

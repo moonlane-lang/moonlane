@@ -16,31 +16,37 @@ pub type TypedProgram = Vec<TypedDecl>;
 // ── Typed Declarations ────────────────────────────────────────────────────────
 
 /// Mirrors `ast::Decl` but with typed expressions.
+/// Struct/Enum/Aspect variants carry no runtime data — the evaluator ignores them.
+/// They exist for structural completeness and future tooling (reflection, docs, LSP).
 #[derive(Debug, Clone)]
 pub enum TypedDecl {
     Let(TypedLetDecl),
     Mut(TypedMutDecl),
     Fun(TypedFunDecl),
-    Struct(TypedStructDecl),
-    Enum(TypedEnumDecl),
+    Struct(#[allow(dead_code)] TypedStructDecl),
+    Enum(#[allow(dead_code)] TypedEnumDecl),
     Impl(TypedImplBlock),
-    Aspect(TypedAspectDecl),
+    Aspect(#[allow(dead_code)] TypedAspectDecl),
     Stmt(TypedStmt),
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedLetDecl {
     pub name:     String,
+    #[allow(dead_code)] // kept for future tooling (hover types, LSP)
     pub type_ann: Option<TypeExpr>,
     pub value:    TypedExpr,
+    #[allow(dead_code)] // kept for future error messages
     pub span:     Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedMutDecl {
     pub name:     String,
+    #[allow(dead_code)] // kept for future tooling (hover types, LSP)
     pub type_ann: Option<TypeExpr>,
     pub value:    TypedExpr,
+    #[allow(dead_code)] // kept for future error messages
     pub span:     Span,
 }
 
@@ -59,14 +65,20 @@ pub enum FunBody {
 #[derive(Debug, Clone)]
 pub struct TypedFunDecl {
     pub name:        String,
+    #[allow(dead_code)] // kept for future reflection / documentation generation
     pub generics:    Vec<GenericParam>,
     pub params:      Vec<Param>,
+    #[allow(dead_code)] // kept for future reflection / documentation generation
     pub return_type: Option<TypeExpr>,
     pub body:        FunBody,
+    #[allow(dead_code)] // kept for future error messages
     pub span:        Span,
 }
 
+/// Carried in TypedDecl for structural completeness; the evaluator produces no
+/// runtime representation for struct/enum declarations.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TypedStructDecl {
     pub name:     String,
     pub generics: Vec<GenericParam>,
@@ -74,7 +86,10 @@ pub struct TypedStructDecl {
     pub span:     Span,
 }
 
+/// Carried in TypedDecl for structural completeness; the evaluator produces no
+/// runtime representation for struct/enum declarations.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TypedEnumDecl {
     pub name:     String,
     pub generics: Vec<GenericParam>,
@@ -88,10 +103,14 @@ pub struct TypedImplBlock {
     pub aspect_type_args: Vec<TypeExpr>,
     pub target_type:      TypeExpr,
     pub methods:          Vec<TypedFunDecl>,
+    #[allow(dead_code)] // kept for future error messages
     pub span:             Span,
 }
 
+/// Carried in TypedDecl for structural completeness; the evaluator produces no
+/// runtime representation for aspect declarations.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TypedAspectDecl {
     pub name:     String,
     pub generics: Vec<String>,
@@ -109,7 +128,7 @@ pub enum TypedStmt {
     ForIn(TypedForInStmt),
     Return(TypedReturnStmt),
     Break(TypedBreakStmt),
-    Continue(Span),
+    Continue(#[allow(dead_code)] Span),
     Expr(TypedExpr),
 }
 
@@ -117,6 +136,7 @@ pub enum TypedStmt {
 pub struct TypedWhileStmt {
     pub condition: TypedExpr,
     pub body:      TypedBlock,
+    #[allow(dead_code)] // kept for future error messages
     pub span:      Span,
 }
 
@@ -126,6 +146,7 @@ pub struct TypedForStmt {
     pub condition: Option<TypedExpr>,
     pub step:      Option<TypedExpr>,
     pub body:      TypedBlock,
+    #[allow(dead_code)] // kept for future error messages
     pub span:      Span,
 }
 
@@ -146,12 +167,14 @@ pub struct TypedForInStmt {
 #[derive(Debug, Clone)]
 pub struct TypedReturnStmt {
     pub value: Option<TypedExpr>,
+    #[allow(dead_code)] // kept for future error messages
     pub span:  Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedBreakStmt {
     pub value: Option<TypedExpr>,
+    #[allow(dead_code)] // kept for future error messages
     pub span:  Span,
 }
 
@@ -162,6 +185,7 @@ pub struct TypedBreakStmt {
 pub struct TypedBlock {
     pub stmts: Vec<TypedDecl>,
     pub tail:  Option<Box<TypedExpr>>,
+    #[allow(dead_code)] // kept for future error messages
     pub span:  Span,
 }
 
@@ -237,6 +261,7 @@ pub enum TypedExpr {
     },
     Closure {
         params: Vec<Param>,
+        #[allow(dead_code)] // kept for future type annotation checking
         return_type: Option<TypeExpr>,
         body: TypedBlock,
         ty: Type,
@@ -246,6 +271,7 @@ pub enum TypedExpr {
     /// The body is kept untyped for runtime re-evaluation at each call site's concrete type.
     GenericClosure {
         params:      Vec<Param>,
+        #[allow(dead_code)] // kept for future type annotation checking
         return_type: Option<TypeExpr>,
         body:        Block,
         ty:          Type,
@@ -339,5 +365,6 @@ pub struct TypedMatchArm {
     pub pattern: Pattern,  // Patterns don't contain expressions, reuse as-is
     pub guard: Option<TypedExpr>,
     pub body: TypedBlock,
+    #[allow(dead_code)] // kept for future error messages
     pub span: Span,
 }

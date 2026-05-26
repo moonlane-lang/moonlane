@@ -33,11 +33,6 @@ pub struct Program {
     pub decls: Vec<Decl>,
 }
 
-impl Program {
-    pub fn new(decls: Vec<Decl>) -> Self {
-        Program { decls }
-    }
-}
 
 // ── Declarations ──────────────────────────────────────────────────────────────
 
@@ -126,6 +121,8 @@ pub struct AspectDecl {
 #[derive(Debug, Clone)]
 pub struct GenericParam {
     pub name:  String,
+    /// Reserved for aspect/type bounds — not yet enforced by the type checker.
+    #[allow(dead_code)]
     pub bound: Option<TypeExpr>,
 }
 
@@ -143,6 +140,8 @@ pub struct Param {
 pub struct FieldDef {
     pub name:     String,
     pub type_ann: TypeExpr,
+    /// Reserved for span propagation through the type registry (v0.4.3, #133).
+    #[allow(dead_code)]
     pub span:     Span,
 }
 
@@ -151,10 +150,15 @@ pub struct FieldDef {
 pub struct VariantDef {
     pub name:   String,
     pub fields: Vec<FieldDef>,
+    /// Reserved for span propagation through the type registry (v0.4.3, #133).
+    #[allow(dead_code)]
     pub span:   Span,
 }
 
+/// An aspect method declaration. Fields beyond `name` are reserved for
+/// aspect completeness checking and default body dispatch (not yet implemented).
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AspectMethod {
     pub name:         String,
     pub generics:     Vec<GenericParam>,

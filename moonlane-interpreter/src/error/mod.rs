@@ -76,7 +76,11 @@ pub enum MoonlaneError {
     ParseError {
         code: ParseErrorCode,
         message: String,
+        /// Raw byte offsets from the pest span. Not used by the current display
+        /// but kept for future IDE/LSP span mapping (see v0.4.3, #133).
+        #[allow(dead_code)]
         start: usize,
+        #[allow(dead_code)]
         end: usize,
         filename: String,
         line: u32,
@@ -87,7 +91,11 @@ pub enum MoonlaneError {
     TypeError {
         code: TypeErrorCode,
         message: String,
+        /// Raw byte offsets from the pest span. Not used by the current display
+        /// but kept for future IDE/LSP span mapping (see v0.4.3, #133).
+        #[allow(dead_code)]
         start: usize,
+        #[allow(dead_code)]
         end: usize,
         filename: String,
         line: u32,
