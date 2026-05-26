@@ -1,5 +1,5 @@
 /// Integration tests for the evaluator.
-/// All Moonlane source files live in tests/evaluator/sources/.
+/// All Moonlane source files live in tests/evaluator/sources/<feature>/.
 ///
 /// Positive files are self-asserting:
 ///   `let _ok = match (actual == expected) { true => 0, };`
@@ -91,305 +91,318 @@ mod tests {
         }
     }
 
-    fn check(filename: &str) {
-        check_file(&format!("{}/{filename}", test_dir()));
+    fn check(path: &str) {
+        check_file(&format!("{}/{path}", test_dir()));
     }
 
-    // ── Positive tests ────────────────────────────────────────────────────────
+    // ── Literals ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn literals() { check("01_literals.mln"); }
+    fn literals() { check("literals/01_literals.mln"); }
 
-    #[test]
-    fn arithmetic() { check("02_arithmetic.mln"); }
+    // ── Arithmetic ────────────────────────────────────────────────────────────
 
     #[test]
-    fn float_arithmetic() { check("03_float_arithmetic.mln"); }
+    fn arithmetic() { check("arithmetic/02_arithmetic.mln"); }
 
     #[test]
-    fn comparison() { check("04_comparison.mln"); }
+    fn float_arithmetic() { check("arithmetic/03_float_arithmetic.mln"); }
 
     #[test]
-    fn logical() { check("05_logical.mln"); }
+    fn comparison() { check("arithmetic/04_comparison.mln"); }
 
     #[test]
-    fn unary() { check("06_unary.mln"); }
+    fn logical() { check("arithmetic/05_logical.mln"); }
 
     #[test]
-    fn range() { check("07_range.mln"); }
+    fn unary() { check("arithmetic/06_unary.mln"); }
 
     #[test]
-    fn cast() { check("08_cast.mln"); }
+    fn range() { check("arithmetic/07_range.mln"); }
 
     #[test]
-    fn tuple() { check("09_tuple.mln"); }
+    fn neg_div_by_zero() { check("arithmetic/neg_01_div_by_zero.mln"); }
 
     #[test]
-    fn array() { check("10_array.mln"); }
+    fn neg_rem_by_zero() { check("arithmetic/neg_02_rem_by_zero.mln"); }
 
-    #[test]
-    fn enum_variant() { check("11_enum_variant.mln"); }
+    // ── Types (arrays, tuples, casts) ─────────────────────────────────────────
 
     #[test]
-    fn if_expression() { check("12_if_expression.mln"); }
+    fn cast() { check("types/08_cast.mln"); }
 
     #[test]
-    fn loop_expr() { check("13_loop.mln"); }
+    fn tuple() { check("types/09_tuple.mln"); }
 
     #[test]
-    fn match_expr() { check("14_match.mln"); }
+    fn array() { check("types/10_array.mln"); }
 
     #[test]
-    fn while_loop() { check("15_while.mln"); }
+    fn from_cast() { check("types/60_from_cast.mln"); }
 
     #[test]
-    fn for_loop() { check("16_for_loop.mln"); }
+    fn from_edge_cases() { check("types/63_from_edge_cases.mln"); }
 
     #[test]
-    fn for_in() { check("17_for_in.mln"); }
+    fn neg_array_oob() { check("types/neg_03_array_oob.mln"); }
 
     #[test]
-    fn return_stmt() { check("18_return.mln"); }
+    fn neg_array_negative_index() { check("types/neg_04_array_negative_index.mln"); }
 
     #[test]
-    fn nested_signals() { check("19_nested_signals.mln"); }
+    fn neg_array_index_at_len() { check("types/neg_05_array_index_at_len.mln"); }
 
     #[test]
-    fn scoping() { check("20_scoping.mln"); }
+    fn neg_cast_float_to_int() { check("types/neg_08_cast_float_to_int.mln"); }
 
     #[test]
-    fn assign() { check("21_assign.mln"); }
+    fn neg_tuple_oob() { check("types/neg_09_tuple_oob.mln"); }
 
     #[test]
-    fn misc() { check("22_misc.mln"); }
+    fn neg_cast_no_from() { check("types/neg_23_cast_no_from.mln"); }
 
-    #[test]
-    fn forward_reference() { check("23_forward_reference.mln"); }
+    // ── Control flow ──────────────────────────────────────────────────────────
 
     #[test]
-    fn struct_literal() { check("24_struct_literal.mln"); }
+    fn if_expression() { check("control_flow/12_if_expression.mln"); }
 
     #[test]
-    fn enum_with_fields() { check("25_enum_with_fields.mln"); }
+    fn loop_expr() { check("control_flow/13_loop.mln"); }
 
     #[test]
-    fn field_access() { check("26_field_access.mln"); }
+    fn match_expr() { check("control_flow/14_match.mln"); }
 
     #[test]
-    fn method_call_builtin() { check("27_method_call_builtin.mln"); }
+    fn while_loop() { check("control_flow/15_while.mln"); }
 
     #[test]
-    fn method_call_user() { check("28_method_call_user.mln"); }
+    fn for_loop() { check("control_flow/16_for_loop.mln"); }
 
     #[test]
-    fn assign_index() { check("29_assign_index.mln"); }
+    fn for_in() { check("control_flow/17_for_in.mln"); }
 
     #[test]
-    fn assign_field() { check("30_assign_field.mln"); }
+    fn loop_if_break() { check("control_flow/35_loop_if_break.mln"); }
 
     #[test]
-    fn call() { check("31_call.mln"); }
+    fn braceless_if() { check("control_flow/47_braceless_if.mln"); }
 
     #[test]
-    fn recursive() { check("32_recursive.mln"); }
+    fn neg_no_arm() { check("control_flow/neg_06_no_arm.mln"); }
 
     #[test]
-    fn closure() { check("33_closure.mln"); }
+    fn neg_and_rhs_evaluated() { check("control_flow/neg_10_and_rhs_evaluated.mln"); }
 
     #[test]
-    fn propagate_error() { check("34_propagate_error.mln"); }
+    fn neg_or_rhs_evaluated() { check("control_flow/neg_11_or_rhs_evaluated.mln"); }
 
     #[test]
-    fn loop_if_break() { check("35_loop_if_break.mln"); }
+    fn neg_nonexhaustive_match() { check("control_flow/neg_13_nonexhaustive_match.mln"); }
 
     #[test]
-    fn call_edge() { check("36_call_edge.mln"); }
+    fn neg_braceless_if_dangling_else() { check("control_flow/neg_19_braceless_if_dangling_else.mln"); }
 
     #[test]
-    fn closure_edge() { check("37_closure_edge.mln"); }
+    fn neg_braceless_if_mixed_arms() { check("control_flow/neg_20_braceless_if_mixed_arms.mln"); }
 
+    // ── Functions ─────────────────────────────────────────────────────────────
+
     #[test]
-    fn builtins() { check("38_builtins.mln"); }
+    fn return_stmt() { check("functions/18_return.mln"); }
 
     #[test]
-    fn perhaps() { check("39_perhaps.mln"); }
+    fn nested_signals() { check("functions/19_nested_signals.mln"); }
 
     #[test]
-    fn method_chain() { check("40_method_chain.mln"); }
+    fn scoping() { check("functions/20_scoping.mln"); }
 
     #[test]
-    fn nested_struct() { check("41_nested_struct.mln"); }
+    fn assign() { check("functions/21_assign.mln"); }
 
     #[test]
-    fn closures_advanced() { check("42_closures_advanced.mln"); }
+    fn misc() { check("functions/22_misc.mln"); }
 
     #[test]
-    fn shorthand_field() { check("43_shorthand_field.mln"); }
+    fn forward_reference() { check("functions/23_forward_reference.mln"); }
 
     #[test]
-    fn trailing_commas() { check("44_trailing_commas.mln"); }
+    fn call() { check("functions/31_call.mln"); }
 
     #[test]
-    fn lvalue_paths() { check("45_lvalue_paths.mln"); }
+    fn recursive() { check("functions/32_recursive.mln"); }
 
     #[test]
-    fn local_struct_scope() { check("46_local_struct_scope.mln"); }
+    fn call_edge() { check("functions/36_call_edge.mln"); }
 
     #[test]
-    fn braceless_if() { check("47_braceless_if.mln"); }
+    fn neg_no_main() { check("functions/neg_07_no_main.mln"); }
 
     #[test]
-    fn generics() { check("48_generics.mln"); }
+    fn neg_stack_single_frame() { check("functions/neg_14_stack_single_frame.mln"); }
 
     #[test]
-    fn generic_higher_order() { check("49_generic_higher_order.mln"); }
+    fn neg_stack_outer_frame() { check("functions/neg_15_stack_outer_frame.mln"); }
 
     #[test]
-    fn generic_consistency() { check("50_generic_consistency.mln"); }
+    fn neg_stack_deep_chain() { check("functions/neg_16_stack_deep_chain.mln"); }
 
     #[test]
-    fn generic_nested_types() { check("51_generic_nested_types.mln"); }
+    fn neg_stack_recursive() { check("functions/neg_17_stack_recursive.mln"); }
 
     #[test]
-    fn let_polymorphism() { check("52_let_polymorphism.mln"); }
+    fn neg_stack_closure_frame() { check("functions/neg_18_stack_closure_frame.mln"); }
 
+    // ── Closures ──────────────────────────────────────────────────────────────
+
     #[test]
-    fn generic_struct() { check("53_generic_struct.mln"); }
+    fn closure() { check("closures/33_closure.mln"); }
 
     #[test]
-    fn generic_enum_user() { check("54_generic_enum_user.mln"); }
+    fn closure_edge() { check("closures/37_closure_edge.mln"); }
 
     #[test]
-    fn generic_nested() { check("55_generic_nested.mln"); }
+    fn closures_advanced() { check("closures/42_closures_advanced.mln"); }
+
+    // ── Structs ───────────────────────────────────────────────────────────────
 
     #[test]
-    fn generic_body_annotation() { check("56_generic_body_annotation.mln"); }
+    fn struct_literal() { check("structs/24_struct_literal.mln"); }
 
     #[test]
-    fn generic_enum_infer_context() { check("57_generic_enum_infer_context.mln"); }
+    fn field_access() { check("structs/26_field_access.mln"); }
 
     #[test]
-    fn aspect_dispatch() { check("58_aspect_dispatch.mln"); }
+    fn method_call_builtin() { check("structs/27_method_call_builtin.mln"); }
 
     #[test]
-    fn iterable_aspect() { check("59_iterable_aspect.mln"); }
+    fn method_call_user() { check("structs/28_method_call_user.mln"); }
 
     #[test]
-    fn from_cast() { check("60_from_cast.mln"); }
+    fn assign_index() { check("structs/29_assign_index.mln"); }
 
     #[test]
-    fn propagate_error_coercion() { check("61_propagate_error_coercion.mln"); }
+    fn assign_field() { check("structs/30_assign_field.mln"); }
 
-    // ── Integration tests ─────────────────────────────────────────────────────
+    #[test]
+    fn method_chain() { check("structs/40_method_chain.mln"); }
 
     #[test]
-    fn int_generic_option_chain() { check("int_03_generic_option_chain.mln"); }
+    fn nested_struct() { check("structs/41_nested_struct.mln"); }
 
     #[test]
-    fn int_generic_algorithms() { check("int_04_generic_algorithms.mln"); }
+    fn shorthand_field() { check("structs/43_shorthand_field.mln"); }
 
     #[test]
-    fn int_generic_data_pipeline() { check("int_05_generic_data_pipeline.mln"); }
+    fn trailing_commas() { check("structs/44_trailing_commas.mln"); }
 
     #[test]
-    fn int_statistics() { check("int_01_statistics.mln"); }
+    fn lvalue_paths() { check("structs/45_lvalue_paths.mln"); }
 
     #[test]
-    fn int_battle() { check("int_02_battle.mln"); }
+    fn local_struct_scope() { check("structs/46_local_struct_scope.mln"); }
 
     #[test]
-    fn int_aspects() { check("int_03_aspects.mln"); }
+    fn neg_missing_field() { check("structs/neg_12_missing_field.mln"); }
 
+    // ── Enums ─────────────────────────────────────────────────────────────────
+
     #[test]
-    fn int_pipeline() { check("int_04_pipeline.mln"); }
+    fn enum_variant() { check("enums/11_enum_variant.mln"); }
 
     #[test]
-    fn int_aspects_combined() { check("int_05_aspects_combined.mln"); }
+    fn enum_with_fields() { check("enums/25_enum_with_fields.mln"); }
 
     #[test]
-    fn int_display() { check("int_06_display.mln"); }
+    fn perhaps() { check("enums/39_perhaps.mln"); }
 
-    // ── Edge-case tests ───────────────────────────────────────────────────────
+    // ── Generics ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn iterable_edge_cases() { check("62_iterable_edge_cases.mln"); }
+    fn generics() { check("generics/48_generics.mln"); }
 
     #[test]
-    fn from_edge_cases() { check("63_from_edge_cases.mln"); }
+    fn generic_consistency() { check("generics/50_generic_consistency.mln"); }
 
     #[test]
-    fn propagate_error_edge_cases() { check("64_propagate_error_edge_cases.mln"); }
+    fn generic_nested_types() { check("generics/51_generic_nested_types.mln"); }
 
-    // ── Negative tests ────────────────────────────────────────────────────────
+    #[test]
+    fn let_polymorphism() { check("generics/52_let_polymorphism.mln"); }
 
     #[test]
-    fn neg_div_by_zero() { check("neg_01_div_by_zero.mln"); }
+    fn generic_struct() { check("generics/53_generic_struct.mln"); }
 
     #[test]
-    fn neg_rem_by_zero() { check("neg_02_rem_by_zero.mln"); }
+    fn generic_enum_user() { check("generics/54_generic_enum_user.mln"); }
 
     #[test]
-    fn neg_array_oob() { check("neg_03_array_oob.mln"); }
+    fn generic_nested() { check("generics/55_generic_nested.mln"); }
 
     #[test]
-    fn neg_array_negative_index() { check("neg_04_array_negative_index.mln"); }
+    fn generic_body_annotation() { check("generics/56_generic_body_annotation.mln"); }
 
     #[test]
-    fn neg_array_index_at_len() { check("neg_05_array_index_at_len.mln"); }
+    fn generic_enum_infer_context() { check("generics/57_generic_enum_infer_context.mln"); }
 
     #[test]
-    fn neg_no_arm() { check("neg_06_no_arm.mln"); }
+    fn neg_generic_type_conflict() { check("generics/neg_21_generic_type_conflict.mln"); }
 
+    // ── Aspects ───────────────────────────────────────────────────────────────
+
     #[test]
-    fn neg_no_main() { check("neg_07_no_main.mln"); }
+    fn aspect_dispatch() { check("aspects/58_aspect_dispatch.mln"); }
 
     #[test]
-    fn neg_cast_float_to_int() { check("neg_08_cast_float_to_int.mln"); }
+    fn iterable_aspect() { check("aspects/59_iterable_aspect.mln"); }
 
     #[test]
-    fn neg_tuple_oob() { check("neg_09_tuple_oob.mln"); }
+    fn iterable_edge_cases() { check("aspects/62_iterable_edge_cases.mln"); }
 
     #[test]
-    fn neg_and_rhs_evaluated() { check("neg_10_and_rhs_evaluated.mln"); }
+    fn neg_missing_aspect_method() { check("aspects/neg_22_missing_aspect_method.mln"); }
 
+    // ── Error handling ────────────────────────────────────────────────────────
+
     #[test]
-    fn neg_or_rhs_evaluated() { check("neg_11_or_rhs_evaluated.mln"); }
+    fn propagate_error() { check("error_handling/34_propagate_error.mln"); }
 
     #[test]
-    fn neg_missing_field() { check("neg_12_missing_field.mln"); }
+    fn propagate_error_coercion() { check("error_handling/61_propagate_error_coercion.mln"); }
 
     #[test]
-    fn neg_nonexhaustive_match() { check("neg_13_nonexhaustive_match.mln"); }
+    fn propagate_error_edge_cases() { check("error_handling/64_propagate_error_edge_cases.mln"); }
 
-    // ── Stack trace tests ─────────────────────────────────────────────────────
+    // ── Builtins ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn neg_stack_single_frame() { check("neg_14_stack_single_frame.mln"); }
+    fn builtins() { check("builtins/38_builtins.mln"); }
+
+    // ── Integration ───────────────────────────────────────────────────────────
 
     #[test]
-    fn neg_stack_outer_frame() { check("neg_15_stack_outer_frame.mln"); }
+    fn int_statistics() { check("integration/int_01_statistics.mln"); }
 
     #[test]
-    fn neg_stack_deep_chain() { check("neg_16_stack_deep_chain.mln"); }
+    fn int_battle() { check("integration/int_02_battle.mln"); }
 
     #[test]
-    fn neg_stack_recursive() { check("neg_17_stack_recursive.mln"); }
+    fn int_aspects() { check("integration/int_03_aspects.mln"); }
 
     #[test]
-    fn neg_stack_closure_frame() { check("neg_18_stack_closure_frame.mln"); }
+    fn int_generic_option_chain() { check("integration/int_03_generic_option_chain.mln"); }
 
     #[test]
-    fn neg_braceless_if_dangling_else() { check("neg_19_braceless_if_dangling_else.mln"); }
+    fn int_pipeline() { check("integration/int_04_pipeline.mln"); }
 
     #[test]
-    fn neg_braceless_if_mixed_arms() { check("neg_20_braceless_if_mixed_arms.mln"); }
+    fn int_generic_algorithms() { check("integration/int_04_generic_algorithms.mln"); }
 
     #[test]
-    fn neg_generic_type_conflict() { check("neg_21_generic_type_conflict.mln"); }
+    fn int_aspects_combined() { check("integration/int_05_aspects_combined.mln"); }
 
     #[test]
-    fn neg_missing_aspect_method() { check("neg_22_missing_aspect_method.mln"); }
+    fn int_generic_data_pipeline() { check("integration/int_05_generic_data_pipeline.mln"); }
 
     #[test]
-    fn neg_cast_no_from() { check("neg_23_cast_no_from.mln"); }
+    fn int_display() { check("integration/int_06_display.mln"); }
 }

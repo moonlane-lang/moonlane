@@ -1,5 +1,6 @@
 /// Integration tests for the full typechecker pipeline.
 /// Tests the complete flow from parsing through type checking.
+/// Source files are organized by language feature under tests/typechecking/sources/<feature>/.
 
 #[cfg(test)]
 mod tests {
@@ -72,533 +73,331 @@ mod tests {
         concat!(env!("CARGO_MANIFEST_DIR"), "/tests/typechecking/sources").to_string()
     }
 
-    // ── Stage 1 positive tests ────────────────────────────────────────────────
-
-    #[test]
-    fn stage1_literals() {
-        check_file(&format!("{}/01_literals.mln", test_dir()));
-    }
-
-    #[test]
-    fn stage1_annotations() {
-        check_file(&format!("{}/02_annotations.mln", test_dir()));
+    fn check(path: &str) {
+        check_file(&format!("{}/{path}", test_dir()));
     }
 
-    #[test]
-    fn stage1_arithmetic() {
-        check_file(&format!("{}/03_arithmetic.mln", test_dir()));
-    }
+    // ── Literals ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn stage1_mut_bindings() {
-        check_file(&format!("{}/08_mut_bindings.mln", test_dir()));
-    }
+    fn stage1_literals() { check("literals/01_literals.mln"); }
 
-    // ── Stage 1 negative tests ────────────────────────────────────────────────
+    // ── Arithmetic ────────────────────────────────────────────────────────────
 
     #[test]
-    fn stage1_neg_type_mismatch() {
-        check_file(&format!("{}/neg_01_type_mismatch.mln", test_dir()));
-    }
+    fn stage1_arithmetic() { check("arithmetic/03_arithmetic.mln"); }
 
     #[test]
-    fn stage1_neg_annotation_required() {
-        check_file(&format!("{}/neg_02_annotation_required.mln", test_dir()));
-    }
+    fn stage1_chained_arithmetic() { check("arithmetic/09_chained_arithmetic.mln"); }
 
     #[test]
-    fn stage1_neg_arithmetic_on_bool() {
-        check_file(&format!("{}/neg_03_arithmetic_on_bool.mln", test_dir()));
-    }
+    fn stage1_neg_arithmetic_on_bool() { check("arithmetic/neg_03_arithmetic_on_bool.mln"); }
 
     #[test]
-    fn stage1_neg_neg_on_bool() {
-        check_file(&format!("{}/neg_04_neg_on_bool.mln", test_dir()));
-    }
+    fn stage1_neg_neg_on_bool() { check("arithmetic/neg_04_neg_on_bool.mln"); }
 
     #[test]
-    fn stage1_neg_ordering_on_bool() {
-        check_file(&format!("{}/neg_05_ordering_on_bool.mln", test_dir()));
-    }
+    fn stage1_neg_ordering_on_bool() { check("arithmetic/neg_05_ordering_on_bool.mln"); }
 
-    // ── Stage 2 positive tests ────────────────────────────────────────────────
+    // ── Functions ─────────────────────────────────────────────────────────────
 
     #[test]
-    fn stage2_if_stmt() {
-        check_file(&format!("{}/stage2_01_if_stmt.mln", test_dir()));
-    }
+    fn stage1_annotations() { check("functions/02_annotations.mln"); }
 
     #[test]
-    fn stage2_while_stmt() {
-        check_file(&format!("{}/stage2_02_while_stmt.mln", test_dir()));
-    }
+    fn stage3_function_calls() { check("functions/04_functions.mln"); }
 
     #[test]
-    fn stage2_if_expr() {
-        check_file(&format!("{}/stage2_03_if_expr.mln", test_dir()));
-    }
+    fn stage3_nested_calls() { check("functions/05_nested_calls.mln"); }
 
     #[test]
-    fn stage2_else_if() {
-        check_file(&format!("{}/stage2_04_else_if.mln", test_dir()));
-    }
+    fn stage3_let_polymorphism() { check("functions/06_let_polymorphism.mln"); }
 
-    // ── Stage 2 negative tests ────────────────────────────────────────────────
-
     #[test]
-    fn stage2_neg_non_bool_condition() {
-        check_file(&format!("{}/stage2_neg_01_non_bool_condition.mln", test_dir()));
-    }
+    fn stage3_forward_reference() { check("functions/07_forward_reference.mln"); }
 
-    // ── Stage 3 positive tests ────────────────────────────────────────────────
-
     #[test]
-    fn stage3_function_calls() {
-        check_file(&format!("{}/04_functions.mln", test_dir()));
-    }
+    fn stage1_mut_bindings() { check("functions/08_mut_bindings.mln"); }
 
     #[test]
-    fn stage3_nested_calls() {
-        check_file(&format!("{}/05_nested_calls.mln", test_dir()));
-    }
+    fn stage1_scoping() { check("functions/10_scoping.mln"); }
 
     #[test]
-    fn stage3_let_polymorphism() {
-        check_file(&format!("{}/06_let_polymorphism.mln", test_dir()));
-    }
+    fn stage1_neg_type_mismatch() { check("functions/neg_01_type_mismatch.mln"); }
 
     #[test]
-    fn stage3_forward_reference() {
-        check_file(&format!("{}/07_forward_reference.mln", test_dir()));
-    }
+    fn stage1_neg_annotation_required() { check("functions/neg_02_annotation_required.mln"); }
 
     #[test]
-    fn stage3_tuples() {
-        check_file(&format!("{}/stage3_01_tuples.mln", test_dir()));
-    }
+    fn stage4_assign() { check("functions/stage4_01_assign.mln"); }
 
     #[test]
-    fn stage3_arrays() {
-        check_file(&format!("{}/stage3_02_arrays.mln", test_dir()));
-    }
+    fn stage4_return_diverges() { check("functions/stage4_02_return_diverges.mln"); }
 
-    // ── Stage 3 negative tests ────────────────────────────────────────────────
+    #[test]
+    fn stage4_index_assign() { check("functions/stage4_03_index_assign.mln"); }
 
     #[test]
-    fn stage3_neg_arity_mismatch() {
-        check_file(&format!("{}/stage3_neg_01_arity_mismatch.mln", test_dir()));
-    }
+    fn stage4_neg_assign_to_let() { check("functions/stage4_neg_01_assign_to_let.mln"); }
 
     #[test]
-    fn stage3_neg_index_non_array() {
-        check_file(&format!("{}/stage3_neg_02_index_non_array.mln", test_dir()));
-    }
+    fn stage4_neg_assign_undeclared() { check("functions/stage4_neg_02_assign_undeclared.mln"); }
 
     #[test]
-    fn stage3_neg_non_function_callee() {
-        check_file(&format!("{}/stage3_neg_03_non_function_callee.mln", test_dir()));
-    }
+    fn stage4_neg_assign_type_mismatch() { check("functions/stage4_neg_03_assign_type_mismatch.mln"); }
 
     #[test]
-    fn stage3_neg_empty_array_no_annotation() {
-        check_file(&format!("{}/stage3_neg_04_empty_array_no_annotation.mln", test_dir()));
-    }
+    fn stage4_neg_index_assign_type_mismatch() { check("functions/stage4_neg_04_index_assign_type_mismatch.mln"); }
 
     #[test]
-    fn stage3_neg_array_element_mismatch() {
-        check_file(&format!("{}/stage3_neg_05_array_element_mismatch.mln", test_dir()));
-    }
+    fn stage7_return_type_propagation() { check("functions/stage7_01_return_type_propagation.mln"); }
 
     #[test]
-    fn stage3_neg_non_int_index() {
-        check_file(&format!("{}/stage3_neg_06_non_int_index.mln", test_dir()));
-    }
+    fn stage7_match_arm_blocks() { check("functions/stage7_02_match_arm_blocks.mln"); }
 
-    // ── Stage 4 positive tests ────────────────────────────────────────────────
+    // ── Control flow ──────────────────────────────────────────────────────────
 
     #[test]
-    fn stage4_if_as_block_tail() {
-        check_file(&format!("{}/stage3_03_if_as_block_tail.mln", test_dir()));
-    }
+    fn stage2_if_stmt() { check("control_flow/stage2_01_if_stmt.mln"); }
 
     #[test]
-    fn stage4_assign() {
-        check_file(&format!("{}/stage4_01_assign.mln", test_dir()));
-    }
+    fn stage2_while_stmt() { check("control_flow/stage2_02_while_stmt.mln"); }
 
     #[test]
-    fn stage4_return_diverges() {
-        check_file(&format!("{}/stage4_02_return_diverges.mln", test_dir()));
-    }
+    fn stage2_if_expr() { check("control_flow/stage2_03_if_expr.mln"); }
 
     #[test]
-    fn stage4_index_assign() {
-        check_file(&format!("{}/stage4_03_index_assign.mln", test_dir()));
-    }
+    fn stage2_else_if() { check("control_flow/stage2_04_else_if.mln"); }
 
-    // ── Stage 4 negative tests ────────────────────────────────────────────────
+    #[test]
+    fn stage2_neg_non_bool_condition() { check("control_flow/stage2_neg_01_non_bool_condition.mln"); }
 
     #[test]
-    fn stage4_neg_if_no_else_non_unit() {
-        check_file(&format!("{}/stage3_neg_07_if_no_else_non_unit.mln", test_dir()));
-    }
+    fn stage6_for_loops() { check("control_flow/stage6_02_for_loops.mln"); }
 
     #[test]
-    fn stage4_neg_assign_to_let() {
-        check_file(&format!("{}/stage4_neg_01_assign_to_let.mln", test_dir()));
-    }
+    fn stage6_loop_expr() { check("control_flow/stage6_03_loop_expr.mln"); }
 
     #[test]
-    fn stage4_neg_assign_undeclared() {
-        check_file(&format!("{}/stage4_neg_02_assign_undeclared.mln", test_dir()));
-    }
+    fn stage6_nested_loop_break() { check("control_flow/stage6_09_nested_loop_break.mln"); }
 
     #[test]
-    fn stage4_neg_assign_type_mismatch() {
-        check_file(&format!("{}/stage4_neg_03_assign_type_mismatch.mln", test_dir()));
-    }
+    fn stage6_neg_for_in_non_iterable() { check("control_flow/stage6_neg_01_for_in_non_iterable.mln"); }
 
     #[test]
-    fn stage4_neg_index_assign_type_mismatch() {
-        check_file(&format!("{}/stage4_neg_04_index_assign_type_mismatch.mln", test_dir()));
-    }
+    fn stage6_neg_loop_break_mismatch() { check("control_flow/stage6_neg_02_loop_break_mismatch.mln"); }
 
-    // ── Stage 5 positive tests ────────────────────────────────────────────────
+    // ── Types (arrays, tuples, casts) ─────────────────────────────────────────
 
     #[test]
-    fn stage5_structs_and_methods() {
-        check_file(&format!("{}/stage5_01_structs_and_methods.mln", test_dir()));
-    }
+    fn stage3_tuples() { check("types/stage3_01_tuples.mln"); }
 
     #[test]
-    fn stage5_builtin_type_methods() {
-        check_file(&format!("{}/stage5_02_builtin_type_methods.mln", test_dir()));
-    }
+    fn stage3_arrays() { check("types/stage3_02_arrays.mln"); }
 
-    // ── Stage 5 negative tests ────────────────────────────────────────────────
+    #[test]
+    fn stage4_if_as_block_tail() { check("types/stage3_03_if_as_block_tail.mln"); }
 
     #[test]
-    fn stage5_neg_struct_field_type_mismatch() {
-        check_file(&format!("{}/stage5_neg_01_struct_field_type_mismatch.mln", test_dir()));
-    }
+    fn stage3_neg_arity_mismatch() { check("types/stage3_neg_01_arity_mismatch.mln"); }
 
     #[test]
-    fn stage5_neg_unknown_field() {
-        check_file(&format!("{}/stage5_neg_02_unknown_field.mln", test_dir()));
-    }
+    fn stage3_neg_index_non_array() { check("types/stage3_neg_02_index_non_array.mln"); }
 
     #[test]
-    fn stage5_neg_method_arg_type_mismatch() {
-        check_file(&format!("{}/stage5_neg_03_method_arg_type_mismatch.mln", test_dir()));
-    }
+    fn stage3_neg_non_function_callee() { check("types/stage3_neg_03_non_function_callee.mln"); }
 
     #[test]
-    fn stage5_neg_unknown_method() {
-        check_file(&format!("{}/stage5_neg_04_unknown_method.mln", test_dir()));
-    }
+    fn stage3_neg_empty_array_no_annotation() { check("types/stage3_neg_04_empty_array_no_annotation.mln"); }
 
     #[test]
-    fn stage5_neg_field_access_non_struct() {
-        check_file(&format!("{}/stage5_neg_05_field_access_non_struct.mln", test_dir()));
-    }
+    fn stage3_neg_array_element_mismatch() { check("types/stage3_neg_05_array_element_mismatch.mln"); }
 
     #[test]
-    fn stage5_neg_field_access_unknown_field() {
-        check_file(&format!("{}/stage5_neg_06_field_access_unknown_field.mln", test_dir()));
-    }
+    fn stage3_neg_non_int_index() { check("types/stage3_neg_06_non_int_index.mln"); }
 
     #[test]
-    fn stage5_neg_struct_literal_missing_field() {
-        check_file(&format!("{}/stage5_neg_07_struct_literal_missing_field.mln", test_dir()));
-    }
+    fn stage4_neg_if_no_else_non_unit() { check("types/stage3_neg_07_if_no_else_non_unit.mln"); }
 
-    // ── Stage 6 tests ─────────────────────────────────────────────────────────
+    #[test]
+    fn stage6_tuple_access() { check("types/stage6_04_tuple_access.mln"); }
 
     #[test]
-    fn stage6_builtins() {
-        check_file(&format!("{}/stage6_01_builtins.mln", test_dir()));
-    }
+    fn stage6_neg_tuple_access_oob() { check("types/stage6_neg_03_tuple_access_oob.mln"); }
 
     #[test]
-    fn stage6_for_loops() {
-        check_file(&format!("{}/stage6_02_for_loops.mln", test_dir()));
-    }
+    fn stage6_cast() { check("types/stage6_06_cast.mln"); }
 
     #[test]
-    fn stage6_loop_expr() {
-        check_file(&format!("{}/stage6_03_loop_expr.mln", test_dir()));
-    }
+    fn stage6_neg_cast_string() { check("types/stage6_neg_04_cast_string.mln"); }
 
     #[test]
-    fn stage6_tuple_access() {
-        check_file(&format!("{}/stage6_04_tuple_access.mln", test_dir()));
-    }
+    fn stage6_neg_cast_bool() { check("types/stage6_neg_10_cast_bool.mln"); }
 
     #[test]
-    fn stage6_cast() {
-        check_file(&format!("{}/stage6_06_cast.mln", test_dir()));
-    }
+    fn stage6_neg_cast_float_to_int() { check("types/stage6_neg_11_cast_float_to_int.mln"); }
 
+    // ── Structs ───────────────────────────────────────────────────────────────
+
     #[test]
-    fn stage6_enums() {
-        check_file(&format!("{}/stage6_08_enums.mln", test_dir()));
-    }
+    fn stage5_structs_and_methods() { check("structs/stage5_01_structs_and_methods.mln"); }
 
     #[test]
-    fn stage6_error_propagation() {
-        check_file(&format!("{}/stage6_07_error_propagation.mln", test_dir()));
-    }
+    fn stage5_builtin_type_methods() { check("structs/stage5_02_builtin_type_methods.mln"); }
 
     #[test]
-    fn stage6_closures() {
-        check_file(&format!("{}/stage6_05_closures.mln", test_dir()));
-    }
+    fn stage5_neg_struct_field_type_mismatch() { check("structs/stage5_neg_01_struct_field_type_mismatch.mln"); }
 
-    // ── Stage 6 negative tests ────────────────────────────────────────────────
+    #[test]
+    fn stage5_neg_unknown_field() { check("structs/stage5_neg_02_unknown_field.mln"); }
 
     #[test]
-    fn stage6_nested_loop_break() {
-        check_file(&format!("{}/stage6_09_nested_loop_break.mln", test_dir()));
-    }
+    fn stage5_neg_method_arg_type_mismatch() { check("structs/stage5_neg_03_method_arg_type_mismatch.mln"); }
 
     #[test]
-    fn stage6_enum_literal_types() {
-        check_file(&format!("{}/stage6_10_enum_literal_types.mln", test_dir()));
-    }
+    fn stage5_neg_unknown_method() { check("structs/stage5_neg_04_unknown_method.mln"); }
 
     #[test]
-    fn stage6_neg_for_in_non_iterable() {
-        check_file(&format!("{}/stage6_neg_01_for_in_non_iterable.mln", test_dir()));
-    }
+    fn stage5_neg_field_access_non_struct() { check("structs/stage5_neg_05_field_access_non_struct.mln"); }
 
     #[test]
-    fn stage6_neg_loop_break_mismatch() {
-        check_file(&format!("{}/stage6_neg_02_loop_break_mismatch.mln", test_dir()));
-    }
+    fn stage5_neg_field_access_unknown_field() { check("structs/stage5_neg_06_field_access_unknown_field.mln"); }
 
     #[test]
-    fn stage6_neg_tuple_access_oob() {
-        check_file(&format!("{}/stage6_neg_03_tuple_access_oob.mln", test_dir()));
-    }
+    fn stage5_neg_struct_literal_missing_field() { check("structs/stage5_neg_07_struct_literal_missing_field.mln"); }
 
     #[test]
-    fn stage6_neg_cast_string() {
-        check_file(&format!("{}/stage6_neg_04_cast_string.mln", test_dir()));
-    }
+    fn stage9_local_struct_scope() { check("structs/stage9_01_local_struct_scope.mln"); }
 
     #[test]
-    fn stage6_neg_cast_bool() {
-        check_file(&format!("{}/stage6_neg_10_cast_bool.mln", test_dir()));
-    }
+    fn stage9_neg_local_struct_not_exported() { check("structs/stage9_neg_01_local_struct_not_exported.mln"); }
 
+    // ── Enums ─────────────────────────────────────────────────────────────────
+
     #[test]
-    fn stage6_neg_cast_float_to_int() {
-        check_file(&format!("{}/stage6_neg_11_cast_float_to_int.mln", test_dir()));
-    }
+    fn stage6_enums() { check("enums/stage6_08_enums.mln"); }
 
     #[test]
-    fn stage6_neg_match_arm_mismatch() {
-        check_file(&format!("{}/stage6_neg_06_match_arm_mismatch.mln", test_dir()));
-    }
+    fn stage6_enum_literal_types() { check("enums/stage6_10_enum_literal_types.mln"); }
 
     #[test]
-    fn stage6_neg_error_propagation_non_result() {
-        check_file(&format!("{}/stage6_neg_05_error_propagation_non_result.mln", test_dir()));
-    }
+    fn stage6_neg_match_arm_mismatch() { check("enums/stage6_neg_06_match_arm_mismatch.mln"); }
 
     #[test]
-    fn stage6_neg_builtin_wrong_arg_type() {
-        check_file(&format!("{}/stage6_neg_07_builtin_wrong_arg_type.mln", test_dir()));
-    }
+    fn stage6_neg_enum_unknown_variant() { check("enums/stage6_neg_08_enum_unknown_variant.mln"); }
 
     #[test]
-    fn stage6_neg_enum_unknown_variant() {
-        check_file(&format!("{}/stage6_neg_08_enum_unknown_variant.mln", test_dir()));
-    }
+    fn stage6_neg_enum_field_type_mismatch() { check("enums/stage6_neg_09_enum_field_type_mismatch.mln"); }
+
+    // ── Closures ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn stage6_neg_enum_field_type_mismatch() {
-        check_file(&format!("{}/stage6_neg_09_enum_field_type_mismatch.mln", test_dir()));
-    }
+    fn stage6_closures() { check("closures/stage6_05_closures.mln"); }
 
-    // ── Stage 7 positive tests ────────────────────────────────────────────────
+    // ── Error handling ────────────────────────────────────────────────────────
 
     #[test]
-    fn stage7_return_type_propagation() {
-        check_file(&format!("{}/stage7_01_return_type_propagation.mln", test_dir()));
-    }
+    fn stage6_error_propagation() { check("error_handling/stage6_07_error_propagation.mln"); }
 
     #[test]
-    fn stage7_match_arm_blocks() {
-        check_file(&format!("{}/stage7_02_match_arm_blocks.mln", test_dir()));
-    }
+    fn stage6_neg_error_propagation_non_result() { check("error_handling/stage6_neg_05_error_propagation_non_result.mln"); }
 
-    // ── Stage 8: assert / dbg / numeric print builtins ────────────────────────
+    // ── Builtins and type ascription ──────────────────────────────────────────
 
     #[test]
-    fn stage8_assert() {
-        check_file(&format!("{}/stage8_01_assert.mln", test_dir()));
-    }
+    fn stage6_builtins() { check("builtins/stage6_01_builtins.mln"); }
 
     #[test]
-    fn stage8_dbg() {
-        check_file(&format!("{}/stage8_02_dbg.mln", test_dir()));
-    }
+    fn stage6_neg_builtin_wrong_arg_type() { check("builtins/stage6_neg_07_builtin_wrong_arg_type.mln"); }
 
     #[test]
-    fn stage8_print_numeric() {
-        check_file(&format!("{}/stage8_03_print_numeric.mln", test_dir()));
-    }
+    fn stage8_assert() { check("builtins/stage8_01_assert.mln"); }
 
     #[test]
-    fn stage8_neg_assert_non_bool() {
-        check_file(&format!("{}/stage8_neg_01_assert_non_bool.mln", test_dir()));
-    }
+    fn stage8_dbg() { check("builtins/stage8_02_dbg.mln"); }
 
     #[test]
-    fn stage8_type_ascription() {
-        check_file(&format!("{}/stage8_04_type_ascription.mln", test_dir()));
-    }
+    fn stage8_print_numeric() { check("builtins/stage8_03_print_numeric.mln"); }
 
     #[test]
-    fn stage8_neg_ascribe_type_mismatch() {
-        check_file(&format!("{}/stage8_neg_02_ascribe_type_mismatch.mln", test_dir()));
-    }
+    fn stage8_type_ascription() { check("builtins/stage8_04_type_ascription.mln"); }
 
     #[test]
-    fn stage8_neg_ascribe_bool_as_int() {
-        check_file(&format!("{}/stage8_neg_03_ascribe_bool_as_int.mln", test_dir()));
-    }
+    fn stage8_ascription_match_arm() { check("builtins/stage8_05_ascription_match_arm.mln"); }
 
     #[test]
-    fn stage8_neg_ascribe_wrong_struct() {
-        check_file(&format!("{}/stage8_neg_04_ascribe_wrong_struct.mln", test_dir()));
-    }
+    fn stage8_ascription_match_arm_bare() { check("builtins/stage8_05_ascription_match_arm_bare.mln"); }
 
-    // ── Stage 8 showcase: ascription where let binding is the inferior alternative ──
-
     #[test]
-    fn stage8_ascription_match_arm() {
-        check_file(&format!("{}/stage8_05_ascription_match_arm.mln", test_dir()));
-    }
+    fn stage8_ascription_two_args() { check("builtins/stage8_06_ascription_two_args.mln"); }
 
     #[test]
-    fn stage8_ascription_match_arm_bare() {
-        check_file(&format!("{}/stage8_05_ascription_match_arm_bare.mln", test_dir()));
-    }
+    fn stage8_ascription_two_args_bare() { check("builtins/stage8_06_ascription_two_args_bare.mln"); }
 
     #[test]
-    fn stage8_ascription_two_args() {
-        check_file(&format!("{}/stage8_06_ascription_two_args.mln", test_dir()));
-    }
+    fn stage8_ascription_nope_arg() { check("builtins/stage8_07_ascription_nope_arg.mln"); }
 
     #[test]
-    fn stage8_ascription_two_args_bare() {
-        check_file(&format!("{}/stage8_06_ascription_two_args_bare.mln", test_dir()));
-    }
+    fn stage8_ascription_nope_arg_bare() { check("builtins/stage8_07_ascription_nope_arg_bare.mln"); }
 
     #[test]
-    fn stage8_ascription_nope_arg() {
-        check_file(&format!("{}/stage8_07_ascription_nope_arg.mln", test_dir()));
-    }
+    fn stage8_neg_assert_non_bool() { check("builtins/stage8_neg_01_assert_non_bool.mln"); }
 
     #[test]
-    fn stage8_ascription_nope_arg_bare() {
-        check_file(&format!("{}/stage8_07_ascription_nope_arg_bare.mln", test_dir()));
-    }
-
-    // ── Stage 9: local struct scope ───────────────────────────────────────────
+    fn stage8_neg_ascribe_type_mismatch() { check("builtins/stage8_neg_02_ascribe_type_mismatch.mln"); }
 
     #[test]
-    fn stage9_local_struct_scope() {
-        check_file(&format!("{}/stage9_01_local_struct_scope.mln", test_dir()));
-    }
+    fn stage8_neg_ascribe_bool_as_int() { check("builtins/stage8_neg_03_ascribe_bool_as_int.mln"); }
 
     #[test]
-    fn stage9_neg_local_struct_not_exported() {
-        check_file(&format!("{}/stage9_neg_01_local_struct_not_exported.mln", test_dir()));
-    }
+    fn stage8_neg_ascribe_wrong_struct() { check("builtins/stage8_neg_04_ascribe_wrong_struct.mln"); }
 
-    // ── Stage 10: generics ────────────────────────────────────────────────────
+    // ── Generics ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn stage10_generic_function() {
-        check_file(&format!("{}/stage10_01_generic_function.mln", test_dir()));
-    }
+    fn stage10_generic_function() { check("generics/stage10_01_generic_function.mln"); }
 
     #[test]
-    fn stage10_type_param_multiple_uses() {
-        check_file(&format!("{}/stage10_02_type_param_multiple_uses.mln", test_dir()));
-    }
+    fn stage10_type_param_multiple_uses() { check("generics/stage10_02_type_param_multiple_uses.mln"); }
 
     #[test]
-    fn stage10_generic_return_tuple() {
-        check_file(&format!("{}/stage10_03_generic_return_tuple.mln", test_dir()));
-    }
+    fn stage10_generic_return_tuple() { check("generics/stage10_03_generic_return_tuple.mln"); }
 
     #[test]
-    fn stage10_generic_higher_order() {
-        check_file(&format!("{}/stage10_04_generic_higher_order.mln", test_dir()));
-    }
+    fn stage10_generic_higher_order() { check("generics/stage10_04_generic_higher_order.mln"); }
 
     #[test]
-    fn stage10_generic_nested_types() {
-        check_file(&format!("{}/stage10_05_generic_nested_types.mln", test_dir()));
-    }
+    fn stage10_generic_nested_types() { check("generics/stage10_05_generic_nested_types.mln"); }
 
-    // ── Stage 10 negative tests ───────────────────────────────────────────────
-
     #[test]
-    fn stage10_neg_type_param_conflict() {
-        check_file(&format!("{}/stage10_neg_01_type_param_conflict.mln", test_dir()));
-    }
+    fn stage10_neg_type_param_conflict() { check("generics/stage10_neg_01_type_param_conflict.mln"); }
 
     #[test]
-    fn stage10_neg_return_type_conflict() {
-        check_file(&format!("{}/stage10_neg_02_return_type_conflict.mln", test_dir()));
-    }
+    fn stage10_neg_return_type_conflict() { check("generics/stage10_neg_02_return_type_conflict.mln"); }
 
     #[test]
-    fn stage10_let_polymorphism() {
-        check_file(&format!("{}/limit_02_let_closure_mono.mln", test_dir()));
-    }
+    fn stage11_generic_struct_basic() { check("generics/stage11_01_generic_struct_basic.mln"); }
 
-    // ── Stage 11: generic structs ─────────────────────────────────────────────
-
     #[test]
-    fn stage11_generic_struct_basic() {
-        check_file(&format!("{}/stage11_01_generic_struct_basic.mln", test_dir()));
-    }
+    fn stage11_generic_struct_two_params() { check("generics/stage11_02_generic_struct_two_params.mln"); }
 
     #[test]
-    fn stage11_generic_struct_two_params() {
-        check_file(&format!("{}/stage11_02_generic_struct_two_params.mln", test_dir()));
-    }
+    fn stage11_generic_enum_user() { check("generics/stage11_03_generic_enum_user.mln"); }
 
     #[test]
-    fn stage11_generic_enum_user() {
-        check_file(&format!("{}/stage11_03_generic_enum_user.mln", test_dir()));
-    }
+    fn stage11_generic_nested() { check("generics/stage11_04_generic_nested.mln"); }
 
     #[test]
-    fn stage11_generic_nested() {
-        check_file(&format!("{}/stage11_04_generic_nested.mln", test_dir()));
-    }
+    fn stage11_neg_generic_struct_field_conflict() { check("generics/stage11_neg_01_generic_struct_field_conflict.mln"); }
 
-    #[test]
-    fn stage11_neg_generic_struct_field_conflict() {
-        check_file(&format!("{}/stage11_neg_01_generic_struct_field_conflict.mln", test_dir()));
-    }
+    // ── Known limitations ─────────────────────────────────────────────────────
 
-    // ── Known-limitation tests ─────────────────────────────────────────────────
+    #[test]
+    fn limit_rank1_fn_arg() { check("generics/limit_01_rank1_fn_arg.mln"); }
 
     #[test]
-    fn limit_rank1_fn_arg() {
-        check_file(&format!("{}/limit_01_rank1_fn_arg.mln", test_dir()));
-    }
+    fn stage10_let_polymorphism() { check("generics/limit_02_let_closure_mono.mln"); }
 
     #[test]
-    fn limit_field_access_needs_annotation() {
-        check_file(&format!("{}/limit_03_field_access_needs_annotation.mln", test_dir()));
-    }
+    fn limit_field_access_needs_annotation() { check("generics/limit_03_field_access_needs_annotation.mln"); }
 }
