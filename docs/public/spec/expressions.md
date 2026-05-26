@@ -48,7 +48,7 @@ let desc: String = match shape {
 |---------|---------|---------|
 | Wildcard | `_` | anything, binds nothing |
 | Binding | `n` | anything, binds to `n` |
-| Literal | `0`, `"hi"`, `true`, `nope` | exact value |
+| Literal | `0`, `"hi"`, `true`, `None` | exact value |
 | Enum variant | `Direction::North` | unit variant |
 | Enum with fields | `Shape::Circle { radius }` | variant, binds fields |
 | Tuple | `(a, b)` | tuple, binds elements |

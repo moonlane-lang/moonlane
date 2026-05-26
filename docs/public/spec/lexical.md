@@ -28,7 +28,7 @@ By convention:
 ```
 and       as        break     continue  else      enum      false
 for       fun       if        impl      let       loop      match
-mut       nope      or        return    struct    aspect     true
+mut       or        return    struct    aspect     true
 use       where     while
 ```
 
@@ -60,7 +60,7 @@ Integer and float are distinct types and do not implicitly coerce.
 
 **Booleans:** `true`, `false`
 
-**Absence literal:** `nope`
+**Absence literal:** `None`
 
 ## Operators
 

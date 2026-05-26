@@ -5,7 +5,7 @@
 A panic is a hard, unrecoverable runtime error. It prints a message and exits the process with a non-zero status. Panics cannot be caught.
 
 Panics are triggered by:
-- `.yolo()` on `nope` or a `Result::Err`
+- `.yolo()` on `None` or a `Result::Err`
 - Out-of-bounds array access
 - Integer division by zero
 - `assert(false)` or `assert_msg(false, msg)`

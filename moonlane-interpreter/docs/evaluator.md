@@ -15,7 +15,7 @@ Entry point: `evaluator::evaluate(program: TypedProgram) -> Result<(), MoonlaneE
 
 The evaluator operates on the `TypedProgram` produced by `typechecker::check()`. It does not re-check types — if the evaluator panics on a type mismatch, that is a typechecker bug, not an evaluator limitation.
 
-Source: `src/evaluator/mod.rs`
+Source: `src/evaluator/` — split into `mod.rs` (core), `builtins.rs`, `call.rs`, `display.rs`, `lvalue.rs`, `pattern.rs`
 
 ---
 
@@ -49,7 +49,7 @@ pub enum Value {
 - Passing an array to a function gives the function its own copy; `array_push` inside the function does not mutate the caller's array.
 - `array_push` applied to the binding itself mutates through the `Rc<RefCell>` as expected.
 
-**`Value::Perhaps` and `Value::Result`** are the canonical runtime representations for the built-in `Perhaps<T>` and `Result<T,E>` types. All construction paths route through these variants — `Perhaps::Some { value: v }` struct literals produce `Value::Perhaps(Some(Box::new(v)))`, `nope` produces `Value::Perhaps(None)`, `Result::Ok { value: v }` produces `Value::Result(Ok(Box::new(v)))`, and `Result::Err { error: e }` produces `Value::Result(Err(Box::new(e)))`. Pattern matching and the `?` operator match against these dedicated variants, not `Value::Enum`.
+**`Value::Perhaps` and `Value::Result`** are the canonical runtime representations for the built-in `Perhaps<T>` and `Result<T,E>` types. All construction paths route through these variants — `Perhaps::Some { value: v }` struct literals produce `Value::Perhaps(Some(Box::new(v)))`, `None` produces `Value::Perhaps(None)`, `Result::Ok { value: v }` produces `Value::Result(Ok(Box::new(v)))`, and `Result::Err { error: e }` produces `Value::Result(Err(Box::new(e)))`. Pattern matching and the `?` operator match against these dedicated variants, not `Value::Enum`.
 
 ### Range representation
 

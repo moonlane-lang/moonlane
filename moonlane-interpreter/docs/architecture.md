@@ -47,6 +47,12 @@ tree-walk-interpreter/
     │   └── conversions.rs — type_expr_to_infer, infer_type_to_type, type_to_infer
     ├── typed_ast/         — typed AST node definitions
     ├── evaluator/         — tree-walking evaluator, environment, runtime values
+    │   ├── mod.rs         — core: Value, Signal, Environment, evaluate(), eval_block/stmt/expr
+    │   ├── builtins.rs    — register_builtins: all built-in function bindings
+    │   ├── call.rs        — call_function, call_function_mut_self
+    │   ├── display.rs     — format_float, value_to_display_string, format_value
+    │   ├── lvalue.rs      — eval_binop, apply_assign_op, lvalue path helpers
+    │   └── pattern.rs     — match_pattern
     └── error/             — unified error type covering all pipeline stages
 ```
 

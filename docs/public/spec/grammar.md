@@ -67,7 +67,7 @@ UnaryExpression         → ( "!" | "-" ) UnaryExpression | PostfixExpression
 PostfixExpression       → PrimaryExpression ( "(" Arguments? ")" | "." IDENTIFIER | "[" Expression "]" | "?" )*
 Arguments               → Expression ( "," Expression )* ","?
 
-PrimaryExpression  → INT | FLOAT | STRING | "true" | "false" | "nope" | "()"
+PrimaryExpression  → INT | FLOAT | STRING | "true" | "false" | "None" | "()"
                    | "(" Expression ( "," Expression )+ ")"   // tuple
                    | "(" Expression ")"
                    | "[" ( Expression ( "," Expression )* ","? )? "]"  // array literal
@@ -88,7 +88,7 @@ LoopExpression     → "loop" Block
 ClosureExpression  → "fun" "(" Params? ")" ( "->" Type )? Block
 
 Pattern            → "_"
-                   | "nope"
+                   | "None"
                    | IDENTIFIER
                    | "(" Pattern ( "," Pattern )* ")"          // tuple pattern
                    | IDENTIFIER "::" IDENTIFIER ( "{" PatternFields "}" )?
