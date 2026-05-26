@@ -146,7 +146,26 @@ Do not proceed to Step 5 until all integration tests pass.
 
 ---
 
-## Step 5 — Move carried-over issues to backlog
+## Step 5 — Bump the crate version in Cargo.toml
+
+Read the milestone version from the kickoff issue (e.g. `v0.4.2`). Strip the leading `v` to get the semver string (e.g. `0.4.2`).
+
+Open `moonlane-interpreter/Cargo.toml` and update the `version` field to match:
+```toml
+version = "0.4.2"
+```
+
+Commit the change on the sprint branch:
+```bash
+git add moonlane-interpreter/Cargo.toml
+git commit -m "chore(#<kickoff-issue-number>): bump crate version to <version>"
+```
+
+The crate version must match the milestone before the PR is opened.
+
+---
+
+## Step 6 — Move carried-over issues to backlog
 
 For each issue that is still open and was planned for this sprint:
 ```bash
@@ -157,13 +176,13 @@ gh issue edit <N> --repo moonlane-lang/moonlane \
 
 ---
 
-## Step 6 — Update the kickoff issue
+## Step 7 — Update the kickoff issue
 
 Edit the kickoff issue body to reflect what was actually completed vs. deferred (use checkboxes: `[x]` for done, `[ ]` for carried over). This is the factual record of the sprint.
 
 ---
 
-## Step 7 — Gather epic and spec notes
+## Step 8 — Gather epic and spec notes
 
 Epic progress — for each milestone touched this sprint:
 ```bash
@@ -177,7 +196,7 @@ git log main..HEAD --oneline -- docs/
 
 ---
 
-## Step 8 — Create the sprint review issue
+## Step 9 — Create the sprint review issue
 
 Use the **same milestone** as the kickoff issue:
 
@@ -228,7 +247,7 @@ Note the issue number returned — needed for the PR.
 
 ---
 
-## Step 9 — Open the pull request
+## Step 10 — Open the pull request
 
 ```bash
 gh pr create \
@@ -249,7 +268,7 @@ Both `Closes` lines are required — on merge, GitHub automatically closes both 
 
 ---
 
-## Step 10 — Hand off to user
+## Step 11 — Hand off to user
 
 > **Sprint $ARGUMENTS quality gate passed and PR is open.**
 >
@@ -270,7 +289,7 @@ The tag name must match the version in `docs/public/changelog.md`.
 
 ## Notes
 
-- Do not create the PR until every quality gate in Step 2 passes. This is enforced by the skill structure — Step 3 must be completed before Step 9.
+- Do not create the PR until every quality gate in Step 2 passes. This is enforced by the skill structure — Step 3 must be completed before Step 10.
 - Do not create the release tag — instruct the user to create it after merging. The tag must point to `main`.
 - A sprint with 0 completed issues still produces a review issue — record why in Completed.
 - If spec ambiguities surfaced (visible in Gate 5 or Spec Notes), prompt the user to open a `/new-rfc`.
