@@ -160,7 +160,7 @@ RFC-0009 states that `Perhaps`, `Result`, `Bool`, `Int`, `Float`, and `String` "
 
 **What actually gets special treatment in the interpreter.**
 
-A survey of the evaluator and typechecker reveals the full set of types and aspects that are hardcoded at the compiler level:
+A survey of the evaluator and typechecker reveals the full set of types and aspects that are hardcoded at the compiler level today:
 
 | Name | Kind | Special treatment |
 |---|---|---|
@@ -168,61 +168,138 @@ A survey of the evaluator and typechecker reveals the full set of types and aspe
 | `Result<T, E>` | enum | Dedicated `Value::Result` variant; `?` operator desugars to `Result::Err` propagation; pattern exhaustiveness hardcoded |
 | `Range` | struct | `..` operator produces `Range`; `for-in` loop has hardcoded `Range` iteration |
 | `RangeInclusive` | struct | `..=` operator produces `RangeInclusive`; `for-in` loop has hardcoded iteration |
-| `Display` | aspect | `print` / `println` builtins dispatch through `Display::to_string`; primitives have hardcoded impls |
+| `Display` | aspect | `print` / `println` builtins dispatch through `Display::to_string` |
 | `Iterable` | aspect | `for-in` loop dispatches through `Iterable::next` for non-`Range` types |
-| `From` | aspect | `?` coercion and numeric conversion dispatch through `From::from`; primitives have hardcoded impls |
+| `From` | aspect | `?` coercion and numeric conversion dispatch through `From::from` |
+| `Int` | primitive | Dedicated `Value::Int` variant; arithmetic operators hardcoded |
+| `Float` | primitive | Dedicated `Value::Float` variant; arithmetic operators hardcoded |
+| `Bool` | primitive | Dedicated `Value::Bool` variant; `if`/`while` conditions require it |
+| `String` | primitive | Dedicated `Value::String` variant; string literals, `+` concatenation hardcoded |
 
-The primitive types (`Int`, `Float`, `Bool`, `String`) are compiler built-ins with no special evaluator logic beyond their type. They have `Display` and `From` implementations registered in the typechecker registry but no dedicated runtime variants.
+**Operator overloading and its impact on `std::core`.**
+
+RFC-0011 proposes that arithmetic and comparison operators desugar into aspect method calls — `a + b` becomes `Add::add(a, b)`, `a == b` becomes `Eq::eq(a, b)`, and so on. This creates a new class of compiler-special aspects: the operator aspects. Like `Display`, `Iterable`, and `From`, these must always be in scope because the compiler desugars every operator expression into a call to one of them. They belong in `std::core`.
+
+The planned operator aspects (drawing from RFC-0011 and issue #149):
+
+| Aspect | Operator(s) | Note |
+|---|---|---|
+| `Add<Rhs>` | `+` | Returns `Self` for v0.5.0; associated `Output` type deferred |
+| `Sub<Rhs>` | `-` (binary) | |
+| `Mul<Rhs>` | `*` | |
+| `Div<Rhs>` | `/` | |
+| `Rem<Rhs>` | `%` | |
+| `Neg` | `-` (unary) | |
+| `Not` | `!` (unary) | |
+| `Eq` | `==`, `!=` | `!=` derived from `==` |
+| `Ord` | `<`, `<=`, `>`, `>=` | Requires `Eq`; ordering expressed as `compare() -> Ordering` |
+| `AddAssign<Rhs>` | `+=` | Deferred to post-v0.5.0 unless needed for `for-in` |
+
+`Ordering` (the return type of `Ord::compare`) is also a `std::core` type: `enum Ordering { Less, Equal, Greater }`.
+
+**This also means the primitives belong in `std::core`.**
+
+If `Add::add`, `Eq::eq` etc. live in `std::core`, then `impl Add for Int` must live somewhere with access to both `Add` and `Int`. Keeping `Int` as a compiler built-in with no module path creates a split: the aspect definition is in `std::core`, but the implementation for the most common type has no co-location. Every future numeric type (`Int64`, `Float32`, etc.) would face the same inconsistency.
+
+The cleaner model: `Int`, `Float`, `Bool`, and `String` are declared in `std::core` with their full set of aspect implementations. They remain primitives in the compiler's internal representation — dedicated `Value` variants, special inference rules, `Bool` required by control flow — but they gain a module path. "Has a module path" and "has special compiler treatment" are orthogonal.
 
 **Proposed decision: `std::core` is auto-imported in every file.**
 
-All seven items above move to `std::core`. Every Moonlane program behaves as if `use std::core::*;` appears implicitly at the top of every file — the programmer never writes this import. This is the Haskell `Prelude` model.
-
-The primitive types (`Int`, `Float`, `Bool`, `String`) stay as compiler built-ins with no module path. They are not in `std::core`. Their `Display` and `From` implementations are declared in `std::core` as aspect impls and are picked up automatically via the auto-import.
+`std::core` contains all types and aspects that the compiler desugars into, plus the primitive types and their implementations. Every Moonlane program behaves as if `use std::core::*;` appears implicitly at the top of every file — the programmer never writes this import. This is the Haskell `Prelude` model.
 
 ```moonlane
 // std/core.mln — always auto-imported
 
+// Primitive types (compiler-special internally, but module-defined)
+pub primitive type Int
+pub primitive type Float
+pub primitive type Bool
+pub primitive type String
+
+// Sum types with compiler-special pattern matching
 pub enum Perhaps<T> {
     Some { value: T },
     None,
 }
 
 pub enum Result<T, E> {
-    Ok    { value: T },
-    Err   { error: E },
+    Ok  { value: T },
+    Err { error: E },
 }
 
+// Range types (produced by .. and ..= operators)
 pub struct Range          { start: Int, end: Int }
 pub struct RangeInclusive { start: Int, end: Int }
 
-pub aspect Display        { fun to_string(self: @Self) -> String }
-pub aspect Iterable<T>    { fun next(self: Self) -> (Perhaps<T>, Self) }
-pub aspect From<Src>      { fun from(src: Src) -> Self }
+// Ordering (return type of Ord::compare)
+pub enum Ordering { Less, Equal, Greater }
 
-// Primitive Display impls
+// I/O and conversion aspects (compiler-dispatched)
+pub aspect Display     { fun to_string(self: @Self) -> String }
+pub aspect Iterable<T> { fun next(self: Self) -> (Perhaps<T>, Self) }
+pub aspect From<Src>   { fun from(src: Src) -> Self }
+
+// Operator aspects (RFC-0011, compiler-desugared)
+pub aspect Add<Rhs> { fun add(self: Self, rhs: Rhs) -> Self }
+pub aspect Sub<Rhs> { fun sub(self: Self, rhs: Rhs) -> Self }
+pub aspect Mul<Rhs> { fun mul(self: Self, rhs: Rhs) -> Self }
+pub aspect Div<Rhs> { fun div(self: Self, rhs: Rhs) -> Self }
+pub aspect Rem<Rhs> { fun rem(self: Self, rhs: Rhs) -> Self }
+pub aspect Neg      { fun neg(self: Self) -> Self }
+pub aspect Not      { fun not(self: Self) -> Self }
+pub aspect Eq       { fun eq(self: @Self, other: @Self) -> Bool }
+pub aspect Ord: Eq  { fun compare(self: @Self, other: @Self) -> Ordering }
+
+// Primitive impls — all co-located with the types
 impl Display for Int    { ... }
 impl Display for Float  { ... }
 impl Display for Bool   { ... }
 impl Display for String { ... }
 
-// Primitive From impls
 impl From<Float> for Int   { ... }
 impl From<Int>   for Float { ... }
+
+impl Add<Int>   for Int   { ... }
+impl Sub<Int>   for Int   { ... }
+impl Mul<Int>   for Int   { ... }
+impl Div<Int>   for Int   { ... }
+impl Rem<Int>   for Int   { ... }
+impl Neg        for Int   { ... }
+impl Add<Float> for Float { ... }
+// ... and so on
+
+impl Eq  for Int    { ... }
+impl Eq  for Float  { ... }
+impl Eq  for Bool   { ... }
+impl Eq  for String { ... }
+impl Ord for Int    { ... }
+impl Ord for Float  { ... }
+impl Ord for String { ... }
+
+impl Add<String> for String { ... }   // string concatenation
+impl Not         for Bool   { ... }   // boolean negation
 ```
 
-**Shadowing rule.** A user-defined name that matches a `std::core` export shadows the auto-import in the declaring module. The shadow is local — it does not affect other modules. This is consistent with how `use` imports are already shadowed by `let` bindings in expression scope.
+The `pub primitive type` declaration is a new grammar form — a hint to the compiler that this type has a dedicated internal representation. The compiler still generates dedicated `Value::Int` etc. variants; the declaration just gives the type a module path and a location for its impls.
+
+**Future numeric types.**
+
+When `Int64`, `Float32`, `UInt` etc. are added, they follow the same pattern:
+- Default-width types (`Int`, `Float`) stay in `std::core` — always in scope
+- Specialised numeric types (`Int64`, `Float32`, `UInt`, etc.) live in `std::numeric` — explicit `use` required
+
+This creates a clear two-tier model: you get `Int` and `Float` for free; you opt in to anything more specific.
+
+**Shadowing rule.** A user-defined name that matches a `std::core` export shadows the auto-import in the declaring module only. Consistent with how `let` bindings shadow outer scope names in expressions.
 
 ```moonlane
-// user code
 enum Perhaps<T> { Some(T), Empty }   // shadows std::core::Perhaps in this file only
-
 fun check(x: Perhaps<Int>) -> Bool { ... }   // refers to the local Perhaps
 ```
 
-An explicit `use std::core::Perhaps;` after a local definition of `Perhaps` is a name conflict (OQ-3) and is an error.
+An explicit `use std::core::Perhaps;` in the same file as a local definition of `Perhaps` is a name conflict (OQ-3) and is an error.
 
-**Interaction with OQ-3 (name conflicts).** The auto-import from `std::core` is treated as lower priority than any explicit `use` declaration. If a user writes `use crate::mymodule::Perhaps;`, that name takes precedence over the auto-imported `std::core::Perhaps` — no conflict error is raised. The explicit import always wins over the implicit one. A conflict only arises between two explicit `use` statements that bind the same name.
+**Interaction with OQ-3 (name conflicts).** The auto-import is lowest priority: any explicit `use` declaration beats it without raising a conflict. A conflict is only raised between two explicit `use` declarations that bind the same name.
 
 ---
 
