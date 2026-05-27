@@ -192,7 +192,7 @@ Spec documents, decision records, and RFCs live in `docs/`. Read them directly â
 
 ## Current Development Focus
 
-The language is at **v0.4.0** (aspects complete). The next release is **v0.5.0**.
+The language is at **v0.4.2** (evaluator refactor complete). The next release is **v0.5.0** (Module System).
 
 Check open tasks: `gh issue list --milestone "v0.5.0"`.
 
