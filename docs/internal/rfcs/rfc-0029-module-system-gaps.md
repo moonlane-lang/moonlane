@@ -178,7 +178,15 @@ A survey of the evaluator and typechecker reveals the full set of types and aspe
 
 **Operator overloading and its impact on `std::core`.**
 
-RFC-0011 proposes that arithmetic and comparison operators desugar into aspect method calls — `a + b` becomes `Add::add(a, b)`, `a == b` becomes `Eq::eq(a, b)`, and so on. This creates a new class of compiler-special aspects: the operator aspects. Like `Display`, `Iterable`, and `From`, these must always be in scope because the compiler desugars every operator expression into a call to one of them. They belong in `std::core`.
+RFC-0011 proposes that arithmetic and comparison operators desugar into aspect method calls. The desugaring follows Moonlane's existing dispatch model — the receiver type comes first, the aspect and type parameter second. This is already the pattern the evaluator uses for `From`: `?` on a `Result<T, E>` resolves to `TargetType::From<E>::from`, not `From::from`. Operator desugaring is the same:
+
+```
+a + b   (a: Int, b: Int)   →   Int::Add<Int>::add(a, b)
+a == b  (a: Int, b: Int)   →   Int::Eq::eq(a, b)
+a < b   (a: Int, b: Int)   →   Int::Ord::compare(a, b) == Ordering::Less
+```
+
+The aspect definition in `std::core` is the interface contract. The runtime lookup key is `TypeA::Aspect<TypeB>::method`. This creates a new class of compiler-special aspects — like `Display`, `Iterable`, and `From`, the operator aspects must always be in scope because the compiler desugars every operator expression into a call to one of them. They belong in `std::core`.
 
 The planned operator aspects (drawing from RFC-0011 and issue #149):
 
@@ -240,15 +248,16 @@ pub aspect Iterable<T> { fun next(self: Self) -> (Perhaps<T>, Self) }
 pub aspect From<Src>   { fun from(src: Src) -> Self }
 
 // Operator aspects (RFC-0011, compiler-desugared)
+// Dispatch: `a + b` (a: T, b: U) → T::Add<U>::add(a, b)
 pub aspect Add<Rhs> { fun add(self: Self, rhs: Rhs) -> Self }
 pub aspect Sub<Rhs> { fun sub(self: Self, rhs: Rhs) -> Self }
 pub aspect Mul<Rhs> { fun mul(self: Self, rhs: Rhs) -> Self }
 pub aspect Div<Rhs> { fun div(self: Self, rhs: Rhs) -> Self }
 pub aspect Rem<Rhs> { fun rem(self: Self, rhs: Rhs) -> Self }
-pub aspect Neg      { fun neg(self: Self) -> Self }
-pub aspect Not      { fun not(self: Self) -> Self }
-pub aspect Eq       { fun eq(self: @Self, other: @Self) -> Bool }
-pub aspect Ord: Eq  { fun compare(self: @Self, other: @Self) -> Ordering }
+pub aspect Neg      { fun neg(self: Self) -> Self }           // -a → T::Neg::neg(a)
+pub aspect Not      { fun not(self: Self) -> Self }           // !a → T::Not::not(a)
+pub aspect Eq       { fun eq(self: @Self, other: @Self) -> Bool }   // a == b → T::Eq::eq(a, b)
+pub aspect Ord: Eq  { fun compare(self: @Self, other: @Self) -> Ordering }  // T::Ord::compare
 
 // Primitive impls — all co-located with the types
 impl Display for Int    { ... }
