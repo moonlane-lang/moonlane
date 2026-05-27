@@ -16,7 +16,6 @@ Module system. Planned for Sprint 9 (`sprint/9`).
 - Glob imports with ambiguity checked at use sites
 - Absolute and relative module paths: `root::`, `std::`, `self::`, `super::`
 - Module-handle imports with `use path::module`
-- `std::core` auto-import for core types and aspects
 
 **Compatibility:**
 - Single-file interpreted programs remain valid without modification

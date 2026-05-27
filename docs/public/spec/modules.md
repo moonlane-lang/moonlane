@@ -113,18 +113,6 @@ In v0.5.0, fields of a `pub struct` are public. Fields of a private struct are p
 
 Within a module, all names defined in that module are accessible without qualification, including private names.
 
-## Standard Library Core
-
-`std::core` is auto-imported into every file as if this appeared implicitly:
-
-```moonlane
-use std::core::*;
-```
-
-`std::core` contains compiler-special core names such as `Perhaps`, `Result`, `Bool`, `Int`, `Float`, `String`, range types, and core aspects such as `Display`, `Iterable`, and `From`.
-
-The auto-import has the lowest precedence. Local declarations and explicit imports shadow auto-imported `std::core` names.
-
 ## Single-File Compatibility
 
 A `.mln` file with no `mod` or `use` declarations is a complete program. Existing single-file programs remain valid without modification.
