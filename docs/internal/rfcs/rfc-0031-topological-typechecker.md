@@ -144,24 +144,31 @@ The old `check(Program)` and `evaluate(TypedProgram)` are kept as compatibility 
 
 ### Path normalization pass
 
-Before `check_graph` runs, a dedicated normalization pass rewrites qualified path expressions in the AST to bare local bindings:
+Before `check_graph` runs, a dedicated normalization pass rewrites qualified path expressions to a new `Expr::ResolvedPath` AST node:
 
 ```
 load_root → normalize → check_graph → evaluate_graph
 ```
 
-`normalize(ModuleGraph) -> Result<ModuleGraph, MoonlaneError>` (in `src/path_normalizer.rs`) walks every `Expr::Path` node and rewrites it using the module's `ResolvedNames`:
+`normalize(ModuleGraph) -> Result<ModuleGraph, MoonlaneError>` (in `src/path_normalizer.rs`) walks every `Expr::Path` node and rewrites it using the module's `ResolvedNames`.
 
-| Expression | Rewrite |
-|---|---|
-| `parser::Token` | `Token` |
-| `root::parser::Token` | `Token` |
-| `self::compute` | `compute` |
-| `super::util::helper` | `helper` (if imported) |
+```rust
+Expr::ResolvedPath {
+    resolved: String,       // bare name the typechecker uses for lookup
+    original: Vec<String>,  // original segments, used in error messages
+    span: Span,
+}
+```
 
-If a qualified path cannot be resolved to any in-scope binding, the normalizer errors immediately with a clear message. Single-segment paths pass through unchanged.
+| Expression | `resolved` | `original` |
+|---|---|---|
+| `parser::Token` | `"Token"` | `["parser", "Token"]` |
+| `root::parser::Token` | `"Token"` | `["root", "parser", "Token"]` |
+| `self::compute` | `"compute"` | `["self", "compute"]` |
 
-This keeps path-resolution concerns out of the type inference engine entirely. The typechecker only ever sees bare names. Qualified path syntax in error messages is preserved via the original span.
+Single-segment paths pass through as plain `Expr::Path`. Unresolvable qualified paths are a hard error before the typechecker runs.
+
+The typechecker looks up `resolved` for name resolution and uses `original.join("::")` when constructing error messages. This is explicit in the type: ignoring `original` in an error site is a visible omission. It also survives inferred-type error messages, where there is no source span for the type itself — the `ResolvedPath` node carries the original form independently of span text.
 
 ### Type-checking loop
 
@@ -207,7 +214,7 @@ This is distinct from `T0003` (undefined name) — the name is known; it is mere
 
 2. **Private-item error code:** New code `T0009` — "name is private in module X". Using `T0003` ("undefined name") would be misleading since the name is known to the typechecker.
 
-3. **Qualified path expressions in code:** Handled by the path normalization pass (#185), not by the typechecker. The typechecker receives only bare names after normalization. This keeps path-resolution logic out of the inference engine and out of the `TypeEnv` (no qualified aliases needed). The restructuring of the typechecker into an explicit multi-stage pipeline is deferred; the normalization pass is a standalone module that does not require internal typechecker changes.
+3. **Qualified path expressions in code:** Handled by the path normalization pass (#185), not by the typechecker. Qualified `Expr::Path` nodes are replaced with `Expr::ResolvedPath { resolved, original }` — `resolved` is the bare name used for lookup, `original` is the full qualified form used in error messages. This is explicit in the AST type rather than relying on span text, which would be fragile for inferred-type error messages where no span exists for the type itself.
 
 4. **Silent-skip for unresolvable imports:** Removed. The loader (#186) errors on missing files; `std::` modules are pre-loaded by the typechecker. There is no legitimate case where an import silently produces nothing — every import either resolves or is an error.
 
