@@ -15,6 +15,7 @@ mod typeinference;
 mod types;
 
 use error::MoonlaneError;
+use typechecker::StdPrelude;
 
 #[derive(Parser)]
 #[command(name = "moonlane")]
@@ -41,21 +42,25 @@ fn main() {
 }
 
 fn run(filename: &str, debug_ast: bool) -> Result<(), MoonlaneError> {
-    // 1. Load modules → untyped AST
-    let ast = module_loader::load_program(filename)?;
+    // 1. Load modules
+    let graph = module_loader::load_root(filename)?;
 
     if debug_ast {
-        println!("{:#?}", ast);
+        for m in graph.modules.iter() {
+            println!("=== {:?} ===\n{:#?}", m.module_path, m.program);
+        }
         return Ok(());
     }
 
-    // 2. Type check → typed AST
-    let typed_ast = typechecker::check(ast)?;
+    // 2. Resolve names and normalize paths
+    let names = name_resolver::resolve(&graph)?;
+    let normalized = path_normalizer::normalize(graph, &names)?;
 
-    
+    // 3. Typecheck
+    let typed_graph = typechecker::check_graph(normalized, &names, StdPrelude::default())?;
 
-    // 3. Evaluate
-    evaluator::evaluate(typed_ast)?;
+    // 4. Evaluate
+    evaluator::evaluate_graph(typed_graph)?;
 
     Ok(())
 }
