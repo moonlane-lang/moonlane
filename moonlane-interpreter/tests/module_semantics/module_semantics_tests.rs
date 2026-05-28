@@ -112,6 +112,29 @@ fn transitive_dependency_via_graph_pipeline() {
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
+// ── #176: glob import filters to public items only ───────────────────────────
+
+#[test]
+fn glob_import_makes_pub_items_accessible() {
+    let dir = fixture_dir("glob_pub");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::*;\nfun main() -> Int { return pub_fn(); }\n");
+    write(&dir.join("helper.mln"), "pub fun pub_fn() -> Int { return 1; }\nfun private_fn() -> Int { return 2; }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn glob_import_does_not_expose_private_items() {
+    let dir = fixture_dir("glob_priv");
+    let main = dir.join("main.mln");
+    // `private_fn` is not pub — should not be callable even after `import helper::*`
+    write(&main, "import helper::*;\nfun main() -> Int { return private_fn(); }\n");
+    write(&dir.join("helper.mln"), "pub fun pub_fn() -> Int { return 1; }\nfun private_fn() -> Int { return 2; }\n");
+
+    run_graph(&main).expect_err("private item via glob should fail");
+}
+
 // ── #175: alias resolution ────────────────────────────────────────────────────
 
 #[test]
