@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Decl, Program};
+use crate::ast::{Decl, Program, Visibility};
 use crate::error::MoonlaneError;
 use crate::module_loader::LoadedModule;
 use crate::name_resolver::ResolvedNames;
 use crate::path_normalizer::NormalizedModuleGraph;
+use crate::error::TypeErrorCode;
 use crate::typed_ast::{TypedDecl, TypedModule, TypedModuleGraph, TypedProgram};
 use crate::typeinference::*;
 
@@ -71,6 +72,58 @@ impl GlobalExports {
     }
 }
 
+// ── check_pub_annotations ─────────────────────────────────────────────────────
+
+/// Enforce T0010: every `pub` function must have explicit return type and
+/// explicit parameter type annotations. Runs before inference so errors are
+/// surfaced early with clear messages rather than cryptic inference failures
+/// when downstream modules attempt to import the function.
+fn check_pub_annotations(
+    loaded: &LoadedModule,
+    names: &ResolvedNames,
+) -> Result<(), MoonlaneError> {
+    let pub_surface = match names.pub_surface.get(&loaded.module_path) {
+        Some(s) => s,
+        None => return Ok(()),
+    };
+
+    for decl in &loaded.program.decls {
+        match decl {
+            Decl::Fun(fd) if fd.visibility == Visibility::Public => {
+                if !pub_surface.contains(fd.name.as_str()) {
+                    continue;
+                }
+                if fd.return_type.is_none() {
+                    return Err(MoonlaneError::type_error(
+                        TypeErrorCode::T0010,
+                        format!(
+                            "public declaration `{}` requires an explicit return type annotation; \
+                             add `-> <Type>` after the parameter list",
+                            fd.name
+                        ),
+                        &fd.span,
+                    ));
+                }
+                for param in &fd.params {
+                    if param.type_ann.is_none() {
+                        return Err(MoonlaneError::type_error(
+                            TypeErrorCode::T0010,
+                            format!(
+                                "public declaration `{}` requires explicit type annotations on \
+                                 all parameters; add `: <Type>` to parameter `{}`",
+                                fd.name, param.name
+                            ),
+                            &param.span,
+                        ));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 // ── check_graph ───────────────────────────────────────────────────────────────
 
 /// Typecheck a normalized module graph. Processes modules in topological order
@@ -97,6 +150,7 @@ pub fn check_graph(
     let mut type_context: Vec<Decl> = Vec::new();
 
     for loaded in graph.modules() {
+        check_pub_annotations(loaded, names)?;
         let imported_schemes = build_import_schemes(loaded, names, &global_exports);
         let (typed_decls, scheme_env) =
             check_impl(&loaded.program, &imported_schemes, &type_context)?;

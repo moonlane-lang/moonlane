@@ -112,6 +112,45 @@ fn transitive_dependency_via_graph_pipeline() {
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
+// ── T0010: pub declarations require explicit annotations ──────────────────────
+
+#[test]
+fn pub_fun_without_return_type_is_t0010() {
+    let dir = fixture_dir("t0010_no_return");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::*;\nfun main() -> Int { return answer(); }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() { return 42; }\n");
+
+    let err = run_graph(&main).expect_err("expected T0010 error");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0010"), "expected T0010, got: {msg}");
+}
+
+#[test]
+fn pub_fun_with_unannotated_param_is_t0010() {
+    let dir = fixture_dir("t0010_no_param_ann");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::*;\nfun main() -> Int { return double(2); }\n");
+    write(&dir.join("helper.mln"), "pub fun double(x) -> Int { return x * 2; }\n");
+
+    let err = run_graph(&main).expect_err("expected T0010 error");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0010"), "expected T0010, got: {msg}");
+}
+
+#[test]
+fn non_pub_fun_without_annotation_is_accepted() {
+    let dir = fixture_dir("t0010_non_pub_ok");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::*;\nfun main() -> Int { return call(); }\n");
+    write(
+        &dir.join("helper.mln"),
+        "fun internal() { }\npub fun call() -> Int { return 0; }\n",
+    );
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
 // ── Collision detection ───────────────────────────────────────────────────────
 
 #[test]
