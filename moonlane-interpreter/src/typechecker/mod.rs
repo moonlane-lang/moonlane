@@ -30,7 +30,8 @@ enum Binding {
 }
 
 /// Per-module import scope, seeded imports-first then local declarations.
-/// Used to build the `SchemeEnv` passed to `check_impl`.
+/// Used to build the `SchemeEnv` passed to `check_impl`. (#177 will use this.)
+#[allow(dead_code)]
 type ScopedEnv = HashMap<String, Binding>;
 
 struct FunGeneralization {
@@ -168,7 +169,7 @@ pub fn check_graph(
 
     for loaded in graph.modules() {
         check_pub_annotations(loaded, names)?;
-        let imported_schemes = build_import_schemes(loaded, names, &global_exports);
+        let imported_schemes = build_import_schemes(loaded, names, &global_exports, &graph)?;
         let (typed_decls, scheme_env) =
             check_impl(&loaded.program, &imported_schemes, &type_context)?;
 
@@ -194,15 +195,21 @@ pub fn check_graph(
 
 /// Build the set of imported name→scheme bindings for a module, drawn from
 /// GlobalExports. Explicit imports take precedence over glob imports.
+///
+/// For explicit imports: if the name is absent from GlobalExports, scans the
+/// source module's `program.decls` in the graph to distinguish T0009 (private
+/// item — declared but not pub) from T0003 (name does not exist). See #191.
 fn build_import_schemes(
     loaded: &LoadedModule,
     names: &ResolvedNames,
     global_exports: &GlobalExports,
-) -> SchemeEnv {
+    graph: &NormalizedModuleGraph,
+) -> Result<SchemeEnv, MoonlaneError> {
     let mut env: SchemeEnv = HashMap::new();
-    let Some(scope) = names.scopes.get(&loaded.module_path) else { return env };
+    let Some(scope) = names.scopes.get(&loaded.module_path) else { return Ok(env) };
 
-    // Glob imports (lower priority — added first so explicit can override)
+    // Glob imports (lower priority — added first so explicit can override).
+    // GlobalExports only stores pub_schemes, so glob imports already filter to pub items.
     for glob_module in &scope.globs {
         if let Some(all_schemes) = global_exports.all_pub_schemes(glob_module) {
             for (name, scheme) in all_schemes {
@@ -211,14 +218,89 @@ fn build_import_schemes(
         }
     }
 
-    // Explicit imports (higher priority — overwrite globs)
+    // Explicit imports (higher priority — overwrite globs).
     for (local_name, binding) in &scope.explicit {
         if let Some(scheme) = global_exports.get_scheme(&binding.source_module, &binding.source_name) {
             env.insert(local_name.clone(), scheme.clone());
+        } else {
+            // Check if the source module is in the graph (not std, which is not file-loaded).
+            let src = graph.modules().iter()
+                .find(|m| m.module_path == binding.source_module);
+            if let Some(src_module) = src {
+                let span = find_import_span(loaded, &binding.source_module, &binding.source_name);
+                if decl_exists(&src_module.program, &binding.source_name) {
+                    return Err(MoonlaneError::type_error(
+                        TypeErrorCode::T0009,
+                        format!(
+                            "visibility error: `{}` is not public in module `{}`",
+                            binding.source_name,
+                            binding.source_module.join("::")
+                        ),
+                        &span,
+                    ));
+                } else {
+                    return Err(MoonlaneError::type_error(
+                        TypeErrorCode::T0003,
+                        format!(
+                            "cannot import `{}` from module `{}`: name does not exist",
+                            binding.source_name,
+                            binding.source_module.join("::")
+                        ),
+                        &span,
+                    ));
+                }
+            }
+            // Source not in graph (std or future external crate) — skip silently.
         }
     }
 
-    env
+    Ok(env)
+}
+
+/// Find the span of the import declaration in `loaded` that references `source_name`
+/// from `source_module`. Falls back to a file-level span if no match is found.
+fn find_import_span(
+    loaded: &LoadedModule,
+    source_module: &[String],
+    source_name: &str,
+) -> crate::ast::Span {
+    use crate::ast::{ImportTree, PathRoot};
+
+    fn tree_contains(tree: &ImportTree, name: &str) -> bool {
+        match tree {
+            ImportTree::Name { name: n, alias } => n == name || alias.as_deref() == Some(name),
+            ImportTree::Path { tree, .. } => tree_contains(tree, name),
+            ImportTree::Group(items) => items.iter().any(|t| tree_contains(t, name)),
+            ImportTree::Glob => false,
+        }
+    }
+
+    for import in &loaded.program.imports {
+        let root_matches = match &import.path.root {
+            PathRoot::Name(n) => source_module.first().map(|s| s == n).unwrap_or(false),
+            PathRoot::Self_ => source_module == &loaded.module_path,
+            PathRoot::Root | PathRoot::Super => true,
+            PathRoot::Std => false,
+        };
+        if root_matches && tree_contains(&import.path.tree, source_name) {
+            return import.span.clone();
+        }
+    }
+    crate::ast::Span::new(0, 0, loaded.file_path.display().to_string())
+}
+
+/// Returns true if `name` is declared as a top-level item in `program`,
+/// regardless of visibility. Used to distinguish T0009 (private) from T0003 (absent).
+fn decl_exists(program: &Program, name: &str) -> bool {
+    program.decls.iter().any(|d| match d {
+        Decl::Fun(f) => f.name == name,
+        Decl::Struct(s) => s.name == name,
+        Decl::Enum(e) => e.name == name,
+        Decl::Aspect(a) => a.name == name,
+        Decl::Let(l) => l.name == name,
+        Decl::Mut(m) => m.name == name,
+        Decl::Impl(_) | Decl::Stmt(_) => false,
+    })
 }
 
 /// Filter a module's scheme_env to only the names declared `pub` in that module.

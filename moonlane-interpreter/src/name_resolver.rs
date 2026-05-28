@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Decl, ImportTree, PathRoot, Visibility};
-use crate::error::MoonlaneError;
+use crate::ast::{Decl, ImportTree, PathRoot, Span, Visibility};
+use crate::error::{MoonlaneError, TypeErrorCode};
 use crate::module_loader::{LoadedModule, ModuleGraph};
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ fn resolve_module(
 
     for import in &loaded.program.imports {
         let base = absolute_base(&import.path.root, &loaded.module_path);
-        process_tree(&base, &import.path.tree, known_modules, pub_surface, &mut scope)?;
+        process_tree(&base, &import.path.tree, known_modules, pub_surface, &mut scope, &import.span)?;
     }
 
     Ok(scope)
@@ -130,7 +130,7 @@ fn collect_re_exports(
 
     for export in &loaded.program.exports {
         let base = absolute_base(&export.path.root, &loaded.module_path);
-        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, &mut re_exports)?;
+        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, &mut re_exports, &export.span)?;
     }
 
     Ok(re_exports)
@@ -143,6 +143,7 @@ fn process_export_tree(
     known_modules: &HashSet<Vec<String>>,
     pub_surface: &HashMap<Vec<String>, HashSet<String>>,
     re_exports: &mut HashMap<String, ImportBinding>,
+    export_span: &Span,
 ) -> Result<(), MoonlaneError> {
     match tree {
         ImportTree::Glob => {
@@ -174,10 +175,14 @@ fn process_export_tree(
                 // Item re-export: verify it's public in the source module.
                 if let Some(surface) = pub_surface.get(base) {
                     if !surface.contains(name.as_str()) {
-                        return Err(MoonlaneError::internal(format!(
-                            "visibility error: cannot re-export `{name}` — it is not public in module `{}`",
-                            base.join("::")
-                        )));
+                        return Err(MoonlaneError::type_error(
+                            TypeErrorCode::T0009,
+                            format!(
+                                "visibility error: cannot re-export `{name}` — it is not public in module `{}`",
+                                base.join("::")
+                            ),
+                            export_span,
+                        ));
                     }
                 }
                 re_exports.insert(local, ImportBinding {
@@ -191,12 +196,12 @@ fn process_export_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_export_tree(&new_base, tree, known_modules, pub_surface, re_exports)?;
+            process_export_tree(&new_base, tree, known_modules, pub_surface, re_exports, export_span)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_export_tree(base, item, known_modules, pub_surface, re_exports)?;
+                process_export_tree(base, item, known_modules, pub_surface, re_exports, export_span)?;
             }
         }
     }
@@ -233,6 +238,7 @@ fn process_tree(
     known_modules: &HashSet<Vec<String>>,
     pub_items: &HashMap<Vec<String>, HashSet<String>>,
     scope: &mut ModuleScope,
+    import_span: &Span,
 ) -> Result<(), MoonlaneError> {
     match tree {
         ImportTree::Glob => {
@@ -250,15 +256,9 @@ fn process_tree(
             let (source_module, kind) = if known_modules.contains(&module_candidate) {
                 (module_candidate, BindingKind::Module)
             } else {
-                // Item import: verify the item is publicly visible in the source module.
-                if let Some(exports) = pub_items.get(base) {
-                    if !exports.contains(name.as_str()) {
-                        return Err(MoonlaneError::internal(format!(
-                            "visibility error: `{name}` is not public in module `{}`",
-                            base.join("::")
-                        )));
-                    }
-                }
+                // Record the binding regardless of visibility.
+                // Visibility (T0009) and existence (T0003) are checked by the typechecker
+                // in build_import_schemes, which has access to the full graph and GlobalExports.
                 (base.to_vec(), BindingKind::Item)
             };
 
@@ -272,12 +272,12 @@ fn process_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_tree(&new_base, tree, known_modules, pub_items, scope)?;
+            process_tree(&new_base, tree, known_modules, pub_items, scope, import_span)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_tree(base, item, known_modules, pub_items, scope)?;
+                process_tree(base, item, known_modules, pub_items, scope, import_span)?;
             }
         }
     }
@@ -479,8 +479,11 @@ mod tests {
     }
 
     #[test]
-    fn rejects_private_item_import() {
-        // import parser::Token; where Token is private in parser
+    fn private_item_import_is_recorded_for_typechecker() {
+        // import parser::Token; where Token is private in parser.
+        // The name_resolver records the binding; visibility enforcement (T0009)
+        // happens in the typechecker's build_import_schemes which has access to
+        // the full NormalizedModuleGraph to distinguish private from absent.
         let graph = make_graph(vec![
             (vec![], make_program(vec![
                 make_import(PathRoot::Name("parser".into()), ImportTree::Name {
@@ -490,10 +493,12 @@ mod tests {
             (vec!["parser".into()], make_program(vec![])), // no pub declarations
         ]);
 
-        let err = resolve(&graph).expect_err("private import should fail");
-        let msg = err.to_string();
-        assert!(msg.contains("Token"), "error should mention Token");
-        assert!(msg.contains("visibility"), "error should mention visibility");
+        let names = resolve(&graph).expect("name_resolver should not reject private imports");
+        let root_scope = names.scopes.get(&vec![]).expect("root scope should exist");
+        assert!(
+            root_scope.explicit.contains_key("Token"),
+            "Token binding should be recorded so the typechecker can produce T0009"
+        );
     }
 
     #[test]

@@ -112,6 +112,42 @@ fn transitive_dependency_via_graph_pipeline() {
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
+// ── T0009: visibility enforcement ────────────────────────────────────────────
+
+#[test]
+fn importing_private_item_is_t0009() {
+    let dir = fixture_dir("t0009_private");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::secret;\nfun main() -> Int { return secret(); }\n");
+    write(&dir.join("helper.mln"), "fun secret() -> Int { return 42; }\n");
+
+    let err = run_graph(&main).expect_err("expected T0009");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0009"), "expected T0009, got: {msg}");
+}
+
+#[test]
+fn importing_nonexistent_name_is_t0003() {
+    let dir = fixture_dir("t0003_absent");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::nonexistent;\nfun main() -> Int { return nonexistent(); }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
+
+    let err = run_graph(&main).expect_err("expected T0003");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0003"), "expected T0003, got: {msg}");
+}
+
+#[test]
+fn importing_pub_item_is_accepted() {
+    let dir = fixture_dir("t0009_pub_ok");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::answer;\nfun main() -> Int { return answer(); }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
 // ── T0010: pub declarations require explicit annotations ──────────────────────
 
 #[test]
