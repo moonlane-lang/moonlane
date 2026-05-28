@@ -35,12 +35,18 @@ pub struct ModuleScope {
     /// Names from these modules are in scope at lower priority than explicit imports.
     /// Ambiguity between two glob-sourced names is deferred to use-site.
     pub globs: Vec<Vec<String>>,
+    /// Re-exported names: local_name → source binding.
+    /// These names are part of this module's public API surface for callers.
+    pub re_exports: HashMap<String, ImportBinding>,
 }
 
 /// The output of the name resolution pass: one scope per loaded module.
 #[derive(Debug, Clone)]
 pub struct ResolvedNames {
     pub scopes: HashMap<Vec<String>, ModuleScope>,
+    /// Combined public surface per module: local declarations + re-exports.
+    /// Used by callers to check import visibility.
+    pub pub_surface: HashMap<Vec<String>, HashSet<String>>,
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -50,8 +56,8 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MoonlaneError> {
         .map(|m| m.module_path.clone())
         .collect();
 
-    // Build a map of publicly visible names per module for visibility checks.
-    let pub_items: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
+    // First pass: collect locally-declared public names per module.
+    let mut pub_surface: HashMap<Vec<String>, HashSet<String>> = graph.modules.iter()
         .map(|m| {
             let names = m.program.decls.iter()
                 .filter_map(|d| decl_pub_name(d))
@@ -60,13 +66,23 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MoonlaneError> {
         })
         .collect();
 
+    // Second pass: process re-exports and extend pub_surface.
+    // Simple single-pass (no support for transitive re-export chains; that's future work).
+    for loaded in &graph.modules {
+        let re_exported = collect_re_exports(loaded, &known_modules, &pub_surface)?;
+        pub_surface.entry(loaded.module_path.clone())
+            .or_default()
+            .extend(re_exported.keys().cloned());
+    }
+
+    // Third pass: resolve imports using the final pub_surface.
     let mut scopes = HashMap::new();
     for loaded in &graph.modules {
-        let scope = resolve_module(loaded, &known_modules, &pub_items)?;
+        let scope = resolve_module(loaded, &known_modules, &pub_surface)?;
         scopes.insert(loaded.module_path.clone(), scope);
     }
 
-    Ok(ResolvedNames { scopes })
+    Ok(ResolvedNames { scopes, pub_surface })
 }
 
 /// Returns the name of a declaration if it is public.
@@ -85,20 +101,106 @@ fn decl_pub_name(decl: &Decl) -> Option<String> {
 fn resolve_module(
     loaded: &LoadedModule,
     known_modules: &HashSet<Vec<String>>,
-    pub_items: &HashMap<Vec<String>, HashSet<String>>,
+    pub_surface: &HashMap<Vec<String>, HashSet<String>>,
 ) -> Result<ModuleScope, MoonlaneError> {
+    let re_exports = collect_re_exports(loaded, known_modules, pub_surface)?;
     let mut scope = ModuleScope {
         module_path: loaded.module_path.clone(),
         explicit: HashMap::new(),
         globs: Vec::new(),
+        re_exports,
     };
 
     for import in &loaded.program.imports {
         let base = absolute_base(&import.path.root, &loaded.module_path);
-        process_tree(&base, &import.path.tree, known_modules, pub_items, &mut scope)?;
+        process_tree(&base, &import.path.tree, known_modules, pub_surface, &mut scope)?;
     }
 
     Ok(scope)
+}
+
+/// Collect re-exported names from a module's `export` declarations.
+/// Returns a map of local_name → binding for each successfully resolved export.
+fn collect_re_exports(
+    loaded: &LoadedModule,
+    known_modules: &HashSet<Vec<String>>,
+    pub_surface: &HashMap<Vec<String>, HashSet<String>>,
+) -> Result<HashMap<String, ImportBinding>, MoonlaneError> {
+    let mut re_exports: HashMap<String, ImportBinding> = HashMap::new();
+
+    for export in &loaded.program.exports {
+        let base = absolute_base(&export.path.root, &loaded.module_path);
+        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, &mut re_exports)?;
+    }
+
+    Ok(re_exports)
+}
+
+/// Walk an export path tree and populate the re_exports map.
+fn process_export_tree(
+    base: &[String],
+    tree: &ImportTree,
+    known_modules: &HashSet<Vec<String>>,
+    pub_surface: &HashMap<Vec<String>, HashSet<String>>,
+    re_exports: &mut HashMap<String, ImportBinding>,
+) -> Result<(), MoonlaneError> {
+    match tree {
+        ImportTree::Glob => {
+            // Re-export all public names from the base module.
+            if let Some(names) = pub_surface.get(base) {
+                for name in names {
+                    re_exports.insert(name.clone(), ImportBinding {
+                        source_module: base.to_vec(),
+                        source_name: name.clone(),
+                        kind: BindingKind::Item,
+                    });
+                }
+            }
+        }
+
+        ImportTree::Name { name, alias } => {
+            let local = alias.as_deref().unwrap_or(name.as_str()).to_string();
+            let mut module_candidate = base.to_vec();
+            module_candidate.push(name.clone());
+
+            if known_modules.contains(&module_candidate) {
+                // Re-exporting a module handle (unusual but allowed).
+                re_exports.insert(local, ImportBinding {
+                    source_module: module_candidate,
+                    source_name: name.clone(),
+                    kind: BindingKind::Module,
+                });
+            } else {
+                // Item re-export: verify it's public in the source module.
+                if let Some(surface) = pub_surface.get(base) {
+                    if !surface.contains(name.as_str()) {
+                        return Err(MoonlaneError::internal(format!(
+                            "visibility error: cannot re-export `{name}` — it is not public in module `{}`",
+                            base.join("::")
+                        )));
+                    }
+                }
+                re_exports.insert(local, ImportBinding {
+                    source_module: base.to_vec(),
+                    source_name: name.clone(),
+                    kind: BindingKind::Item,
+                });
+            }
+        }
+
+        ImportTree::Path { name, tree } => {
+            let mut new_base = base.to_vec();
+            new_base.push(name.clone());
+            process_export_tree(&new_base, tree, known_modules, pub_surface, re_exports)?;
+        }
+
+        ImportTree::Group(items) => {
+            for item in items {
+                process_export_tree(base, item, known_modules, pub_surface, re_exports)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Compute the absolute path prefix corresponding to a path root,
@@ -216,7 +318,7 @@ pub enum ScopeLookup<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Block, Decl, FunDecl, GenericParam, ImportDecl, ImportPath, ImportTree, PathRoot, Program, Span, Visibility};
+    use crate::ast::{Block, Decl, FunDecl, ImportDecl, ImportPath, ImportTree, PathRoot, Program, Span, Visibility};
     use crate::module_loader::{LoadedModule, ModuleGraph};
     use std::path::PathBuf;
 
@@ -442,5 +544,126 @@ mod tests {
         let child_scope = &names.scopes[&vec!["parser".to_string(), "child".to_string()]];
         let binding = child_scope.explicit.get("Token").expect("Token should be bound");
         assert_eq!(binding.source_module, vec!["parser"]);
+    }
+
+    fn make_export(root: PathRoot, tree: ImportTree) -> crate::ast::ExportDecl {
+        use crate::ast::ExportDecl;
+        ExportDecl { path: ImportPath { root, tree }, span: span() }
+    }
+
+    #[test]
+    fn facade_re_exports_item_for_callers() {
+        // parser.mln: export ast::Ast;
+        // Caller can import parser::Ast even though Ast is defined in ast.
+        use crate::ast::ExportDecl;
+        let ast_module_prog = make_program_with_pubs(vec![], &["Ast"]);
+        let parser_prog = Program {
+            imports: vec![],
+            exports: vec![make_export(
+                PathRoot::Name("ast".into()),
+                ImportTree::Name { name: "Ast".into(), alias: None },
+            )],
+            decls: vec![],
+        };
+        let root_prog = make_program(vec![
+            make_import(PathRoot::Name("parser".into()), ImportTree::Name {
+                name: "Ast".into(), alias: None,
+            }),
+        ]);
+        let graph = make_graph(vec![
+            (vec![], root_prog),
+            (vec!["parser".into()], parser_prog),
+            (vec!["ast".into()], ast_module_prog),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        // parser's re_exports should include Ast
+        let parser_scope = &names.scopes[&vec!["parser".to_string()]];
+        assert!(parser_scope.re_exports.contains_key("Ast"), "parser should re-export Ast");
+        // root should have imported Ast from parser
+        let root_scope = &names.scopes[&vec![]];
+        let binding = root_scope.explicit.get("Ast").expect("Ast should be importable from facade");
+        assert_eq!(binding.source_module, vec!["parser"]);
+    }
+
+    #[test]
+    fn re_export_alias_is_visible_not_original() {
+        // parser.mln: export ast::Ast as Tree;
+        use crate::ast::ExportDecl;
+        let ast_module_prog = make_program_with_pubs(vec![], &["Ast"]);
+        let parser_prog = Program {
+            imports: vec![],
+            exports: vec![make_export(
+                PathRoot::Name("ast".into()),
+                ImportTree::Name { name: "Ast".into(), alias: Some("Tree".into()) },
+            )],
+            decls: vec![],
+        };
+        let graph = make_graph(vec![
+            (vec!["parser".into()], parser_prog),
+            (vec!["ast".into()], ast_module_prog),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        let parser_scope = &names.scopes[&vec!["parser".to_string()]];
+        assert!(parser_scope.re_exports.contains_key("Tree"), "aliased re-export Tree should appear");
+        assert!(!parser_scope.re_exports.contains_key("Ast"), "original name Ast should not appear");
+    }
+
+    #[test]
+    fn rejects_re_export_of_private_item() {
+        // parser.mln: export ast::Hidden; where Hidden is private in ast
+        use crate::ast::ExportDecl;
+        let ast_module_prog = make_program(vec![]); // no pub declarations
+        let parser_prog = Program {
+            imports: vec![],
+            exports: vec![make_export(
+                PathRoot::Name("ast".into()),
+                ImportTree::Name { name: "Hidden".into(), alias: None },
+            )],
+            decls: vec![],
+        };
+        let graph = make_graph(vec![
+            (vec!["parser".into()], parser_prog),
+            (vec!["ast".into()], ast_module_prog),
+        ]);
+
+        let err = resolve(&graph).expect_err("re-exporting private item should fail");
+        let msg = err.to_string();
+        assert!(msg.contains("Hidden"), "error should mention Hidden");
+        assert!(msg.contains("visibility"), "error should mention visibility");
+    }
+
+    #[test]
+    fn glob_re_export_includes_all_public_names() {
+        // parser.mln: export ast::*;
+        use crate::ast::ExportDecl;
+        let ast_module_prog = make_program_with_pubs(vec![], &["Ast", "Token"]);
+        let parser_prog = Program {
+            imports: vec![],
+            exports: vec![make_export(
+                PathRoot::Name("ast".into()),
+                ImportTree::Glob,
+            )],
+            decls: vec![],
+        };
+        let root_prog = make_program(vec![
+            make_import(PathRoot::Name("parser".into()), ImportTree::Name {
+                name: "Ast".into(), alias: None,
+            }),
+        ]);
+        let graph = make_graph(vec![
+            (vec![], root_prog),
+            (vec!["parser".into()], parser_prog),
+            (vec!["ast".into()], ast_module_prog),
+        ]);
+
+        let names = resolve(&graph).unwrap();
+        let parser_scope = &names.scopes[&vec!["parser".to_string()]];
+        assert!(parser_scope.re_exports.contains_key("Ast"));
+        assert!(parser_scope.re_exports.contains_key("Token"));
+        // root can import Ast from parser
+        let root_scope = &names.scopes[&vec![]];
+        assert!(root_scope.explicit.contains_key("Ast"));
     }
 }
