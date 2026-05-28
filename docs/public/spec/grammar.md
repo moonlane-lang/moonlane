@@ -1,20 +1,19 @@
 # Grammar
 
 ```
-Program            → ModDeclaration* UseDeclaration* Declaration* EOF
+Program            → HeaderDecl* Declaration* EOF
 
-ModDeclaration     → "mod" IDENTIFIER ";"
-                   | "pub" "mod" IDENTIFIER ";"
+HeaderDecl         → ImportDecl | ExportDecl
 
-UseDeclaration     → "use" UsePath ";"
-                   | "pub" "use" UsePath ";"
-UsePath            → PathRoot "::" UseTree
+ImportDecl         → "import" ImportPath ";"
+ExportDecl         → "export" ImportPath ";"
+ImportPath         → PathRoot "::" ImportTree
 PathRoot           → "root" | "std" | "self" | "super" | IDENTIFIER
-UseTree            → IDENTIFIER
-                   | IDENTIFIER "as" IDENTIFIER
-                   | "{" UseTree ( "," UseTree )* ","? "}"
+ImportTree         → ImportItem
+                   | IDENTIFIER "::" ImportTree
+                   | "{" ImportItem ( "," ImportItem )* ","? "}"
                    | "*"
-                   | IDENTIFIER "::" UseTree
+ImportItem         → IDENTIFIER ( "as" IDENTIFIER )?
 
 Declaration        → LetDeclaration
                    | MutDeclaration
@@ -25,13 +24,13 @@ Declaration        → LetDeclaration
                    | TraitDeclaration
                    | Statement
 
-LetDeclaration     → "let" IDENTIFIER ( ":" Type )? "=" Expression ";"
-MutDeclaration     → "mut" IDENTIFIER ( ":" Type )? "=" Expression ";"
-FunDeclaration     → "fun" IDENTIFIER GenericParams? "(" Params? ")" ( "->" Type )? Block
-StructDeclaration  → "struct" IDENTIFIER GenericParams? "{" StructFields "}"
-EnumDeclaration    → "enum" IDENTIFIER GenericParams? "{" EnumVariants "}"
+LetDeclaration     → "pub"? "let" IDENTIFIER ( ":" Type )? "=" Expression ";"
+MutDeclaration     → "pub"? "mut" IDENTIFIER ( ":" Type )? "=" Expression ";"
+FunDeclaration     → "pub"? "fun" IDENTIFIER GenericParams? "(" Params? ")" ( "->" Type )? Block
+StructDeclaration  → "pub"? "struct" IDENTIFIER GenericParams? "{" StructFields "}"
+EnumDeclaration    → "pub"? "enum" IDENTIFIER GenericParams? "{" EnumVariants "}"
 ImplBlock          → "impl" ( Type "for" )? Type "{" FunDeclaration* "}"
-TraitDeclaration   → "aspect" IDENTIFIER "{" TraitMethod* "}"
+TraitDeclaration   → "pub"? "aspect" IDENTIFIER "{" TraitMethod* "}"
 TraitMethod        → "fun" IDENTIFIER "(" Params? ")" ( "->" Type )? ( Block | ";" )
 
 Params             → Param ( "," Param )* ","?

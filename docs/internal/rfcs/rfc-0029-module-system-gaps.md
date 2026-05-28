@@ -2,7 +2,8 @@
 id: rfc-0029
 title: "Module System — Gaps and Clarifications"
 date: '2026-05-27'
-status: accepted
+status: superseded
+superseded-by: rfc-0030
 ---
 
 ## Summary
@@ -409,7 +410,9 @@ Relative paths obey the same visibility rules as absolute paths. `super::private
 
 ## Decision
 
-**Outcome:** Accepted — v0.5.0  
+> **Superseded by RFC-0030** (2026-05-28). All open questions resolved here are re-answered in RFC-0030 under the revised `import`/`export` design. See RFC-0030 for the accepted design.
+
+**Outcome:** Accepted — v0.5.0 *(superseded before implementation)*  
 **Target:** v0.5.0
 
 | Question | Decision |

@@ -6,19 +6,25 @@ title: "Moonlane Language Changelog"
 
 ## v0.5.0
 
-Module system. Planned for Sprint 9 (`sprint/9`).
+Module system. Shipped by Sprint 9 (`sprint/9`).
 
 **New language features:**
-- Multi-file programs with explicit `mod` declarations
-- Public submodules via `pub mod`
-- Imports and re-exports via `use` and `pub use`
-- Import aliases with `use path::Name as Alias`
-- Glob imports with ambiguity checked at use sites
-- Absolute and relative module paths: `root::`, `std::`, `self::`, `super::`
-- Module-handle imports with `use path::module`
+- Multi-file programs: each `.mln` file is a module; the module graph is built from `import` declarations
+- `import path::Name;` both loads the referenced file and brings `Name` into scope
+- Import forms: single name, alias (`as`), group (`{A, B}`), glob (`*`), module handle
+- `export path::Name;` re-exports a name from a submodule into the current module's public API
+- `pub` on `fun`, `struct`, `enum`, and `aspect` marks declarations as externally accessible
+- Absolute and relative path roots: `root::`, `std::`, `self::`, `super::`
+- Fully-qualified paths valid in type and expression position without a preceding `import`
+- Circular imports detected at load time with a full chain in the error message
+- Facade modules: `parser.mln` alongside `parser/` directory — no special `mod.mln` file
+- File-to-module mapping via `::` → `/` with no special cases
+
+**Deferred to a future release:**
+- `std::core` auto-import and standard library core types (#150)
 
 **Compatibility:**
-- Single-file interpreted programs remain valid without modification
+- Single-file programs with no `import` or `export` declarations remain valid without modification
 
 ## v0.4.2
 

@@ -2,7 +2,8 @@
 id: rfc-0009
 title: "Module System"
 date: '2026-05-21'
-status: accepted
+status: superseded
+superseded-by: rfc-0030
 ---
 
 ## Summary
@@ -165,7 +166,9 @@ pub-ann   ::= 'pub'   -- prefix on struct, enum, fun, let, mut declarations
 
 ## Decision
 
-**Outcome:** Accepted — v0.5.0
+> **Superseded by RFC-0030** (2026-05-28). The `mod` + `use` two-step pattern and `name/mod.mln` directory module convention were replaced by a unified `import`/`export` design. See RFC-0030 for the accepted design.
+
+**Outcome:** Accepted — v0.5.0 *(superseded before implementation)*
 
 | Question | Decision |
 |---|---|

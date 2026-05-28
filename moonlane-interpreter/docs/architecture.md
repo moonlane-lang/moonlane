@@ -35,7 +35,8 @@ tree-walk-interpreter/
 └── src/
     ├── main.rs            — CLI entry point: selects a root .mln file, runs the pipeline
     ├── grammar.pest       — pest PEG grammar for the language
-    ├── module_loader.rs   — loads the selected root file and declared child modules
+    ├── module_loader.rs   — loads the selected root file and its transitive import graph
+    ├── name_resolver.rs   — resolves import scopes, visibility, and re-exports per module
     ├── parser/            — drives pest, builds untyped AST from CST
     ├── ast/               — untyped AST node definitions
     ├── types/             — concrete type representation (Type enum)
@@ -91,7 +92,8 @@ Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bou
 
 | Component | Notes |
 |-----------|-------|
-| Module Loader | `src/module_loader.rs` |
+| Module Loader | `src/module_loader.rs` — `load_root` builds the `ModuleGraph`; `load_program` flattens it into a merged `ast::Program` |
+| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope` and a `pub_surface` map; not yet wired into the `check` pipeline (v0.5.0) |
 | Parser | `src/parser/`, `src/grammar.pest` |
 | Type Checker | [typechecker.md](typechecker.md) |
 | Evaluator | [evaluator.md](evaluator.md) |

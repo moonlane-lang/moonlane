@@ -1,19 +1,10 @@
 # Modules
 
-## Files and Module Declarations
+## Files and Modules
 
-A source file is a module. Modules are declared explicitly with `mod` declarations at the top of a file:
+Every `.mln` source file is a module. There is no `mod` declaration — the module graph is built entirely from `import` declarations.
 
-```moonlane
-mod parser;
-pub mod lexer;
-```
-
-`mod name;` resolves to either `name.mln` or `name/mod.mln` alongside the declaring file. If both files exist, the program is rejected as ambiguous.
-
-A bare `mod name;` declares a private submodule. `pub mod name;` declares a public submodule whose path is reachable from outside the declaring module.
-
-The selected root file is the root module. In script mode, the selected root file is the file passed directly to the toolchain:
+The root file passed to the toolchain is the root module:
 
 ```bash
 moonlane run src/main.mln
@@ -21,15 +12,38 @@ moonlane run src/main.mln
 
 In that example, `root::` refers to `src/main.mln`.
 
-## File Header Ordering
+## File-to-Module Mapping
 
-At file scope, all module declarations must come before all imports, and all imports must come before other declarations:
+`::` maps directly to `/` in the filesystem. There is no special directory module file.
 
-```text
-mod* use* declaration*
+| Import | File resolved |
+|---|---|
+| `import parser::Ast;` | `parser.mln` |
+| `import parser::ast::Ast;` | `parser/ast.mln` |
+| `import root::a::b::c::T;` | `a/b/c.mln` relative to the root file |
+
+A directory module with a public facade is expressed by placing `name.mln` alongside the `name/` directory. The two coexist without ambiguity — they are different paths:
+
+```
+src/
+  main.mln            ← import parser::Ast; import parser::lexer::Token;
+  parser.mln          ← export ast::Ast; export lexer::Token;
+  parser/
+    ast.mln           ← pub struct Ast { ... }
+    lexer.mln         ← pub struct Token { ... }
 ```
 
-`mod` or `use` declarations are not valid inside blocks.
+`parser.mln` is the facade. Files in `parser/` form the namespace. There is no `name/mod.mln` convention.
+
+## File Header Ordering
+
+At file scope, `import` and `export` declarations must precede all other declarations:
+
+```
+(import | export)* declaration*
+```
+
+`import` and `export` are not valid inside blocks.
 
 ## Paths
 
@@ -39,12 +53,11 @@ Path roots are:
 
 | Root | Meaning |
 |---|---|
-| `root::` | The selected root module for the current program or package |
+| `root::` | The selected root module for the current program |
 | `std::` | The bundled standard library root |
 | `self::` | The current module |
 | `super::` | The parent module; invalid from the root module |
-| imported module name | A module handle introduced by `use path::module;` |
-| declared child module name | A child module declared by `mod name;` in the current module |
+| imported module handle | A module brought into scope by `import path::module;` |
 
 Fully-qualified paths are valid anywhere a name is expected:
 
@@ -54,45 +67,57 @@ let token: root::parser::Token = root::parser::Token::new();
 
 ## Imports
 
-Imports bring public names into the current module:
+`import` both loads the module file and brings names into the current scope:
 
 ```moonlane
-use std::math;
-use std::collections::{Map, Set};
-use root::parser::Ast;
-use root::v1::Parser as ParserV1;
-use root::prelude::*;
+import parser::{Ast, Token};       // loads parser.mln, brings Ast and Token into scope
+import std::math;                  // loads std/math, brings math into scope as a module handle
+import root::lexer::Token as Tok;  // absolute path with alias
+import parser::*;                  // glob import — all public names from parser.mln
 ```
 
 Import forms:
 
-- `use path::to::Name;` imports `Name`.
-- `use path::to::{A, B, C};` imports multiple names from one path.
-- `use path::to::Name as Alias;` imports `Name` under `Alias`.
-- `use path::*;` imports all public names from the module.
-- `use path::module;` imports `module` as a module handle, allowing `module::item`.
+| Form | Effect |
+|---|---|
+| `import path::Name;` | imports `Name` |
+| `import path::Name as Alias;` | imports `Name` under `Alias` |
+| `import path::{A, B, C};` | imports multiple names from one path |
+| `import path::{A as X, B};` | imports with per-item aliases |
+| `import path::*;` | imports all public names from the module |
+| `import path::module;` | imports `module` as a module handle; `module::item` is then valid |
 
-`pub use` re-exports an imported name from the current module's public API:
+## Re-exports
+
+`export` re-exports names from submodules into the current module's public API:
 
 ```moonlane
-mod ast;
-mod lexer;
-
-pub use ast::Ast;
-pub use lexer::Token;
+// parser.mln — facade module for the parser namespace
+export ast::Ast;
+export lexer::{Token, Span};
+export ast::ParseError as Error;
 ```
 
-Re-exported names are indistinguishable from names defined directly in the re-exporting module.
+`export` and `import` share the same path and tree syntax. Re-exported names are indistinguishable from names defined directly in the re-exporting module.
+
+`pub` and `export` serve different roles:
+
+| Keyword | Purpose |
+|---|---|
+| `pub` | Marks a declaration in this file as externally accessible |
+| `export path::Name;` | Re-exports a name from a submodule into this module's public API |
+
+`export` declarations are processed after the module graph is fully loaded; they do not affect which files are loaded.
 
 ## Import Conflicts
 
-Two explicit imports that bind the same local name in the same module are a compile-time error.
+Two explicit imports that bind the same local name in the same module are a compile-time error at the second import.
 
-Glob imports use a softer ambiguity rule:
+Glob imports use a softer rule:
 
 - Local declarations beat glob imports.
 - Explicit imports beat glob imports.
-- Two glob imports may export the same name without an immediate error.
+- Two glob imports may name the same item without an immediate error.
 - A name from conflicting glob imports is an error only if it is referenced ambiguously.
 
 ## Visibility
@@ -107,12 +132,29 @@ pub fun parse(tokens: Token[]) -> Ast { ... }
 fun helper(token: Token) -> Bool { ... }
 ```
 
-`pub` is valid on `mod`, `struct`, `enum`, `fun`, `linear struct`, `linear enum`, `aspect`, and top-level `let`/`mut` bindings.
+`pub` is valid on `struct`, `enum`, `fun`, `linear struct`, `linear enum`, `aspect`, and top-level `let`/`mut` bindings.
 
 In v0.5.0, fields of a `pub struct` are public. Fields of a private struct are private because the struct itself is not externally nameable.
 
 Within a module, all names defined in that module are accessible without qualification, including private names.
 
+Modules do not have their own visibility annotation. Module-level access control is handled entirely by `pub` on individual items.
+
+## Circular Imports
+
+Circular imports are a compile error. The error message includes the full import chain.
+
+## Module Graph Loading
+
+The module graph is built from `import` declarations:
+
+1. The root file is parsed.
+2. All `import` declarations are collected; each is resolved to a file path via the `::` → `/` mapping.
+3. Each referenced file is loaded recursively; cycles are detected and rejected.
+4. Only files reachable via at least one `import` declaration are loaded.
+
+`export` declarations do not affect which files are loaded.
+
 ## Single-File Compatibility
 
-A `.mln` file with no `mod` or `use` declarations is a complete program. Existing single-file programs remain valid without modification.
+A `.mln` file with no `import` or `export` declarations is a complete program. Existing single-file programs remain valid without modification.
