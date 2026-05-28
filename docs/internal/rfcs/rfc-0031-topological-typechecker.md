@@ -26,6 +26,7 @@ The v0.6.0 module-semantic sprint must replace the flat merge with a topological
 2. Each module is typechecked in isolation: only names in scope (from its imports and its own declarations) are visible.
 3. A module's `pub` declarations become available to downstream modules after it is checked.
 4. The flat merge (`module_loader::load_program`) and last-segment fallback (`ADR-0020`) are removed.
+5. Qualified path expressions in code (`root::mod::Name`, `self::name`) are resolved to bare local bindings before typechecking, in a dedicated normalization pass.
 
 ## Non-Goals
 
@@ -141,12 +142,35 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MoonlaneError>
 
 The old `check(Program)` and `evaluate(TypedProgram)` are kept as compatibility wrappers (single-module synthetic graph) until all callers are migrated, then deleted alongside the flat-merge hack.
 
+### Path normalization pass
+
+Before `check_graph` runs, a dedicated normalization pass rewrites qualified path expressions in the AST to bare local bindings:
+
+```
+load_root → normalize → check_graph → evaluate_graph
+```
+
+`normalize(ModuleGraph) -> Result<ModuleGraph, MoonlaneError>` (in `src/path_normalizer.rs`) walks every `Expr::Path` node and rewrites it using the module's `ResolvedNames`:
+
+| Expression | Rewrite |
+|---|---|
+| `parser::Token` | `Token` |
+| `root::parser::Token` | `Token` |
+| `self::compute` | `compute` |
+| `super::util::helper` | `helper` (if imported) |
+
+If a qualified path cannot be resolved to any in-scope binding, the normalizer errors immediately with a clear message. Single-segment paths pass through unchanged.
+
+This keeps path-resolution concerns out of the type inference engine entirely. The typechecker only ever sees bare names. Qualified path syntax in error messages is preserved via the original span.
+
 ### Type-checking loop
 
 Each module produces a `ModuleExports { scheme_env: SchemeEnv, type_env: HashMap<String, Type> }` bundle that is accumulated into a `GlobalExports` registry. When typechecking module M, the inference context is pre-seeded with:
 1. M's own declarations.
 2. For each `import mod::name`, the corresponding entry from `GlobalExports[mod]`.
 3. For `import mod::*`, all `pub` entries from `GlobalExports[mod]`.
+
+Imports whose source module is not in `GlobalExports` (unresolvable `std::`, `root::`, or `super::` imports) are silently skipped during scope construction. Usage of the unresolved name fails at inference time with T0003.
 
 ### Private-item error: `T0009`
 
@@ -163,15 +187,19 @@ This is distinct from `T0003` (undefined name) — the name is known; it is mere
 1. Implement `check_graph` (returns `TypedModuleGraph`) alongside the existing `check` (Issue #172).
 2. Implement `evaluate_graph` alongside the existing `evaluate` (Issue #183).
 3. Wire `ResolvedNames` from the `ModuleGraph` into each module's inference scope (Issue #173).
-4. Enforce `pub_surface` in glob and named imports; introduce `T0009` (Issues #174, #176).
-5. Add alias resolution (Issue #175).
-6. Add conflict detection (Issue #177).
-7. Add re-export propagation (Issue #178).
-8. Remove the flat-merge `load_program`, `check(Program)`, `evaluate(TypedProgram)`, and all ADR-0019/ADR-0020 fallback code (Issue #179).
-9. Update spec and changelog; mark RFC-0030 incorporated (Issue #180).
+4. Implement the path normalization pass `src/path_normalizer.rs` (Issue #185).
+5. Enforce `pub_surface` in glob and named imports; introduce `T0009` (Issues #174, #176).
+6. Add alias resolution (Issue #175).
+7. Add conflict detection (Issue #177).
+8. Add re-export propagation (Issue #178).
+9. Migrate CLI binary to new pipeline (Issue #184).
+10. Remove the flat-merge `load_program`, `check(Program)`, `evaluate(TypedProgram)`, and all ADR-0019/ADR-0020 fallback code (Issue #179).
+11. Update spec and changelog; mark RFC-0030 incorporated (Issue #180).
 
 ## Resolved Questions
 
 1. **Output shape:** `check_graph` returns `TypedModuleGraph`. The evaluator is updated in the same sprint. The flat `TypedProgram` path is deleted when the migration is complete (Issue #179).
 
 2. **Private-item error code:** New code `T0009` — "name is private in module X". Using `T0003` ("undefined name") would be misleading since the name is known to the typechecker.
+
+3. **Qualified path expressions in code:** Handled by the path normalization pass (#185), not by the typechecker. The typechecker receives only bare names after normalization. This keeps path-resolution logic out of the inference engine and out of the `TypeEnv` (no qualified aliases needed). The restructuring of the typechecker into an explicit multi-stage pipeline is deferred; the normalization pass is a standalone module that does not require internal typechecker changes.
