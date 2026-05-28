@@ -159,6 +159,48 @@ fn alias_import_original_name_not_in_scope() {
     run_graph(&main).expect_err("original name should not be in scope");
 }
 
+// ── T0011: import conflict detection ─────────────────────────────────────────
+
+#[test]
+fn two_explicit_imports_same_local_name_is_t0011() {
+    let dir = fixture_dir("t0011_explicit");
+    let main = dir.join("main.mln");
+    // Both `import a::foo` and `import b::foo` bind local name `foo` → conflict
+    write(&main, "import a::foo;\nimport b::foo;\nfun main() -> Int { return foo(); }\n");
+    write(&dir.join("a.mln"), "pub fun foo() -> Int { return 1; }\n");
+    write(&dir.join("b.mln"), "pub fun foo() -> Int { return 2; }\n");
+
+    let err = run_graph(&main).expect_err("expected T0011");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0011"), "expected T0011, got: {msg}");
+}
+
+#[test]
+fn two_glob_imports_same_name_is_t0011() {
+    let dir = fixture_dir("t0011_glob");
+    let main = dir.join("main.mln");
+    write(&main, "import a::*;\nimport b::*;\nfun main() -> Int { return foo(); }\n");
+    write(&dir.join("a.mln"), "pub fun foo() -> Int { return 1; }\n");
+    write(&dir.join("b.mln"), "pub fun foo() -> Int { return 2; }\n");
+
+    let err = run_graph(&main).expect_err("expected T0011 on glob/glob conflict");
+    let msg = format!("{err}");
+    assert!(msg.contains("T0011"), "expected T0011, got: {msg}");
+}
+
+#[test]
+fn explicit_import_wins_over_glob_same_name() {
+    // Explicit import silently wins over glob that exports the same name.
+    let dir = fixture_dir("t0011_explicit_wins");
+    let main = dir.join("main.mln");
+    write(&main, "import a::foo;\nimport b::*;\nfun main() -> Int { return foo(); }\n");
+    write(&dir.join("a.mln"), "pub fun foo() -> Int { return 1; }\n");
+    write(&dir.join("b.mln"), "pub fun foo() -> Int { return 2; }\n");
+
+    // Should succeed — explicit import from `a` wins
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
 // ── T0009: visibility enforcement ────────────────────────────────────────────
 
 #[test]
@@ -238,14 +280,19 @@ fn non_pub_fun_without_annotation_is_accepted() {
 
 #[test]
 fn duplicate_top_level_name_across_modules_runs_with_warning() {
-    // Both modules declare `helper` — evaluate_graph should warn on stderr but not error.
+    // Two modules each declare a private function with the same name.
+    // Neither is exported (so no T0011 import conflict); the collision appears
+    // only in the flat runtime environment and is detected as a warning.
     let dir = fixture_dir("collision");
     let main = dir.join("main.mln");
-    write(&main, "import a::*;\nimport b::*;\nfun main() -> Int { return 0; }\n");
-    write(&dir.join("a.mln"), "pub fun helper() -> Int { return 1; }\n");
-    write(&dir.join("b.mln"), "pub fun helper() -> Int { return 2; }\n");
+    write(
+        &main,
+        "import a::pub_a;\nimport b::pub_b;\nfun main() -> Int { return pub_a() + pub_b(); }\n",
+    );
+    write(&dir.join("a.mln"), "pub fun pub_a() -> Int { return 1; }\nfun helper() -> Int { return 10; }\n");
+    write(&dir.join("b.mln"), "pub fun pub_b() -> Int { return 2; }\nfun helper() -> Int { return 20; }\n");
 
-    // The program typechecks and evaluates — collision is a warning, not an error.
+    // The program typechecks and evaluates — runtime collision of `helper` is a warning.
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 

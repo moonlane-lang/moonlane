@@ -221,10 +221,27 @@ fn build_import_schemes(
     let Some(scope) = names.scopes.get(&loaded.module_path) else { return Ok(env) };
 
     // Glob imports (lower priority — added first so explicit can override).
-    // GlobalExports only stores pub_schemes, so glob imports already filter to pub items.
+    // Track which module each glob name came from to detect glob/glob conflicts (T0011).
+    let mut glob_source: HashMap<String, &[String]> = HashMap::new();
     for glob_module in &scope.globs {
         if let Some(all_schemes) = global_exports.all_pub_schemes(glob_module) {
             for (name, scheme) in all_schemes {
+                if let Some(prior_source) = glob_source.get(name.as_str()) {
+                    // Two different glob imports export the same name → T0011.
+                    return Err(MoonlaneError::type_error(
+                        TypeErrorCode::T0011,
+                        format!(
+                            "import conflict: `{name}` is exported by both `{}` and `{}`; \
+                             use an explicit import to disambiguate: `import {}::{}` or `import {}::{}`",
+                            prior_source.join("::"),
+                            glob_module.join("::"),
+                            prior_source.join("::"), name,
+                            glob_module.join("::"), name,
+                        ),
+                        &crate::ast::Span::new(0, 0, loaded.file_path.display().to_string()),
+                    ));
+                }
+                glob_source.insert(name.clone(), glob_module.as_slice());
                 env.entry(name.clone()).or_insert_with(|| scheme.clone());
             }
         }

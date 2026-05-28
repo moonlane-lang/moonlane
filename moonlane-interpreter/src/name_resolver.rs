@@ -266,7 +266,7 @@ fn process_tree(
                 source_module,
                 source_name: name.clone(),
                 kind,
-            })?;
+            }, import_span)?;
         }
 
         ImportTree::Path { name, tree } => {
@@ -289,11 +289,21 @@ fn add_explicit(
     scope: &mut ModuleScope,
     local_name: String,
     binding: ImportBinding,
+    import_span: &Span,
 ) -> Result<(), MoonlaneError> {
-    if scope.explicit.contains_key(&local_name) {
-        return Err(MoonlaneError::internal(format!(
-            "import conflict: `{local_name}` is already bound in this module by a previous import"
-        )));
+    if let Some(existing) = scope.explicit.get(&local_name) {
+        return Err(MoonlaneError::type_error(
+            TypeErrorCode::T0011,
+            format!(
+                "import conflict: `{local_name}` is imported from both `{}` and `{}`; \
+                 use an explicit import to disambiguate: `import {}::{}` or `import {}::{}`",
+                existing.source_module.join("::"),
+                binding.source_module.join("::"),
+                existing.source_module.join("::"), existing.source_name,
+                binding.source_module.join("::"), binding.source_name,
+            ),
+            import_span,
+        ));
     }
     scope.explicit.insert(local_name, binding);
     Ok(())
