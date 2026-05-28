@@ -217,7 +217,11 @@ fn absolute_base(root: &PathRoot, current: &[String]) -> Vec<String> {
                 current[..current.len() - 1].to_vec()
             }
         }
-        PathRoot::Name(n) => vec![n.clone()],
+        PathRoot::Name(n) => {
+            let mut path = current.to_vec();
+            path.push(n.clone());
+            path
+        }
     }
 }
 
@@ -573,7 +577,8 @@ mod tests {
         let graph = make_graph(vec![
             (vec![], root_prog),
             (vec!["parser".into()], parser_prog),
-            (vec!["ast".into()], ast_module_prog),
+            // ast is imported by parser, so its path is ["parser", "ast"]
+            (vec!["parser".into(), "ast".into()], ast_module_prog),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -601,7 +606,8 @@ mod tests {
         };
         let graph = make_graph(vec![
             (vec!["parser".into()], parser_prog),
-            (vec!["ast".into()], ast_module_prog),
+            // ast is imported by parser, so its path is ["parser", "ast"]
+            (vec!["parser".into(), "ast".into()], ast_module_prog),
         ]);
 
         let names = resolve(&graph).unwrap();
@@ -625,7 +631,8 @@ mod tests {
         };
         let graph = make_graph(vec![
             (vec!["parser".into()], parser_prog),
-            (vec!["ast".into()], ast_module_prog),
+            // ast is imported by parser, so its path is ["parser", "ast"]
+            (vec!["parser".into(), "ast".into()], ast_module_prog),
         ]);
 
         let err = resolve(&graph).expect_err("re-exporting private item should fail");
@@ -655,7 +662,8 @@ mod tests {
         let graph = make_graph(vec![
             (vec![], root_prog),
             (vec!["parser".into()], parser_prog),
-            (vec!["ast".into()], ast_module_prog),
+            // ast is imported by parser, so its path is ["parser", "ast"]
+            (vec!["parser".into(), "ast".into()], ast_module_prog),
         ]);
 
         let names = resolve(&graph).unwrap();

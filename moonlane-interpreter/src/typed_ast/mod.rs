@@ -11,7 +11,22 @@ use crate::types::Type;
 // ── Program ───────────────────────────────────────────────────────────────────
 
 /// A fully typed program — list of typed declarations.
+/// Used by the old single-module pipeline; kept for compatibility.
 pub type TypedProgram = Vec<TypedDecl>;
+
+/// A single typed module, produced by `check_graph`.
+#[derive(Debug, Clone)]
+pub struct TypedModule {
+    pub module_path: Vec<String>,
+    pub decls: Vec<TypedDecl>,
+}
+
+/// The output of `check_graph` — one typed module per loaded module, in
+/// topological order (dependencies before dependents).
+#[derive(Debug, Clone)]
+pub struct TypedModuleGraph {
+    pub modules: Vec<TypedModule>,
+}
 
 // ── Typed Declarations ────────────────────────────────────────────────────────
 
