@@ -19,6 +19,9 @@ pub type TypedProgram = Vec<TypedDecl>;
 pub struct TypedModule {
     pub module_path: Vec<String>,
     pub decls: Vec<TypedDecl>,
+    /// Alias → canonical name for imports declared `import mod::name as alias`.
+    /// The evaluator registers these so that `alias` resolves to the same value as `name`.
+    pub import_aliases: std::collections::HashMap<String, String>,
 }
 
 /// The output of `check_graph` — one typed module per loaded module, in

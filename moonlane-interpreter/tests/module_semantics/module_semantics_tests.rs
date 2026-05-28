@@ -112,6 +112,30 @@ fn transitive_dependency_via_graph_pipeline() {
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
+// ── #175: alias resolution ────────────────────────────────────────────────────
+
+#[test]
+fn alias_import_makes_alias_callable() {
+    let dir = fixture_dir("alias_ok");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::answer as compute;\nfun main() -> Int { return compute(); }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
+
+    run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn alias_import_original_name_not_in_scope() {
+    // `answer` should not be resolvable after `import helper::answer as compute`
+    let dir = fixture_dir("alias_orig_out");
+    let main = dir.join("main.mln");
+    write(&main, "import helper::answer as compute;\nfun main() -> Int { return answer(); }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
+
+    // `answer` is not imported — only `compute` is. Should fail (T0003 or unresolved).
+    run_graph(&main).expect_err("original name should not be in scope");
+}
+
 // ── T0009: visibility enforcement ────────────────────────────────────────────
 
 #[test]

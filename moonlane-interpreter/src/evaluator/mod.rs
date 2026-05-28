@@ -242,14 +242,29 @@ pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MoonlaneError> {
         }
     }
 
+    // Collect import aliases before consuming graph: alias → canonical_name.
+    let all_aliases: Vec<(String, String)> = graph.modules.iter()
+        .flat_map(|m| m.import_aliases.iter().map(|(a, c)| (a.clone(), c.clone())))
+        .collect();
+
     // Flatten all module decls into a single program in topological order.
     let flat: TypedProgram = graph.modules.into_iter()
         .flat_map(|m| m.decls)
         .collect();
-    evaluate(flat)
+    evaluate_with_aliases(flat, &all_aliases)
+}
+
+/// Like `evaluate`, but after Pass 1b also registers import aliases so that
+/// `alias` resolves to the same value as `canonical_name` in the flat env.
+fn evaluate_with_aliases(program: TypedProgram, aliases: &[(String, String)]) -> Result<(), MoonlaneError> {
+    evaluate_inner(program, aliases)
 }
 
 pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
+    evaluate_inner(program, &[])
+}
+
+fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result<(), MoonlaneError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut env = Environment::new();
     builtins::register_builtins(&mut env);
@@ -309,6 +324,17 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
                 }
             }
             _ => {}
+        }
+    }
+
+    // Register import aliases after all closures are created (Pass 1b complete).
+    // Each alias points to the same value as its canonical name so calls like
+    // `compute()` (aliased from `answer`) resolve correctly at runtime.
+    for (alias, canonical) in aliases {
+        if let Some(val) = env.get(canonical) {
+            if env.get(alias).is_none() {
+                env.define(alias, val);
+            }
         }
     }
 

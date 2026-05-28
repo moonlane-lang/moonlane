@@ -184,9 +184,21 @@ pub fn check_graph(
             }
         }
 
+        // Collect import aliases (local_name → source_name where they differ).
+        // Used by evaluate_graph to register aliased names in the flat environment.
+        let import_aliases = names.scopes.get(&loaded.module_path)
+            .map(|scope| {
+                scope.explicit.iter()
+                    .filter(|(local, binding)| *local != &binding.source_name)
+                    .map(|(local, binding)| (local.clone(), binding.source_name.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
         typed_modules.push(TypedModule {
             module_path: loaded.module_path.clone(),
             decls: typed_decls,
+            import_aliases,
         });
     }
 
