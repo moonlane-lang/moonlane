@@ -13,5 +13,8 @@ mod parsing_tests;
 #[path = "module_loading/module_loading_tests.rs"]
 mod module_loading_tests;
 
+#[path = "module_semantics/module_semantics_tests.rs"]
+mod module_semantics_tests;
+
 #[path = "evaluator/evaluator_tests.rs"]
 mod evaluator_tests;
