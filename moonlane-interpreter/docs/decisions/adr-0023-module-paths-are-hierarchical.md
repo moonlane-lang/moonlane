@@ -1,7 +1,8 @@
 # ADR-0023: Module Paths Are Hierarchical (Absolute from Root)
 
 **Status:** Accepted  
-**Date:** 2026-05-28
+**Date:** 2026-05-28  
+**Updated:** 2026-05-28 (v0.6.0 — extended to cover all PathRoot variants)
 
 ---
 
@@ -21,24 +22,18 @@ root imports parser → module_path = ["parser"]
 parser imports lexer → module_path = ["parser", "lexer"]
 ```
 
-This is enforced in `module_loader.rs`:
-```rust
-let mut child_path = module_path.clone();  // parent's path
-child_path.extend(mod_segs);               // append new name
-self.load_module(child, child_path)?;
-```
+This is enforced in `module_loader.rs` by `child_module_path`, which mirrors `name_resolver::absolute_base` for every `PathRoot` variant:
 
-The `name_resolver::absolute_base` function produces the canonical key for a module referenced in an import path. For `PathRoot::Name(n)` from a module at `current`:
+| PathRoot | `absolute_base` result | `child_module_path` result |
+|---|---|---|
+| `Name(n)` | `current + [n]` | `parent + mod_segs` (where `mod_segs = [n] + rest`) |
+| `Root` | `[]` | `mod_segs` only (no parent prefix) |
+| `Self_` | `current` | `parent + mod_segs` |
+| `Super` | `current[..-1]` | `parent[..-1] + mod_segs` |
 
-```rust
-PathRoot::Name(n) => {
-    let mut path = current.to_vec();
-    path.push(n.clone());
-    path
-}
-```
+This ensures `import root::helper::*` from `parser.mln` (path `["parser"]`) resolves to module path `["helper"]`, matching helper's actual `module_path` — **not** `["parser", "helper"]`.
 
-This ensures `import lexer::*` from `parser.mln` (path `["parser"]`) resolves to `["parser", "lexer"]`, matching lexer's actual `module_path`.
+The original implementation only handled `PathRoot::Name` correctly (`parent + mod_segs`). The `root::`, `self::`, and `super::` cases were incorrect (also prepended parent path). The bug was discovered when the `root_qualified_path_in_non_root_module` integration test failed because `global_exports` had `["helper"]` but the loader registered it as `["parser", "helper"]`.
 
 ---
 

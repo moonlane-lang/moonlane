@@ -35,10 +35,6 @@
 
 Each stage is a separate Rust module. No stage is skipped.
 
-> **Note (v0.6.0 in-progress):** The CLI binary (`main.rs`) currently still uses the legacy
-> `load_program → check → evaluate` path (#184). The full pipeline above is exercised by
-> `module_semantics` integration tests and will replace the CLI path when #184 is closed.
-
 ---
 
 ## Crate Structure
@@ -83,8 +79,8 @@ tree-walk-interpreter/
 | Resolved names | `name_resolver::ResolvedNames` | name resolver | path normalizer / typechecker |
 | Normalized graph | `path_normalizer::NormalizedModuleGraph` | path normalizer | typechecker |
 | Typed module graph | `typed_ast::TypedModuleGraph` | typechecker (`check_graph`) | evaluator (`evaluate_graph`) |
-| Untyped program (legacy) | `ast::Program` | module loader (`load_program`) | typechecker (`check`) |
-| Typed program (legacy) | `typed_ast::TypedProgram` | typechecker (`check`) | evaluator (`evaluate`) |
+| Untyped program (single-file) | `ast::Program` | `load_program` (single-file shim) | typechecker (`check`) |
+| Typed program (single-file) | `typed_ast::TypedProgram` | typechecker (`check`) | evaluator (`evaluate`) |
 | Errors | `MoonlaneError` | any stage | caller / CLI |
 
 ---
@@ -110,8 +106,8 @@ Type error codes: E0001–E0008. Runtime panics (`.yolo()` on `nope`, out-of-bou
 
 | Component | Notes |
 |-----------|-------|
-| Module Loader | `src/module_loader.rs` — `load_root` builds the topological `ModuleGraph`; `load_program` (legacy) flattens it for the old single-module pipeline |
-| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope`, `pub_surface`, and re-exports; wired into `check_graph` (v0.6.0) |
+| Module Loader | `src/module_loader.rs` — `load_root` builds the topological `ModuleGraph`; `load_program` parses a single file (shim for single-file test harnesses) |
+| Name Resolver | `src/name_resolver.rs` — `resolve` produces per-module `ModuleScope`, `pub_surface`, and re-exports; wired into `check_graph` |
 | Path Normalizer | `src/path_normalizer.rs` — `normalize` rewrites qualified `Expr::Path` nodes to `Expr::ResolvedPath`; produces `NormalizedModuleGraph` |
 | Parser | `src/parser/`, `src/grammar.pest` |
 | Type Checker | [typechecker.md](typechecker.md) |

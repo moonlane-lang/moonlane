@@ -1,7 +1,6 @@
 # Typechecker Implementation Notes
 
-> Status: v0.4 complete (generics, monomorphization, let-polymorphism, aspects).  
-> v0.6.0 in-progress: per-module `check_graph` pipeline (RFC-0031).
+> Status: v0.6.0 complete — per-module `check_graph` pipeline (RFC-0031) shipped.
 
 ---
 

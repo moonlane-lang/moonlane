@@ -256,7 +256,7 @@ fn process_tree(
             let (source_module, kind) = if known_modules.contains(&module_candidate) {
                 (module_candidate, BindingKind::Module)
             } else {
-                // Record the binding regardless of visibility.
+                // Record the binding regardless of visibility. See ADR-0024.
                 // Visibility (T0009) and existence (T0003) are checked by the typechecker
                 // in build_import_schemes, which has access to the full graph and GlobalExports.
                 (base.to_vec(), BindingKind::Item)
