@@ -753,10 +753,14 @@ fn eval_untyped_expr(expr: &Expr, env: &mut Environment) -> Result<Signal, Moonl
                     None => Err(MoonlaneError::panic(RuntimeErrorCode::R0003, format!("undefined variable `{name}`"), span)),
                 }
             } else {
-                // Check env first (e.g. "Circle::new" for static methods);
-                // fall back to unit enum variant construction only if not found.
+                // Check full qualified name (e.g. "Circle::new" for static methods).
                 let key = segments.join("::");
                 if let Some(val) = env.get(&key) {
+                    return Ok(Signal::Value(val));
+                }
+                // Check last segment alone for module-qualified calls (e.g. helper::answer → answer).
+                let last = segments.last().unwrap();
+                if let Some(val) = env.get(last) {
                     return Ok(Signal::Value(val));
                 }
                 let name    = segments[segments.len() - 2].clone();
@@ -1108,10 +1112,14 @@ pub fn eval_expr(expr: &TypedExpr, env: &mut Environment) -> Result<Signal, Moon
                     )),
                 }
             } else {
-                // Check env first (e.g. "Circle::new" for static methods);
-                // fall back to unit enum variant construction only if not found.
+                // Check full qualified name (e.g. "Circle::new" for static methods).
                 let key = segments.join("::");
                 if let Some(val) = env.get(&key) {
+                    return Ok(Signal::Value(val));
+                }
+                // Check last segment alone for module-qualified calls (e.g. helper::answer → answer).
+                let last = segments.last().unwrap();
+                if let Some(val) = env.get(last) {
                     return Ok(Signal::Value(val));
                 }
                 let name    = segments[segments.len() - 2].clone();

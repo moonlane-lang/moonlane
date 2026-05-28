@@ -612,21 +612,43 @@ fn construct_expr(
             })
         }
         Expr::Path(segments, span) => {
-            let [type_name, member_name] = segments.as_slice() else {
-                return Err(MoonlaneError::internal("invalid path in construct"));
-            };
-            if let Some(ty) = ctx.method_env
-                .get(type_name.as_str())
-                .and_then(|m| m.get(member_name.as_str()))
-                .cloned()
-            {
+            // For 2-segment paths, try method_env first (static methods, enum variant constructors).
+            if let [type_name, member_name] = segments.as_slice() {
+                if let Some(ty) = ctx.method_env
+                    .get(type_name.as_str())
+                    .and_then(|m| m.get(member_name.as_str()))
+                    .cloned()
+                {
+                    return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
+                }
+                // Also check enum variants via enum_env.
+                if let Some(info) = ctx.enum_env.get(type_name.as_str()) {
+                    if let Some(variant) = info.variants.iter().find(|v| &v.name == member_name) {
+                        let ty = if variant.fields.is_empty() {
+                            Type::Named(type_name.clone(), vec![])
+                        } else {
+                            let field_types: Vec<Type> = variant.fields.iter()
+                                .map(|(_, t)| infer_type_to_type(t, span))
+                                .collect::<Result<_, _>>()?;
+                            Type::Fun(field_types, Box::new(Type::Named(type_name.clone(), vec![])))
+                        };
+                        return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
+                    }
+                }
+            }
+            // Fallback: look up last segment as a module-qualified item.
+            let last = segments.last().ok_or_else(|| MoonlaneError::internal("empty path in construct"))?;
+            if let Some(ty) = ctx.lookup(last).cloned() {
                 return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
             }
-            Ok(TypedExpr::Path(
-                segments.clone(),
-                Type::Named(type_name.clone(), vec![]),
-                span.clone(),
-            ))
+            // Try scheme_env for polymorphic functions — instantiate with fresh vars.
+            if let Some(scheme) = ctx.scheme_env.get(last.as_str()) {
+                let instance = instantiate(scheme, &mut ctx.gen);
+                if let Ok(ty) = infer_type_to_type(&instance, span) {
+                    return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
+                }
+            }
+            Err(MoonlaneError::internal(format!("unresolved path `{}`", segments.join("::"))))
         }
         Expr::Closure { params, return_type, body, span } => {
             let param_types: Vec<Type> = params.iter()
@@ -1068,6 +1090,14 @@ fn construct_call(
                 _ => vec![None; args.len()],
             }
         }
+        Expr::Path(segments, _) => {
+            let last = segments.last().map(|s| s.as_str()).unwrap_or("");
+            match ctx.lookup(last) {
+                Some(Type::Fun(params, _)) if params.len() == args.len() =>
+                    params.iter().map(|p| Some(p.clone())).collect(),
+                _ => vec![None; args.len()],
+            }
+        }
         _ => vec![None; args.len()],
     };
 
@@ -1084,6 +1114,22 @@ fn construct_call(
             })?;
             let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
             let typed = TypedExpr::Ident(name.clone(), concrete.clone(), ident_span.clone());
+            (typed, concrete)
+        }
+        Expr::Path(segments, path_span) if {
+            let last = segments.last().map(|s| s.as_str()).unwrap_or("");
+            ctx.lookup(last).is_none()
+                && ctx.scheme_env.contains_key(last)
+                // Only use scheme instantiation if method_env doesn't have it
+                && !(segments.len() == 2 && ctx.method_env
+                    .get(segments[0].as_str())
+                    .and_then(|m| m.get(segments[1].as_str()))
+                    .is_some())
+        } => {
+            let last = segments.last().unwrap();
+            let scheme = ctx.scheme_env.get(last.as_str()).unwrap();
+            let concrete = instantiate_scheme_for_call(scheme, &arg_types, span, &mut ctx.gen)?;
+            let typed = TypedExpr::Path(segments.clone(), concrete.clone(), path_span.clone());
             (typed, concrete)
         }
         _ => {

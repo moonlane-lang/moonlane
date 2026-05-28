@@ -137,3 +137,43 @@ fn rejects_circular_module_graph() {
 
     assert!(msg.contains("circular module dependency"), "message was: {msg}");
 }
+
+#[test]
+fn qualified_function_call_via_module_handle() {
+    let dir = fixture_dir("qual_fn");
+    let main = dir.join("main.mln");
+    // import helper::* loads helper.mln into the graph.
+    // helper::answer() uses a qualified path; typechecker falls back to bare "answer".
+    write(&main, "import helper::*;\nfun main() -> Int { return helper::answer(); }\n");
+    write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
+
+    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
+    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
+    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn qualified_type_in_return_signature_typechecks() {
+    let dir = fixture_dir("qual_type");
+    let main = dir.join("main.mln");
+    // helper::Token as return type — TypeExpr::Named("helper::Token") strips to "Token".
+    // The struct literal uses the bare name Token (already visible in merged namespace).
+    write(&main, "import helper::*;\nfun wrap(v: Int) -> helper::Token { return Token { value: v }; }\nfun main() -> Int { let t = wrap(7); return t.value; }\n");
+    write(&dir.join("helper.mln"), "pub struct Token { value: Int }\n");
+
+    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
+    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
+    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn self_qualified_path_in_expression_resolves() {
+    let dir = fixture_dir("self_path");
+    let main = dir.join("main.mln");
+    // self::answer() — Path(["self","answer"]); typechecker falls back to bare "answer".
+    write(&main, "fun answer() -> Int { return 99; }\nfun main() -> Int { return self::answer(); }\n");
+
+    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
+    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
+    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+}

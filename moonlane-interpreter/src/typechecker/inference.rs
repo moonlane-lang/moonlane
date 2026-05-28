@@ -89,7 +89,7 @@ fn infer_decl(
         Decl::Struct(_) | Decl::Enum(_) | Decl::Aspect(_) => Ok(InferType::unit()),
         Decl::Impl(ib) => {
             let target_name = match &ib.target_type {
-                TypeExpr::Named(name, _) => name.clone(),
+                TypeExpr::Named(name, _) => name.rsplit("::").next().unwrap_or(name).to_string(),
                 _ => return Err(MoonlaneError::internal("generic impl blocks not yet supported")),
             };
             // Verify the impl provides every method the aspect declares.
@@ -615,29 +615,33 @@ fn infer_expr(
             Ok(break_var)
         }
         Expr::Path(segments, span) => {
-            let [type_name, member_name] = segments.as_slice() else {
-                return Err(MoonlaneError::type_error(
-                    TypeErrorCode::T0003,
-                    format!("unresolved path `{}`", segments.join("::")),
-                    span,
-                ));
-            };
-            if let Some(fun_ty) = ctx.get_method_type(type_name, member_name).cloned() {
-                return Ok(fun_ty);
-            }
-            if let Some(info) = ctx.get_enum(type_name).cloned() {
-                if let Some(variant) = info.variants.iter().find(|v| v.name == *member_name) {
-                    if variant.fields.is_empty() {
-                        let type_args: Vec<InferType> = info.type_params.iter()
-                            .map(|_| ctx.fresh_var())
-                            .collect();
-                        return Ok(InferType::Named(type_name.clone(), type_args));
+            // For 2-segment paths, first try TypeName::member (static methods, enum variants).
+            if let [type_name, member_name] = segments.as_slice() {
+                if let Some(fun_ty) = ctx.get_method_type(type_name, member_name).cloned() {
+                    return Ok(fun_ty);
+                }
+                if let Some(info) = ctx.get_enum(type_name).cloned() {
+                    if let Some(variant) = info.variants.iter().find(|v| v.name == *member_name) {
+                        if variant.fields.is_empty() {
+                            let type_args: Vec<InferType> = info.type_params.iter()
+                                .map(|_| ctx.fresh_var())
+                                .collect();
+                            return Ok(InferType::Named(type_name.clone(), type_args));
+                        }
                     }
                 }
             }
+            // Fallback for module-qualified paths: look up the last segment as a free name.
+            // This handles `helper::answer`, `self::fn_name`, `root::mod::item`, etc.
+            if let Some(last) = segments.last() {
+                if let Some(ty) = ctx.lookup(last) {
+                    return Ok(ty);
+                }
+            }
+            let path_str = segments.join("::");
             Err(MoonlaneError::type_error(
                 TypeErrorCode::T0003,
-                format!("no member `{member_name}` on type `{type_name}`"),
+                format!("unresolved path `{path_str}`"),
                 span,
             ))
         }
