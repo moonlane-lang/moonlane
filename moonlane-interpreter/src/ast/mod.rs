@@ -120,6 +120,7 @@ pub struct MutDecl {
 
 #[derive(Debug, Clone)]
 pub struct FunDecl {
+    #[allow(dead_code)] // read by name_resolver; not yet wired into the typechecker pipeline
     pub visibility:  Visibility,
     pub name:        String,
     pub generics:    Vec<GenericParam>,
@@ -132,6 +133,7 @@ pub struct FunDecl {
 
 #[derive(Debug, Clone)]
 pub struct StructDecl {
+    #[allow(dead_code)]
     pub visibility: Visibility,
     pub name:       String,
     pub generics:   Vec<GenericParam>,
@@ -142,6 +144,7 @@ pub struct StructDecl {
 
 #[derive(Debug, Clone)]
 pub struct EnumDecl {
+    #[allow(dead_code)]
     pub visibility: Visibility,
     pub name:       String,
     pub generics:   Vec<GenericParam>,
@@ -161,6 +164,7 @@ pub struct ImplBlock {
 
 #[derive(Debug, Clone)]
 pub struct AspectDecl {
+    #[allow(dead_code)]
     pub visibility: Visibility,
     pub name:       String,
     pub generics:   Vec<String>,
