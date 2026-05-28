@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use moonlane::evaluator;
 use moonlane::module_loader;
+use moonlane::name_resolver;
+use moonlane::path_normalizer;
 use moonlane::typechecker;
 
 fn fixture_dir(name: &str) -> PathBuf {
@@ -143,13 +145,16 @@ fn qualified_function_call_via_module_handle() {
     let dir = fixture_dir("qual_fn");
     let main = dir.join("main.mln");
     // import helper::* loads helper.mln into the graph.
-    // helper::answer() uses a qualified path; typechecker falls back to bare "answer".
+    // helper::answer() uses a qualified path; the path normalizer rewrites it to "answer".
     write(&main, "import helper::*;\nfun main() -> Int { return helper::answer(); }\n");
     write(&dir.join("helper.mln"), "pub fun answer() -> Int { return 42; }\n");
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
+    let names = name_resolver::resolve(&graph).unwrap_or_else(|e| panic!("{e}"));
+    let normalized = path_normalizer::normalize(graph, &names).unwrap_or_else(|e| panic!("{e}"));
+    let typed = typechecker::check_graph(normalized, &names, typechecker::StdPrelude::empty())
+        .unwrap_or_else(|e| panic!("{e}"));
+    evaluator::evaluate_graph(typed).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -170,12 +175,15 @@ fn qualified_type_in_return_signature_typechecks() {
 fn self_qualified_path_in_expression_resolves() {
     let dir = fixture_dir("self_path");
     let main = dir.join("main.mln");
-    // self::answer() — Path(["self","answer"]); typechecker falls back to bare "answer".
+    // self::answer() — Path(["self","answer"]); the path normalizer rewrites it to "answer".
     write(&main, "fun answer() -> Int { return 99; }\nfun main() -> Int { return self::answer(); }\n");
 
-    let program = module_loader::load_program(&main).unwrap_or_else(|e| panic!("{e}"));
-    let typed = typechecker::check(program).unwrap_or_else(|e| panic!("{e}"));
-    evaluator::evaluate(typed).unwrap_or_else(|e| panic!("{e}"));
+    let graph = module_loader::load_root(&main).unwrap_or_else(|e| panic!("{e}"));
+    let names = name_resolver::resolve(&graph).unwrap_or_else(|e| panic!("{e}"));
+    let normalized = path_normalizer::normalize(graph, &names).unwrap_or_else(|e| panic!("{e}"));
+    let typed = typechecker::check_graph(normalized, &names, typechecker::StdPrelude::empty())
+        .unwrap_or_else(|e| panic!("{e}"));
+    evaluator::evaluate_graph(typed).unwrap_or_else(|e| panic!("{e}"));
 }
 
 // ── #169: module system integration tests ────────────────────────────────────

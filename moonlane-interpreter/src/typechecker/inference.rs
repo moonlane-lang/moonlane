@@ -638,14 +638,6 @@ fn infer_expr(
                     }
                 }
             }
-            // Last-segment fallback: works because the flat merge (ADR-0019) registers all
-            // declarations under their bare names. Remove when per-module scope is
-            // introduced (ADR-0020).
-            if let Some(last) = segments.last() {
-                if let Some(ty) = ctx.lookup(last) {
-                    return Ok(ty);
-                }
-            }
             let path_str = segments.join("::");
             Err(MoonlaneError::type_error(
                 TypeErrorCode::T0003,

@@ -16,6 +16,23 @@ mod registry;
 
 type SchemeEnv = HashMap<String, TypeScheme>;
 
+// ── ScopedEnv ─────────────────────────────────────────────────────────────────
+
+/// A single resolved import binding, tracking the source module for conflict
+/// reporting. Used by `ScopedEnv` and by #177 (T0011 conflict detection).
+#[allow(dead_code)]
+enum Binding {
+    /// Unambiguous: one scheme from one source module.
+    Single { scheme: TypeScheme, source: ModulePath },
+    /// Conflicting glob imports both export the same name.
+    /// Deferred error: T0011 fires when the name is looked up.
+    Conflict { sources: Vec<ModulePath> },
+}
+
+/// Per-module import scope, seeded imports-first then local declarations.
+/// Used to build the `SchemeEnv` passed to `check_impl`.
+type ScopedEnv = HashMap<String, Binding>;
+
 struct FunGeneralization {
     name:    String,
     fun_ty:  InferType,

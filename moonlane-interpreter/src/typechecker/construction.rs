@@ -644,20 +644,6 @@ fn construct_expr(
                     }
                 }
             }
-            // Last-segment fallback: `mod::name` resolves as bare `name` because the flat
-            // merge (ADR-0019) registers all declarations under their bare names. Remove
-            // when per-module scope is introduced (ADR-0020).
-            let last = segments.last().ok_or_else(|| MoonlaneError::internal("empty path in construct"))?;
-            if let Some(ty) = ctx.lookup(last).cloned() {
-                return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
-            }
-            // Try scheme_env for polymorphic functions — instantiate with fresh vars.
-            if let Some(scheme) = ctx.scheme_env.get(last.as_str()) {
-                let instance = instantiate(scheme, &mut ctx.gen);
-                if let Ok(ty) = infer_type_to_type(&instance, span) {
-                    return Ok(TypedExpr::Path(segments.clone(), ty, span.clone()));
-                }
-            }
             Err(MoonlaneError::internal(format!("unresolved path `{}`", segments.join("::"))))
         }
         Expr::Closure { params, return_type, body, span } => {
