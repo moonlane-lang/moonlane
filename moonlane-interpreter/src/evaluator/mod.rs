@@ -225,67 +225,67 @@ impl<'a> ImplMethodKey<'a> {
 
 /// Evaluate a typed module graph produced by `check_graph`.
 ///
-/// Concatenates all module declarations in topological order into a flat program
-/// and evaluates them. Per-module runtime environments are deferred to v0.7.0 (#189).
+/// Each module is initialised in its own `Environment` seeded with builtins,
+/// then cross-linked via the `imported_names` table populated by `check_graph`.
+/// Modules are processed in topological order (dependencies before dependents).
 pub fn evaluate_graph(graph: TypedModuleGraph) -> Result<(), MoonlaneError> {
-    // Best-effort detection of duplicate top-level names across modules (#192).
-    let mut seen_names: HashMap<String, Vec<String>> = HashMap::new();
-    for module in &graph.modules {
-        for decl in &module.decls {
-            let name = match decl {
-                TypedDecl::Fun(f) => Some(f.name.clone()),
-                TypedDecl::Let(l) => Some(l.name.clone()),
-                TypedDecl::Mut(m) => Some(m.name.clone()),
-                _ => None,
-            };
-            if let Some(n) = name {
-                seen_names.entry(n).or_default().push(module.module_path.join("::"));
+    CALL_STACK.with(|s| s.borrow_mut().clear());
+
+    // module_envs: path → fully initialised Environment.
+    // Built incrementally; later modules can look up values from earlier ones.
+    let mut module_envs: HashMap<Vec<String>, Environment> = HashMap::new();
+
+    let root_path = graph.modules.last()
+        .map(|m| m.module_path.clone())
+        .unwrap_or_default();
+
+    for module in graph.modules {
+        let mut env = Environment::new();
+        builtins::register_builtins(&mut env);
+
+        // Seed names imported from already-initialised dependency modules.
+        for (local_name, (source_module, canonical_name)) in &module.imported_names {
+            if let Some(src_env) = module_envs.get(source_module) {
+                if let Some(val) = src_env.get(canonical_name) {
+                    env.define(local_name, val);
+                }
             }
         }
-    }
-    for (name, modules) in &seen_names {
-        if modules.len() > 1 {
-            eprintln!(
-                "warning: top-level name `{name}` declared in multiple modules ({}); \
-                 behaviour is undefined (#189)",
-                modules.join(", ")
-            );
-        }
+
+        // Run the standard 3-pass + alias evaluation on this module's decls.
+        run_passes(&module.decls, &module.import_aliases, &mut env)?;
+
+        module_envs.insert(module.module_path, env);
     }
 
-    // Collect import aliases before consuming graph: alias → canonical_name.
-    let all_aliases: Vec<(String, String)> = graph.modules.iter()
-        .flat_map(|m| m.import_aliases.iter().map(|(a, c)| (a.clone(), c.clone())))
-        .collect();
-
-    // Flatten all module decls into a single program in topological order.
-    let flat: TypedProgram = graph.modules.into_iter()
-        .flat_map(|m| m.decls)
-        .collect();
-    evaluate_with_aliases(flat, &all_aliases)
-}
-
-/// Like `evaluate`, but after Pass 1b also registers import aliases so that
-/// `alias` resolves to the same value as `canonical_name` in the flat env.
-fn evaluate_with_aliases(program: TypedProgram, aliases: &[(String, String)]) -> Result<(), MoonlaneError> {
-    evaluate_inner(program, aliases)
+    // Run main() from the root module's environment.
+    let dummy = Span { start: 0, end: 0, filename: "<program>".to_string(), line: 0, col: 0 };
+    let env = module_envs.get_mut(&root_path)
+        .ok_or_else(|| MoonlaneError::panic(RuntimeErrorCode::R0001, "root module not found", &dummy))?;
+    run_main(env)
 }
 
 pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
-    evaluate_inner(program, &[])
-}
-
-fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result<(), MoonlaneError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut env = Environment::new();
-    // KNOWN LIMITATION (#189): evaluate_graph flattens all modules into one Environment.
-    // std::core builtins are seeded here at lowest priority; a user binding with the same
-    // name will shadow them silently. Per-module environments (tracked in #189) will fix this.
     builtins::register_builtins(&mut env);
+    run_passes(&program, &std::collections::HashMap::new(), &mut env)?;
+    run_main(&mut env)
+}
 
-    // Pass 1a: define placeholder entries for all top-level functions and methods
-    // so that closures created in 1b can capture references to them via shared Rcs.
-    for decl in &program {
+/// Run the standard 3-pass evaluation on `decls` into `env`.
+///
+/// Pass 1a: placeholder bindings so closures can capture each other's Rc.
+/// Pass 1b: replace placeholders with real closures ("ties the knot").
+/// Alias registration: bind aliased import names after closures exist.
+/// Pass 2: evaluate top-level let/mut/stmt declarations in order.
+fn run_passes(
+    decls:   &TypedProgram,
+    aliases: &std::collections::HashMap<String, String>,
+    env:     &mut Environment,
+) -> Result<(), MoonlaneError> {
+    // Pass 1a
+    for decl in decls {
         match decl {
             TypedDecl::Fun(f) => { env.define(&f.name, Value::Unit); }
             TypedDecl::Impl(impl_block) => {
@@ -300,39 +300,30 @@ fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result
         }
     }
 
-    // Pass 1b: create closures that capture the now-complete name set.
-    // Using env.set() mutates existing Rc cells, so all already-captured envs
-    // (from earlier iterations) see the updates — this "ties the knot" for
-    // mutual recursion without a separate fixpoint pass.
-    for decl in &program {
+    // Pass 1b
+    for decl in decls {
         match decl {
             TypedDecl::Fun(f) => {
                 let body = match &f.body {
-                    FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
+                    FunBody::Typed(b)   => ClosureBody::Typed(b.clone()),
                     FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
                 };
                 let captured = env.clone();
                 env.set(&f.name, Value::Closure(Rc::new(ClosureValue {
-                    name:     Some(f.name.clone()),
-                    params:   f.params.clone(),
-                    body,
-                    captured,
+                    name: Some(f.name.clone()), params: f.params.clone(), body, captured,
                 })));
             }
             TypedDecl::Impl(impl_block) => {
                 if let crate::ast::TypeExpr::Named(type_name, _) = &impl_block.target_type {
                     for method in &impl_block.methods {
                         let body = match &method.body {
-                            FunBody::Typed(b) => ClosureBody::Typed(b.clone()),
+                            FunBody::Typed(b)   => ClosureBody::Typed(b.clone()),
                             FunBody::Generic(b) => ClosureBody::Untyped(b.clone()),
                         };
                         let key = ImplMethodKey::from_block(type_name, &method.name, impl_block).to_env_key();
                         let captured = env.clone();
                         env.set(&key, Value::Closure(Rc::new(ClosureValue {
-                            name:     Some(method.name.clone()),
-                            params:   method.params.clone(),
-                            body,
-                            captured,
+                            name: Some(method.name.clone()), params: method.params.clone(), body, captured,
                         })));
                     }
                 }
@@ -341,9 +332,7 @@ fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result
         }
     }
 
-    // Register import aliases after all closures are created (Pass 1b complete).
-    // Each alias points to the same value as its canonical name so calls like
-    // `compute()` (aliased from `answer`) resolve correctly at runtime.
+    // Alias registration
     for (alias, canonical) in aliases {
         if let Some(val) = env.get(canonical) {
             if env.get(alias).is_none() {
@@ -352,15 +341,18 @@ fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result
         }
     }
 
-    // Pass 2: evaluate top-level let/mut bindings and statements in order.
-    for decl in &program {
+    // Pass 2
+    for decl in decls {
         if !matches!(decl, TypedDecl::Fun(_) | TypedDecl::Impl(_)) {
-            eval_decl(decl, &mut env)?;
+            eval_decl(decl, env)?;
         }
     }
 
-    // Call main() by executing its body in the full top-level env so that any
-    // top-level let/mut bindings from Pass 2 are visible.
+    Ok(())
+}
+
+/// Locate and execute `main()` in `env`. Called after all passes complete.
+fn run_main(env: &mut Environment) -> Result<(), MoonlaneError> {
     let dummy = Span { start: 0, end: 0, filename: "<program>".to_string(), line: 0, col: 0 };
     let main_body = match env.get("main") {
         Some(Value::Closure(rc)) => rc.body.clone(),
@@ -372,14 +364,12 @@ fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result
             return Err(MoonlaneError::panic(RuntimeErrorCode::R0001, "no main() function defined", &dummy)),
     };
     let main_sig = match &main_body {
-        ClosureBody::Typed(b)   => eval_block(b, &mut env),
-        ClosureBody::Untyped(b) => eval_untyped_block(b, &mut env),
+        ClosureBody::Typed(b)   => eval_block(b, env),
+        ClosureBody::Untyped(b) => eval_untyped_block(b, env),
     };
     match main_sig? {
         Signal::Value(_) | Signal::Return(_) => Ok(()),
-        other => Err(MoonlaneError::internal(
-            format!("unexpected signal from main(): {other:?}"),
-        )),
+        other => Err(MoonlaneError::internal(format!("unexpected signal from main(): {other:?}"))),
     }
 }
 

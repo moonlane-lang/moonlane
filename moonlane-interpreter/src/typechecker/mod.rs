@@ -198,14 +198,37 @@ pub fn check_graph(
             }
         }
 
-        // Collect import aliases (local_name → source_name where they differ).
-        // Used by evaluate_graph to register aliased names in the flat environment.
-        let import_aliases = names.scopes.get(&loaded.module_path)
+        let (import_aliases, imported_names) = names.scopes.get(&loaded.module_path)
             .map(|scope| {
-                scope.explicit.iter()
+                let aliases = scope.explicit.iter()
                     .filter(|(local, binding)| *local != &binding.source_name)
                     .map(|(local, binding)| (local.clone(), binding.source_name.clone()))
-                    .collect()
+                    .collect();
+
+                let mut imports: HashMap<String, (Vec<String>, String)> = HashMap::new();
+
+                // Glob imports (lower priority — added first so explicit can override).
+                // Process Std then User, mirroring build_import_schemes tier ordering.
+                // std::core names are always registered via builtins, so skipping the
+                // Std glob here is safe — but we still process User globs for cross-module names.
+                let ordered_globs = scope.globs.iter()
+                    .filter(|(t, _)| *t == GlobTier::Std)
+                    .chain(scope.globs.iter().filter(|(t, _)| *t == GlobTier::User));
+                for (_, glob_module) in ordered_globs {
+                    let Some(pub_schemes) = global_exports.all_pub_schemes(glob_module) else { continue };
+                    for name in pub_schemes.keys() {
+                        imports.insert(name.clone(), (glob_module.clone(), name.clone()));
+                    }
+                }
+
+                // Explicit imports (higher priority — overwrite globs).
+                for (local, binding) in &scope.explicit {
+                    if binding.kind == crate::name_resolver::BindingKind::Item {
+                        imports.insert(local.clone(), (binding.source_module.clone(), binding.source_name.clone()));
+                    }
+                }
+
+                (aliases, imports)
             })
             .unwrap_or_default();
 
@@ -213,6 +236,7 @@ pub fn check_graph(
             module_path: loaded.module_path.clone(),
             decls: typed_decls,
             import_aliases,
+            imported_names,
         });
     }
 

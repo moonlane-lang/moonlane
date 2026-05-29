@@ -22,6 +22,9 @@ pub struct TypedModule {
     /// Alias → canonical name for imports declared `import mod::name as alias`.
     /// The evaluator registers these so that `alias` resolves to the same value as `name`.
     pub import_aliases: std::collections::HashMap<String, String>,
+    /// Every explicitly imported name: local_name → (source_module_path, canonical_name).
+    /// Used by `evaluate_graph` to seed each module's environment from its dependencies.
+    pub imported_names: std::collections::HashMap<String, (Vec<String>, String)>,
 }
 
 /// The output of `check_graph` — one typed module per loaded module, in
