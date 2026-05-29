@@ -112,7 +112,7 @@ Each binding is stored as an `Rc<RefCell<Value>>`. This has two consequences:
 **Pass 1a — Define placeholders:**
 Every top-level `Fun` and `Impl` method is bound to `Value::Unit` in the root environment. This ensures the names exist before any closure is created, so closures formed in Pass 1b can capture them via shared `Rc`s.
 
-Impl methods are registered under a structured key computed by `impl_method_key()`:
+Impl methods are registered under a structured key produced by `ImplMethodKey::from_block(...).to_env_key()`:
 - Ordinary impl methods: `"TypeName::method_name"`
 - `impl From<S> for T` methods: `"T::From<S>::from"` (disambiguates multiple `From` impls on the same target)
 

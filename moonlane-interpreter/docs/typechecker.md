@@ -148,15 +148,15 @@ The HM algorithm infers types at rank 1: `∀` only at the outermost level. High
 Three hoisting steps run before Pass 1:
 
 1. `register_builtins` — binds built-in function names (`print`, `array_push`, etc.) as `TypeScheme` entries in `ctx.poly_env`, and registers `String.len` in `ctx.method_env`.
-2. `build_registry` (via `TypeRegistry`) — registers `Perhaps<T>` and `Result<T,E>` with their type params as fresh type variables, user-defined enum variants, struct field types, and method signatures.
-3. `hoist_fun_decls` — walks top-level `FunDecl`s and pre-registers each with a fresh type variable in `ctx.mono_env`. Enables forward references and mutual recursion.
+2. `build_registry` (via `TypeDefinitionRegistry`) — registers `Perhaps<T>` and `Result<T,E>` with their type params as fresh type variables, user-defined enum variants, struct field types, and method signatures.
+3. `hoist_fun_decls` — walks top-level `FunDecl`s and pre-registers each with a fresh type variable in both `ctx.mono_env` and `ctx.poly_env`. Enables forward references, mutual recursion, and shadowing of `std::core` builtin names.
 
 `hoist_fun_decls` is also called at block entry in `infer_block`, so nested functions support forward references within their block.
 
 Struct and enum declarations follow **lexical scope rules** matching Rust's model:
 
 - `build_registry` registers only top-level `struct`/`enum` declarations. These are globally visible for the entire compilation unit.
-- Struct/enum declarations inside function bodies (or any nested block) are registered at block entry by `infer_block` using `TypeRegistry::push_struct_scope` / `register_struct_fields` / `pop_struct_scope`. On scope exit, all names registered in that scope are removed from the registry.
+- Struct/enum declarations inside function bodies (or any nested block) are registered at block entry by `infer_block` using `TypeDefinitionRegistry::push_struct_scope` / `register_struct_fields` / `pop_struct_scope`. On scope exit, all names registered in that scope are removed from the registry.
 - `construct_block` in Pass 2 mirrors this: it pushes a new struct scope, builds concrete field types from the substitution, and pops on exit.
 - A locally-declared struct is **not visible outside its enclosing block**. Two functions may declare structs with the same name without collision.
 
@@ -174,7 +174,7 @@ InferContext {
     poly_env: Vec<HashMap<String, TypeScheme>>           // scope stack, mirrors mono_env
     constraints: Vec<Constraint>                        // accumulated equality constraints
     var_gen: TypeVarGenerator                           // globally unique TypeVar allocator
-    registry: TypeRegistry                              // pre-built struct/enum/method registries
+    registry: TypeDefinitionRegistry                    // pre-built struct/enum/method/aspect-impl registries
     current_return_type / current_break_type            // context for return/break inference
     current_type_params: HashMap<String, TypeVar>       // active generic param map (see below)
 }
@@ -264,16 +264,18 @@ Error: `E0008 Non-exhaustive match`.
 
 ## Type Registries
 
-Three registries live inside `TypeRegistry` (owned by `InferContext`):
+All type and impl data is stored in a single `TypeDefinitionRegistry` (owned by `InferContext`, shared with `ConstructCtx` via reference). This replaced the previous design where four separate maps were passed to `ConstructCtx` individually (#133).
 
 | Field | Type | Content |
 |---|---|---|
-| `struct_env` | `HashMap<String, Vec<(String, InferType)>>` | struct name → field list (TypeVars for generic params) |
+| `struct_env` | `HashMap<String, Vec<(String, InferType, Span)>>` | struct name → field list (name, type, declaration span) |
 | `struct_type_params` | `HashMap<String, Vec<TypeVar>>` | generic struct name → ordered type-param TypeVars (absent for non-generic structs) |
 | `method_env` | `HashMap<String, HashMap<String, InferType>>` | type name → method name → fun type |
 | `enum_env` | `HashMap<String, EnumInfo>` | enum name → variant list + type params |
+| `aspect_env` | `HashMap<String, Vec<String>>` | aspect name → required method names |
+| `impl_aspect_env` | `HashMap<(target, aspect), Vec<Vec<Type>>>` | aspect impl type-arg lists |
 
-`TypeRegistry` is constructed in one pre-pass and injected into `InferContext::new`, consistent with [ADR-0001](decisions/adr-0001-typeregistry-structure-and-location.md).
+`TypeDefinitionRegistry` is constructed in one pre-pass and injected into `InferContext::new`, consistent with [ADR-0001](decisions/adr-0001-typeregistry-structure-and-location.md).
 
 ---
 
@@ -291,7 +293,7 @@ Three registries live inside `TypeRegistry` (owned by `InferContext`):
 
 All four v0.4 extension points are done:
 
-1. ~~Add `impl_env` / extend `TypeRegistry` with aspect-impl storage~~ — **done**: `TypeRegistry` carries `aspect_env: HashMap<String, Vec<String>>` (aspect name → required method names) and `impl_aspect_env: HashMap<(target, aspect), Vec<Vec<Type>>>` (impl type-arg lists).
+1. ~~Add `impl_env` / extend `TypeDefinitionRegistry` with aspect-impl storage~~ — **done**: `TypeDefinitionRegistry` carries `aspect_env: HashMap<String, Vec<String>>` (aspect name → required method names) and `impl_aspect_env: HashMap<(target, aspect), Vec<Vec<Type>>>` (impl type-arg lists).
 2. ~~Replace the provisional `as` cast with a `From<S>` aspect check~~ — **done**: `construct_cast` calls `has_from_impl(target, source)` and errors with `cannot cast` if no impl is registered.
 3. ~~Replace the provisional `?` error type match with a `From<E>` coercion lookup~~ — **done**: `construction.rs` emits a `PropagateError` node carrying the `from_key` when `E1 ≠ E2`; the evaluator calls the impl at runtime.
 4. ~~Upgrade `for-in` from Array/Range only to an `Iterable<T>` aspect check~~ — **done**: inference pass checks `iterable_elem_type` and falls back to Array/Range for built-in types.
