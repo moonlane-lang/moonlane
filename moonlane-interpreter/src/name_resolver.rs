@@ -96,6 +96,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MoonlaneError> {
     // Inject the std::core virtual module into pub_surface so that
     // `import std::core::Perhaps` and similar are recognized as valid imports.
     // (std::core has no physical file; these names are registered in the type registry.)
+    // See ADR-0027 for the virtual-module design and its migration path.
     let std_core_surface: HashSet<String> = [
         "Perhaps", "Result", "Display", "Iterable", "From",
     ].iter().map(|s| s.to_string()).collect();
@@ -135,8 +136,8 @@ fn resolve_module(
         process_tree(&base, &import.path.tree, known_modules, pub_surface, &mut scope, &import.span)?;
     }
 
-    // Auto-import std::core at lowest (Std) priority — RFC-0030.
-    // Every module sees core names without an explicit import statement.
+    // Auto-import std::core at lowest (Std) priority — RFC-0030. See ADR-0026 (glob tiers)
+    // and ADR-0027 (virtual module). Every module sees core names without an explicit import.
     scope.globs.push((GlobTier::Std, vec!["std".to_string(), "core".to_string()]));
 
     Ok(scope)

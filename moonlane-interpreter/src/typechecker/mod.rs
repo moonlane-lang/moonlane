@@ -169,6 +169,7 @@ pub fn check_graph(
     let mut global_exports = GlobalExports::new();
 
     // Seed std::core into GlobalExports so that std:: imports and the auto-glob resolve.
+    // StdPrelude is the single source of truth for all built-in schemes. See ADR-0027.
     global_exports.insert(
         vec!["std".to_string(), "core".to_string()],
         ModuleExports { pub_schemes: std_prelude.schemes().clone() },
@@ -235,7 +236,7 @@ fn build_import_schemes(
 
     // Glob imports (lower priority — added first so explicit can override).
     // Process Std globs before User globs so User silently wins cross-tier conflicts.
-    // T0011 fires only when two globs of the **same** tier export the same name.
+    // T0011 fires only when two globs of the **same** tier export the same name. See ADR-0026.
     let mut glob_source: HashMap<String, (Vec<String>, GlobTier)> = HashMap::new();
     let ordered_globs = scope.globs.iter()
         .filter(|(t, _)| *t == GlobTier::Std)

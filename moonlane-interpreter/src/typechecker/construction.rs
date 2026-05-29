@@ -52,7 +52,7 @@ struct ConstructCtx<'a> {
     env:          Vec<HashMap<String, Type>>,
     /// Stack of concrete struct field maps (name → fields with spans), innermost last.
     struct_scopes: Vec<HashMap<String, Vec<(String, Type, Span)>>>,
-    /// Unified registry — source of truth for type definitions across all passes.
+    /// Unified registry — source of truth for type definitions across all passes. See ADR-0025.
     registry:     &'a TypeDefinitionRegistry,
     method_env:   HashMap<String, HashMap<String, Type>>,
     /// Shared generator continued from Pass 1; keeps TypeVar identities globally unique.
