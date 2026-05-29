@@ -37,6 +37,14 @@ fn run_graph(main: &Path) -> Result<(), moonlane::error::MoonlaneError> {
     evaluator::evaluate_graph(typed)
 }
 
+fn run_graph_std(main: &Path) -> Result<(), moonlane::error::MoonlaneError> {
+    let graph = module_loader::load_root(main)?;
+    let names = name_resolver::resolve(&graph)?;
+    let normalized = path_normalizer::normalize(graph, &names)?;
+    let typed = typechecker::check_graph(normalized, &names, typechecker::StdPrelude::default())?;
+    evaluator::evaluate_graph(typed)
+}
+
 // ── Basic single-module graph ─────────────────────────────────────────────────
 
 #[test]
@@ -239,6 +247,35 @@ fn user_glob_wins_over_std_glob_same_name_no_t0011() {
     write(&dir.join("a.mln"), "pub fun foo() -> Int { return 42; }\n");
     // Single User glob — no conflict possible, must succeed.
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+// ── std::core auto-import (RFC-0030) ─────────────────────────────────────────
+
+#[test]
+fn print_available_without_explicit_import() {
+    // print() must be in scope in every module without any import statement.
+    let dir = fixture_dir("auto_import_print");
+    let main = dir.join("main.mln");
+    write(&main, "fun main() { print(42); }\n");
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn explicit_std_core_import_is_valid() {
+    // `import std::core::print` should work and bring print into scope.
+    let dir = fixture_dir("explicit_std_import");
+    let main = dir.join("main.mln");
+    write(&main, "import std::core::print;\nfun main() { print(\"hi\"); }\n");
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn local_function_shadows_std_core_auto_import() {
+    // A user-defined `print` function must shadow the auto-imported std::core::print.
+    let dir = fixture_dir("shadow_std_print");
+    let main = dir.join("main.mln");
+    write(&main, "fun print(x: Int) -> Int { return x + 1; }\nfun main() { print(1); }\n");
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
 // ── T0009: visibility enforcement ────────────────────────────────────────────

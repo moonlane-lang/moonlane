@@ -199,28 +199,20 @@ fn register_impl_methods<'a>(
     }
 }
 
-pub(super) fn register_builtins(ctx: &mut InferContext) {
+/// Seed `ctx` with all built-in free-function bindings from `StdPrelude`,
+/// plus built-in method registrations and aspect declarations.
+pub(super) fn register_builtins(ctx: &mut InferContext, prelude: &super::StdPrelude) {
     let str_ty   = InferType::str();
     let int_ty   = InferType::int();
     let float_ty = InferType::float();
     let bool_ty  = InferType::bool();
-    let unit_ty  = InferType::unit();
 
-    let mono = |params, ret| TypeScheme::mono(InferType::Fun(params, Box::new(ret)));
+    // Free-function builtins all come from StdPrelude — no separate list needed.
+    for (name, scheme) in prelude.schemes() {
+        ctx.bind_poly(name, scheme.clone());
+    }
 
-    // print/println accept any Display type (polymorphic; bound not enforced at compile time).
-    let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("print", print_scheme(t));
-    let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("println", print_scheme(t));
-
-    ctx.bind_poly("string_len",    mono(vec![str_ty.clone()], int_ty.clone()));
-    ctx.bind_poly("string_concat", mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
-    ctx.bind_poly("clock",         mono(vec![], int_ty.clone()));
-    ctx.bind_poly("assert",        mono(vec![bool_ty.clone()], unit_ty.clone()));
-    ctx.bind_poly("assert_msg",    mono(vec![bool_ty.clone(), str_ty.clone()], unit_ty.clone()));
-
-    // to_string() method on built-in types (via Display aspect).
+    // Methods are not free functions; they're not in StdPrelude::schemes.
     for type_name in &["Int", "Float", "Bool", "String"] {
         let self_ty = match *type_name {
             "Int"    => int_ty.clone(),
@@ -232,33 +224,28 @@ pub(super) fn register_builtins(ctx: &mut InferContext) {
         ctx.register_method(type_name.to_string(), "to_string".to_string(),
             InferType::Fun(vec![self_ty], Box::new(str_ty.clone())));
     }
-
     ctx.register_method("String".to_string(), "len".to_string(),
         InferType::Fun(vec![str_ty.clone()], Box::new(int_ty.clone())));
 
-    // Also register the Display aspect so `impl Display for Foo` completeness check works.
-    ctx.registry_mut().register_aspect("Display".into(), vec!["to_string".into()]);
-    // Iterable aspect: for-in completeness
+    ctx.registry_mut().register_aspect("Display".into(),  vec!["to_string".into()]);
     ctx.registry_mut().register_aspect("Iterable".into(), vec!["next".into()]);
-    // From aspect: cast completeness
-    ctx.registry_mut().register_aspect("From".into(), vec!["from".into()]);
-
-    let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("array_push", array_push_scheme(t));
-    let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("array_len", array_len_scheme(t));
-    let t = ctx.fresh_type_var_raw();
-    ctx.bind_poly("dbg", dbg_scheme(t));
+    ctx.registry_mut().register_aspect("From".into(),     vec!["from".into()]);
 }
 
-/// Single source of truth for all builtin function signatures.
-/// Populates `scheme_env` with both polymorphic and monomorphic builtins.
-/// The construction pass auto-derives its concrete types from this; no second
-/// registration site is needed.
+/// Add all built-in function schemes from `StdPrelude` to `scheme_env`.
+/// Used by the construction pass so builtin names are known during typed-AST building.
 pub(super) fn register_builtin_schemes(
     scheme_env: &mut HashMap<String, TypeScheme>,
-    gen: &mut TypeVarGenerator,
+    prelude: &super::StdPrelude,
 ) {
+    for (name, scheme) in prelude.schemes() {
+        scheme_env.insert(name.clone(), scheme.clone());
+    }
+}
+
+/// Populate `map` with all built-in function schemes.
+/// Called by `StdPrelude::default()` — this is the single canonical list.
+pub(super) fn populate_std_schemes(map: &mut HashMap<String, TypeScheme>, gen: &mut TypeVarGenerator) {
     let mono = |params: Vec<InferType>, ret: InferType| {
         TypeScheme::mono(InferType::Fun(params, Box::new(ret)))
     };
@@ -267,23 +254,18 @@ pub(super) fn register_builtin_schemes(
     let bool_ty  = InferType::bool();
     let unit_ty  = InferType::unit();
 
-    // Polymorphic builtins — each call site gets a fresh instantiation.
-    let t = gen.fresh();
-    scheme_env.insert("print".into(), print_scheme(t));
-    let t = gen.fresh();
-    scheme_env.insert("println".into(), print_scheme(t));
-    let t = gen.fresh();
-    scheme_env.insert("array_push".into(), array_push_scheme(t));
-    let t = gen.fresh();
-    scheme_env.insert("array_len".into(), array_len_scheme(t));
-    let t = gen.fresh();
-    scheme_env.insert("dbg".into(), dbg_scheme(t));
+    // Polymorphic builtins.
+    let t = gen.fresh(); map.insert("print".into(),      print_scheme(t));
+    let t = gen.fresh(); map.insert("println".into(),    print_scheme(t));
+    let t = gen.fresh(); map.insert("array_push".into(), array_push_scheme(t));
+    let t = gen.fresh(); map.insert("array_len".into(),  array_len_scheme(t));
+    let t = gen.fresh(); map.insert("dbg".into(),        dbg_scheme(t));
 
     // Monomorphic builtins.
-    scheme_env.insert("string_len".into(),    mono(vec![str_ty.clone()], int_ty.clone()));
-    scheme_env.insert("string_concat".into(), mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
-    scheme_env.insert("clock".into(),         mono(vec![], int_ty.clone()));
-    scheme_env.insert("assert".into(),        mono(vec![bool_ty.clone()], unit_ty.clone()));
-    scheme_env.insert("assert_msg".into(),    mono(vec![bool_ty, str_ty], unit_ty));
+    map.insert("string_len".into(),    mono(vec![str_ty.clone()], int_ty.clone()));
+    map.insert("string_concat".into(), mono(vec![str_ty.clone(), str_ty.clone()], str_ty.clone()));
+    map.insert("clock".into(),         mono(vec![], int_ty.clone()));
+    map.insert("assert".into(),        mono(vec![bool_ty.clone()], unit_ty.clone()));
+    map.insert("assert_msg".into(),    mono(vec![bool_ty, str_ty], unit_ty));
 }
 

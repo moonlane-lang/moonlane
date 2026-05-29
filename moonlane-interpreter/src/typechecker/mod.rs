@@ -43,7 +43,9 @@ struct FunGeneralization {
 // ── StdPrelude ────────────────────────────────────────────────────────────────
 
 /// Pre-loaded standard library type schemes, seeded into GlobalExports before
-/// the per-module typechecking loop begins.
+/// the per-module typechecking loop begins.  `StdPrelude` is the single source
+/// of truth for all builtin function signatures — `register_builtins` and
+/// the construction pass both derive from it.
 pub struct StdPrelude {
     schemes: SchemeEnv,
 }
@@ -54,11 +56,21 @@ impl StdPrelude {
         Self { schemes: HashMap::new() }
     }
 
-    /// Standard library types: Int, Float, Bool, String, Perhaps, Result.
-    /// Builtins are already registered by `register_builtins`; this exists to
-    /// make std:: imports resolve in the scope builder without a real std file.
+    /// All built-in function schemes (print, assert, array_push, …).
+    /// This is the canonical list — nothing else should register builtins.
     pub fn default() -> Self {
-        Self { schemes: HashMap::new() }
+        let mut schemes = HashMap::new();
+        let mut gen = TypeVarGenerator::new();
+        registry::populate_std_schemes(&mut schemes, &mut gen);
+        Self { schemes }
+    }
+
+    pub(super) fn schemes(&self) -> &SchemeEnv {
+        &self.schemes
+    }
+
+    pub(super) fn contains(&self, name: &str) -> bool {
+        self.schemes.contains_key(name)
     }
 }
 
@@ -156,10 +168,10 @@ pub fn check_graph(
 ) -> Result<TypedModuleGraph, MoonlaneError> {
     let mut global_exports = GlobalExports::new();
 
-    // Seed std::core into GlobalExports so that std:: imports resolve.
+    // Seed std::core into GlobalExports so that std:: imports and the auto-glob resolve.
     global_exports.insert(
         vec!["std".to_string(), "core".to_string()],
-        ModuleExports { pub_schemes: std_prelude.schemes },
+        ModuleExports { pub_schemes: std_prelude.schemes().clone() },
     );
 
     let mut typed_modules: Vec<TypedModule> = Vec::new();
@@ -171,7 +183,7 @@ pub fn check_graph(
         check_pub_annotations(loaded, names)?;
         let imported_schemes = build_import_schemes(loaded, names, &global_exports, &graph)?;
         let (typed_decls, scheme_env) =
-            check_impl(&loaded.program, &imported_schemes, &type_context)?;
+            check_impl(&loaded.program, &imported_schemes, &type_context, &std_prelude)?;
 
         // Export pub names from this module's scheme_env, plus re-exported names
         // pulled from their source modules in GlobalExports (#178).
@@ -389,7 +401,7 @@ fn filter_pub_schemes(
 
 /// Run the type checker over an untyped AST, producing a fully typed AST.
 pub fn check(program: Program) -> Result<TypedProgram, MoonlaneError> {
-    let (decls, _) = check_impl(&program, &HashMap::new(), &[])?;
+    let (decls, _) = check_impl(&program, &HashMap::new(), &[], &StdPrelude::default())?;
     Ok(decls)
 }
 
@@ -406,6 +418,7 @@ fn check_impl(
     program: &Program,
     imported_schemes: &SchemeEnv,
     type_context: &[Decl],
+    std_prelude: &StdPrelude,
 ) -> Result<(Vec<TypedDecl>, SchemeEnv), MoonlaneError> {
     // Build a registry program that includes type decls from imported modules
     // so the registry knows about all available struct/enum types.
@@ -431,7 +444,7 @@ fn check_impl(
     }
 
     // Pre-pass: register built-in value bindings and hoist function names.
-    registry::register_builtins(&mut ctx);
+    registry::register_builtins(&mut ctx, std_prelude);
     inference::hoist_fun_decls(&program.decls, &mut ctx);
 
     // Pass 1: walk AST, emit constraints, collect function generalizations.
@@ -447,7 +460,7 @@ fn check_impl(
         let scheme = generalize(resolved, &fg.env_fvs);
         scheme_env.insert(fg.name, scheme);
     }
-    registry::register_builtin_schemes(&mut scheme_env, &mut gen);
+    registry::register_builtin_schemes(&mut scheme_env, std_prelude);
 
     // Imported schemes must be visible in the construction pass so calls to imported
     // functions can be constructed. Use or_insert so locally-defined names shadow imports.
@@ -464,18 +477,10 @@ fn check_impl(
         program, &subst, &scheme_env, ctx.registry(), gen,
     )?;
 
-    // Return the user-defined scheme_env (before builtin_schemes were added to it,
-    // but builtins are already in register_builtin_schemes output so we recompute here).
+    // Return only user-defined names. Builtins (from StdPrelude) are available to
+    // every module via the auto-glob and don't need to be in GlobalExports.
     let user_scheme_env: SchemeEnv = scheme_env.into_iter()
-        .filter(|(name, _)| {
-            // Keep only user-defined names (not builtins registered by register_builtin_schemes).
-            // Builtins are always available and don't need to be in GlobalExports.
-            !matches!(name.as_str(),
-                "print" | "println" | "string_len" | "parse_int" | "parse_float"
-                | "int_to_string" | "float_to_string" | "bool_to_string" | "assert"
-                | "string_to_chars" | "char_to_string"
-            )
-        })
+        .filter(|(name, _)| !std_prelude.contains(name))
         .collect();
 
     Ok((typed_decls, user_scheme_env))

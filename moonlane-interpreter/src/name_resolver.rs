@@ -127,6 +127,10 @@ fn resolve_module(
         process_tree(&base, &import.path.tree, known_modules, pub_surface, &mut scope, &import.span)?;
     }
 
+    // Auto-import std::core at lowest (Std) priority — RFC-0030.
+    // Every module sees core names without an explicit import statement.
+    scope.globs.push((GlobTier::Std, vec!["std".to_string(), "core".to_string()]));
+
     Ok(scope)
 }
 
@@ -456,7 +460,10 @@ mod tests {
         let names = resolve(&graph).unwrap();
         let root_scope = &names.scopes[&vec![]];
         assert!(root_scope.explicit.is_empty(), "glob should not add explicit bindings");
-        assert_eq!(root_scope.globs, vec![(GlobTier::User, vec!["parser".to_string()])]);
+        assert_eq!(root_scope.globs, vec![
+            (GlobTier::User, vec!["parser".to_string()]),
+            (GlobTier::Std,  vec!["std".to_string(), "core".to_string()]),
+        ]);
     }
 
     #[test]

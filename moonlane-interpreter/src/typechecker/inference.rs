@@ -28,7 +28,10 @@ pub(super) fn hoist_fun_decls(decls: &[Decl], ctx: &mut InferContext) {
         if let Decl::Fun(fun) = decl {
             if fun.generics.is_empty() {
                 let fresh = ctx.fresh_var();
-                ctx.bind_mono(&fun.name, fresh, false);
+                ctx.bind_mono(&fun.name, fresh.clone(), false);
+                // Also bind in poly_env so user declarations shadow any imported binding
+                // (poly_env lookup takes precedence over mono_env regardless of scope level).
+                ctx.bind_poly(&fun.name, TypeScheme::mono(fresh));
             }
         }
     }

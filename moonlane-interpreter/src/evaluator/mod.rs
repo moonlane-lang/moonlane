@@ -280,6 +280,9 @@ pub fn evaluate(program: TypedProgram) -> Result<(), MoonlaneError> {
 fn evaluate_inner(program: TypedProgram, aliases: &[(String, String)]) -> Result<(), MoonlaneError> {
     CALL_STACK.with(|s| s.borrow_mut().clear());
     let mut env = Environment::new();
+    // KNOWN LIMITATION (#189): evaluate_graph flattens all modules into one Environment.
+    // std::core builtins are seeded here at lowest priority; a user binding with the same
+    // name will shadow them silently. Per-module environments (tracked in #189) will fix this.
     builtins::register_builtins(&mut env);
 
     // Pass 1a: define placeholder entries for all top-level functions and methods

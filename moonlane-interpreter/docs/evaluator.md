@@ -205,6 +205,12 @@ Generic functions and let-polymorphic closures re-run the construction pass at e
 
 This function goes away when RFC-0001 (memory model with mutable references) is implemented. At that point, `next` can take `&mut self` and mutate in place, and `eval_for_in` can call `call_function` directly.
 
+### Flat module environment — std::core builtins can be shadowed by user names (#189)
+
+`evaluate_graph` merges all module environments into one. `std::core` builtin names (e.g. `print`, `assert`) are seeded into this flat environment at lowest priority. A user-defined function with the same name in any module will shadow the builtin silently at runtime, even if the typechecker resolved them to different scopes.
+
+This will be resolved when per-module runtime environments are introduced (tracked in #189).
+
 ### Declaration name collisions across modules produce undefined runtime behaviour
 
 In v0.6.0, two modules may each declare a top-level name (e.g. `fun tokenize()`) without importing each other. The typechecker approves both in isolation, but `evaluate_graph` flattens all modules into a single environment: the second declaration silently overwrites the first.
