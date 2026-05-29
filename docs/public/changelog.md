@@ -58,8 +58,8 @@ Module system. Shipped by Sprint 9 (`sprint/9`).
 - Facade modules: `parser.mln` alongside `parser/` directory — no special `mod.mln` file
 - File-to-module mapping via `::` → `/` with no special cases
 
-**Deferred to a future release:**
-- `std::core` auto-import and standard library core types (#150)
+**Shipped in v0.6.1:**
+- `std::core` auto-import and standard library core types (#150, #201, #202)
 
 **Compatibility:**
 - Single-file programs with no `import` or `export` declarations remain valid without modification
