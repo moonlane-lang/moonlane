@@ -407,7 +407,6 @@ fn construct_stmt(stmt: &Stmt, ctx: &mut ConstructCtx) -> Result<TypedStmt, Mete
                         .and_then(|ty| if let Type::Fun(_, ret) = ty { Some(ret.as_ref()) } else { None })
                         .cloned();
                     match next_ret {
-                        Some(Type::Perhaps(elem)) => *elem,
                         Some(Type::Named(n, mut args)) if n == "Perhaps" && args.len() == 1 =>
                             args.remove(0),
                         _ => return Err(MetelError::internal(
@@ -828,12 +827,12 @@ fn check_match_exhaustiveness(
             let has_false = arms.iter().any(|a| a.guard.is_none() && is_bool_literal_pattern(&a.pattern, false));
             has_true && has_false
         }
-        Type::Perhaps(_) => {
+        Type::Named(name, _) if name == "Perhaps" => {
             let has_some = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "Some"));
             let has_none = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Perhaps", "None"));
             has_some && has_none
         }
-        Type::Result(_, _) => {
+        Type::Named(name, _) if name == "Result" => {
             let has_ok  = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Result", "Ok"));
             let has_err = arms.iter().any(|a| a.guard.is_none() && pattern_covers_variant(&a.pattern, "Result", "Err"));
             has_ok && has_err
@@ -920,8 +919,6 @@ fn construct_pattern_bindings(
 
 fn extract_type_args_from_type(ty: &Type) -> Vec<Type> {
     match ty {
-        Type::Perhaps(t)     => vec![*t.clone()],
-        Type::Result(t, e)   => vec![*t.clone(), *e.clone()],
         Type::Named(_, args) => args.clone(),
         _ => vec![],
     }
@@ -1014,9 +1011,6 @@ fn construct_enum_literal_ty(
         })
         .collect::<Result<_, _>>()?;
 
-    // Route through infer_type_to_type so "Perhaps"/"Result" become
-    // Type::Perhaps/Type::Result rather than Type::Named — infer_type_to_type
-    // is the single normalisation point for this conversion.
     let infer_args: Vec<InferType> = concrete_args.iter().map(type_to_infer).collect();
     infer_type_to_type(&InferType::Named(enum_name.to_string(), infer_args), span)
 }

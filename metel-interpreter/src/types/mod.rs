@@ -15,9 +15,6 @@ pub enum Type {
     Fun(Vec<Type>, Box<Type>),
     /// A named type (struct, enum) with concrete type arguments after monomorphisation.
     Named(String, Vec<Type>),
-    /// Convenience aliases — resolve to Named("Perhaps", ...) and Named("Result", ...)
-    Perhaps(Box<Type>),
-    Result(Box<Type>, Box<Type>),
 }
 
 
@@ -59,8 +56,6 @@ impl std::fmt::Display for Type {
                 }
                 Ok(())
             }
-            Type::Perhaps(t) => write!(f, "Perhaps<{}>", t),
-            Type::Result(t, e) => write!(f, "Result<{}, {}>", t, e),
         }
     }
 }

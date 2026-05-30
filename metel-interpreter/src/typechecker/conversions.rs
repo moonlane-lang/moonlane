@@ -96,14 +96,7 @@ pub(super) fn infer_type_to_type(ty: &InferType, span: &Span) -> Result<Type, Me
         InferType::Named(name, args) => {
             let a: Result<Vec<_>, _> = args.iter().map(|a| infer_type_to_type(a, span)).collect();
             let args = a?;
-            match (name.as_str(), args.len()) {
-                ("Perhaps", 1) => Ok(Type::Perhaps(Box::new(args.into_iter().next().unwrap()))),
-                ("Result",  2) => {
-                    let mut it = args.into_iter();
-                    Ok(Type::Result(Box::new(it.next().unwrap()), Box::new(it.next().unwrap())))
-                }
-                _ => Ok(Type::Named(name.clone(), args)),
-            }
+            Ok(Type::Named(name.clone(), args))
         }
     }
 }
@@ -126,8 +119,6 @@ pub(super) fn type_to_infer(ty: &Type) -> InferType {
             Box::new(type_to_infer(ret)),
         ),
         Type::Named(n, args) => InferType::Named(n.clone(), args.iter().map(type_to_infer).collect()),
-        Type::Perhaps(t)     => InferType::Named("Perhaps".into(), vec![type_to_infer(t)]),
-        Type::Result(t, e)   => InferType::Named("Result".into(), vec![type_to_infer(t), type_to_infer(e)]),
         other                => InferType::Concrete(other.clone()),
     }
 }
