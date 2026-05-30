@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Metel Module System — Implementation Report</title>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #161b27;
+      --border:    #2a3045;
+      --accent:    #5b8dee;
+      --accent2:   #7c5cbf;
+      --green:     #3dcf8e;
+      --yellow:    #f0c060;
+      --red:       #e05c6a;
+      --text:      #cdd5e0;
+      --muted:     #6b7a99;
+      --code-bg:   #1a2030;
+      --pass1:     #2c3f7a;
+      --pass2:     #3a2c7a;
+      --pass3:     #22634a;
+      --pass4:     #5c3a22;
+      --pass5:     #1e4a5c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    nav {
+      width: 240px;
+      min-width: 240px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 32px 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    nav .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      padding: 0 24px 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    nav .logo span { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+    nav ul { list-style: none; }
+    nav ul li a {
+      display: block;
+      padding: 8px 24px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color .15s, background .15s;
+    }
+    nav ul li a:hover { color: var(--text); background: rgba(255,255,255,.04); }
+    nav ul li a.active { color: var(--accent); background: rgba(91,141,238,.08); }
+    nav .section-label {
+      padding: 16px 24px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    main { flex: 1; max-width: 900px; padding: 48px 56px; }
+
+    /* ── Typography ── */
+    h1 { font-size: 32px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    h2 { font-size: 22px; font-weight: 700; color: #fff; margin: 56px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    h3 { font-size: 16px; font-weight: 600; color: var(--accent); margin: 28px 0 10px; }
+    p  { margin-bottom: 14px; color: var(--text); }
+    a  { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 4px; }
+    .meta { display: flex; gap: 24px; margin: 20px 0 40px; }
+    .meta-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 13px; }
+    .meta-item .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+    .meta-item .value { color: var(--text); font-weight: 600; }
+
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: #a8d1ff;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      margin: 16px 0;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #a8d1ff;
+    }
+    pre .kw  { color: #c792ea; }
+    pre .ty  { color: #ffcb6b; }
+    pre .cm  { color: #546e7a; font-style: italic; }
+    pre .str { color: #c3e88d; }
+
+    /* ── Pipeline diagram ── */
+    .pipeline {
+      margin: 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      align-items: flex-start;
+    }
+    .pipe-step {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 24px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      width: 100%;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      text-decoration: none;
+    }
+    .pipe-step:hover { border-color: var(--accent); background: rgba(91,141,238,.06); }
+    .pipe-step .num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
+      flex-shrink: 0;
+    }
+    .pipe-step .info { flex: 1; }
+    .pipe-step .name { font-weight: 600; color: #fff; font-size: 15px; }
+    .pipe-step .desc { font-size: 13px; color: var(--muted); }
+    .pipe-step .output { font-size: 12px; font-family: monospace; color: var(--accent); background: rgba(91,141,238,.1); padding: 2px 10px; border-radius: 20px; }
+
+    .pipe-arrow {
+      margin-left: 40px;
+      color: var(--border);
+      font-size: 22px;
+      line-height: 1;
+      padding: 4px 0;
+    }
+
+    .step-p1 { background: rgba(44,63,122,.25); }
+    .step-p2 { background: rgba(58,44,122,.25); }
+    .step-p3 { background: rgba(34,99,74,.25); }
+    .step-p4 { background: rgba(92,58,34,.25); }
+    .step-p5 { background: rgba(30,74,92,.25); }
+
+    .num-p1 { background: #2c3f7a; color: #8aaeff; }
+    .num-p2 { background: #3a2c7a; color: #c4a0ff; }
+    .num-p3 { background: #22634a; color: #5dffc4; }
+    .num-p4 { background: #5c3a22; color: #ffb86c; }
+    .num-p5 { background: #1e4a5c; color: #56d4f6; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 16px 0;
+    }
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .badge-green  { background: rgba(61,207,142,.15); color: var(--green); border: 1px solid rgba(61,207,142,.3); }
+    .badge-yellow { background: rgba(240,192,96,.15); color: var(--yellow); border: 1px solid rgba(240,192,96,.3); }
+    .badge-red    { background: rgba(224,92,106,.15); color: var(--red); border: 1px solid rgba(224,92,106,.3); }
+    .badge-blue   { background: rgba(91,141,238,.15); color: var(--accent); border: 1px solid rgba(91,141,238,.3); }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    th { background: var(--surface); border: 1px solid var(--border); padding: 10px 14px; text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    td { border: 1px solid var(--border); padding: 10px 14px; color: var(--text); }
+    tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+    /* ── Status bar chart ── */
+    .bar-chart { margin: 20px 0; }
+    .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .bar-label { width: 180px; font-size: 13px; color: var(--muted); flex-shrink: 0; }
+    .bar-track { flex: 1; height: 20px; background: rgba(255,255,255,.05); border-radius: 10px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 10px; transition: width .6s ease; }
+    .bar-pct { width: 40px; text-align: right; font-size: 13px; color: var(--text); flex-shrink: 0; }
+
+    /* ── Donut chart ── */
+    .charts-row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; margin: 20px 0; }
+    .donut-wrap { text-align: center; }
+    .donut-wrap svg { display: block; margin: 0 auto; }
+    .donut-legend { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Debt severity meter ── */
+    .debt-item {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      background: var(--surface);
+    }
+    .debt-sev { flex-shrink: 0; width: 64px; text-align: center; }
+    .debt-sev .sev-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
+    .debt-body h4 { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .debt-body p { font-size: 13px; color: var(--muted); margin: 0; }
+
+    /* ── Callout ── */
+    .callout {
+      border-left: 3px solid var(--accent);
+      background: rgba(91,141,238,.07);
+      border-radius: 0 10px 10px 0;
+      padding: 14px 20px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .callout.warn { border-color: var(--yellow); background: rgba(240,192,96,.07); }
+    .callout.danger { border-color: var(--red); background: rgba(224,92,106,.07); }
+    .callout strong { color: #fff; }
+
+    /* ── Scope diagram ── */
+    .scope-diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 2;
+    }
+    .scope-diagram .tier { display: flex; align-items: center; gap: 12px; }
+    .tier-box {
+      border: 1px solid;
+      border-radius: 6px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tier-std  { border-color: #3a5a8a; color: #7aafff; background: rgba(58,90,138,.2); }
+    .tier-user { border-color: #5a3a8a; color: #c07aff; background: rgba(90,58,138,.2); }
+    .tier-expl { border-color: #3a7a5a; color: #7affc0; background: rgba(58,122,90,.2); }
+
+    ul.feature-list { list-style: none; }
+    ul.feature-list li {
+      padding: 5px 0 5px 24px;
+      position: relative;
+      font-size: 14px;
+      color: var(--text);
+    }
+    ul.feature-list li::before {
+      content: '✓';
+      position: absolute; left: 0;
+      color: var(--green);
+      font-weight: 700;
+    }
+    ul.feature-list.missing li::before { content: '✗'; color: var(--red); }
+
+    /* ── Overview boxes ── */
+    .overview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0; }
+    .overview-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .overview-box .big { font-size: 36px; font-weight: 700; color: var(--accent); }
+    .overview-box .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar nav -->
+  <nav>
+    <div class="logo">⬡ Metel <span>v0.5–v0.6.2</span></div>
+    <div class="section-label">Overview</div>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#pipeline">Pipeline</a></li>
+    </ul>
+    <div class="section-label">Passes</div>
+    <ul>
+      <li><a href="#pass1">Pass 1 — Module Loading</a></li>
+      <li><a href="#pass2">Pass 2 — Name Resolution</a></li>
+      <li><a href="#pass3">Pass 3 — Path Normalization</a></li>
+      <li><a href="#pass4">Pass 4 — Typechecking</a></li>
+      <li><a href="#pass5">Pass 5 — Evaluation</a></li>
+    </ul>
+    <div class="section-label">Status</div>
+    <ul>
+      <li><a href="#implemented">Implemented</a></li>
+      <li><a href="#missing">What Is Missing</a></li>
+      <li><a href="#debt">Technical Debt</a></li>
+      <li><a href="#summary">Summary</a></li>
+    </ul>
+  </nav>
+
+  <!-- Main content -->
+  <main>
+    <div class="subtitle">Metel Language · Module System</div>
+    <h1>Implementation Report</h1>
+
+    <div class="meta">
+      <div class="meta-item"><div class="label">Date</div><div class="value">2026-05-29</div></div>
+      <div class="meta-item"><div class="label">Versions</div><div class="value">v0.5.0 – v0.6.2</div></div>
+      <div class="meta-item"><div class="label">Sprints</div><div class="value">Sprints 9 – 13</div></div>
+      <div class="meta-item"><div class="label">Status</div><div class="value" style="color:var(--green)">Active</div></div>
+    </div>
+
+    <p>
+      This report is a full technical account of the Metel module system — what was implemented, how each pass works, what is still missing, and what technical debt exists. It is written to enable informed design decisions without requiring a code-reading session.
+    </p>
+
+    <!-- ── OVERVIEW ── -->
+    <h2 id="overview">Overview</h2>
+
+    <div class="overview-grid">
+      <div class="overview-box">
+        <div class="big">5</div>
+        <div class="sub">Sequential pipeline passes</div>
+      </div>
+      <div class="overview-box">
+        <div class="big" style="color:var(--green)">13</div>
+        <div class="sub">Implemented features</div>
+      </div>
+      <div class="overview-box">
+        <div class="big" style="color:var(--yellow)">7</div>
+        <div class="sub">Missing features</div>
+      </div>
+    </div>
+
+    <p>
+      The module system is built as five strictly-ordered passes. Each pass produces a typed output that is the only accepted input to the next — there are no shortcuts or bypass paths.
+      Every <code>.mln</code> file is a module; the module graph is discovered purely through <code>import</code> declarations.
+    </p>
+
+    <div class="callout">
+      <strong>Single-module compatibility:</strong> A <code>.mln</code> file with no <code>import</code> or <code>export</code> declarations is a complete program. Existing single-file programs remain valid without modification.
+    </div>
+
+    <h3>How modules map to files</h3>
+    <p>
+      <code>::</code> in import paths maps directly to <code>/</code> in the filesystem:
+    </p>
+    <table>
+      <thead><tr><th>Import declaration</th><th>File resolved</th></tr></thead>
+      <tbody>
+        <tr><td><code>import parser::Ast;</code></td><td><code>parser.mln</code></td></tr>
+        <tr><td><code>import parser::ast::Ast;</code></td><td><code>parser/ast.mln</code></td></tr>
+        <tr><td><code>import root::a::b::c::T;</code></td><td><code>a/b/c.mln</code> (from root)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ── PIPELINE ── -->
+    <h2 id="pipeline">The Pipeline</h2>
+
+    <p>
+      The pipeline is orchestrated in <code>src/main.rs</code> (the <code>run</code> function, lines 44–66).
+      There is no partial execution — all five passes run for every program.
+    </p>
+
+    <div class="pipeline">
+      <a href="#pass1" class="pipe-step step-p1">
+        <div class="num num-p1">1</div>
+        <div class="info">
+          <div class="name">Module Loading</div>
+          <div class="desc">DFS file discovery · cycle detection · path assignment</div>
+        </div>
+        <div class="output">→ ModuleGraph</div>
+      </a>
+      <div class="pipe-arrow">↓</div>
+
+      <a href="#pass2" class="pipe-step step-p2">
+        <div class="num num-p2">2</div>
+        <div class="info">
+          <div class="name">Name Resolution</div>
+          <div class="desc">Scope building · pub_surface · import / re-export resolution</div>
+        </div>
+        <div class="output">→ ResolvedNames</div>
+      </a>
+      <div class="pipe-arrow">↓</div>
+
+      <a href="#pass3" class="pipe-step step-p3">
+        <div class="num num-p3">3</div>
+        <div class="info">
+          <div class="name">Path Normalization</div>
+          <div class="desc">AST rewriting · qualified paths → ResolvedPath nodes</div>
+        </div>
+        <div class="output">→ NormalizedModuleGraph</div>
+      </a>
+      <div class="pipe-arrow">↓</div>
+
+      <a href="#pass4" class="pipe-step step-p4">
+        <div class="num num-p4">4</div>
+        <div class="info">
+          <div class="name">Typechecking</div>
+          <div class="desc">Per-module HM type inference · GlobalExports accumulator</div>
+        </div>
+        <div class="output">→ TypedModuleGraph</div>
+      </a>
+      <div class="pipe-arrow">↓</div>
+
+      <a href="#pass5" class="pipe-step step-p5">
+        <div class="num num-p5">5</div>
+        <div class="info">
+          <div class="name">Evaluation</div>
+          <div class="desc">Per-module environments · imported_names seeding · 3-pass eval</div>
+        </div>
+        <div class="output">→ Result&lt;(), Error&gt;</div>
+      </a>
+    </div>
+
+    <!-- ── PASS 1 ── -->
+    <h2 id="pass1">Pass 1 — Module Loading</h2>
+    <p><span class="badge badge-blue">module_loader.rs · 255 lines</span></p>
+
+    <p>
+      Discovers and parses every <code>.mln</code> file reachable from the root via <code>import</code> declarations using depth-first recursion.
+    </p>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>Cycle Detection</h3>
+        <p>Uses a <code>Vec&lt;PathBuf&gt;</code> call stack. On a second visit to any path already in the stack, the full circular chain is reported as an error.</p>
+      </div>
+      <div class="card">
+        <h3>Deduplication</h3>
+        <p>A <code>HashSet&lt;PathBuf&gt;</code> visited set ensures each file is loaded at most once, even if imported by many modules.</p>
+      </div>
+    </div>
+
+    <h3>Data produced per file</h3>
+    <pre><span class="kw">pub struct</span> <span class="ty">LoadedModule</span> {
+    <span class="kw">pub</span> module_path: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;,  <span class="cm">// e.g. ["parser", "ast"]</span>
+    <span class="kw">pub</span> file_path:   <span class="ty">PathBuf</span>,
+    <span class="kw">pub</span> program:     <span class="ty">Program</span>,      <span class="cm">// untyped AST, not yet name-resolved</span>
+}
+
+<span class="kw">pub struct</span> <span class="ty">ModuleGraph</span> {
+    <span class="kw">pub</span> root: <span class="ty">PathBuf</span>,
+    <span class="kw">pub</span> modules: <span class="ty">Vec</span>&lt;<span class="ty">LoadedModule</span>&gt;,  <span class="cm">// DFS order = topological order</span>
+}</pre>
+
+    <h3>Path root resolution</h3>
+    <table>
+      <thead><tr><th>PathRoot</th><th>Resolved to</th></tr></thead>
+      <tbody>
+        <tr><td><code>root::</code></td><td><code>[]</code> — project root</td></tr>
+        <tr><td><code>self::</code></td><td>current module's path</td></tr>
+        <tr><td><code>super::</code></td><td>current module's path minus last segment</td></tr>
+        <tr><td><code>Name(n)</code></td><td>current module's path + <code>[n]</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>std:: imports</strong> return <code>None</code> from the resolver — they are virtual modules with no file and are silently skipped during loading.
+    </div>
+
+    <p>The output <code>Vec&lt;LoadedModule&gt;</code> is in DFS traversal order: dependencies come before dependents. This ordering is relied on by all downstream passes.</p>
+
+    <!-- ── PASS 2 ── -->
+    <h2 id="pass2">Pass 2 — Name Resolution</h2>
+    <p><span class="badge badge-blue">name_resolver.rs · 722 lines</span></p>
+
+    <p>Builds the scope metadata used by every subsequent pass: which names each module exports publicly, and what imports each module can see.</p>
+
+    <pre><span class="kw">pub struct</span> <span class="ty">ResolvedNames</span> {
+    <span class="kw">pub</span> scopes:      <span class="ty">HashMap</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;, <span class="ty">ModuleScope</span>&gt;,
+    <span class="kw">pub</span> pub_surface: <span class="ty">HashMap</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;, <span class="ty">HashSet</span>&lt;<span class="ty">String</span>&gt;&gt;,
+}</pre>
+
+    <h3>Three-pass structure inside Pass 2</h3>
+    <div class="card">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="text-align:center; flex-shrink:0;">
+          <div style="background:#2a3a6a;color:#8aaeff;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">2a</div>
+        </div>
+        <div>
+          <strong>Collect pub names</strong>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Scan each module's AST for top-level declarations with the <code>pub</code> keyword. Populate <code>pub_surface</code>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="text-align:center; flex-shrink:0;">
+          <div style="background:#3a2a6a;color:#c07aff;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">2b</div>
+        </div>
+        <div>
+          <strong>Process export declarations</strong>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Re-exports extend <code>pub_surface</code>: <code>export path::Name</code> pulls a name from a submodule into this module's public API. Re-exporting a private item is error T0009.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="text-align:center; flex-shrink:0;">
+          <div style="background:#226a4a;color:#7affc0;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">2c</div>
+        </div>
+        <div>
+          <strong>Resolve import declarations</strong>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Using the finalized <code>pub_surface</code>, record each import as an explicit <code>ImportBinding</code> or a glob entry. Then inject <code>std::core</code> into every module's globs at <code>GlobTier::Std</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Import priority tiers</h3>
+    <div class="scope-diagram">
+      <div class="tier">
+        <div class="tier-box tier-std">Std (lowest)</div>
+        <span style="color:var(--muted)">← auto-imported std::core</span>
+      </div>
+      <div style="margin-left:40px;color:var(--muted);">↑ wins if same name</div>
+      <div class="tier">
+        <div class="tier-box tier-user">User</div>
+        <span style="color:var(--muted)">← explicit import path::*</span>
+      </div>
+      <div style="margin-left:40px;color:var(--muted);">↑ always wins</div>
+      <div class="tier">
+        <div class="tier-box tier-expl">Explicit (highest)</div>
+        <span style="color:var(--muted)">← import path::Name (or as Alias)</span>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Conflict</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Explicit vs. any glob</td><td><span class="badge badge-green">Explicit wins silently</span></td></tr>
+        <tr><td>User glob vs. Std glob</td><td><span class="badge badge-green">User wins silently</span></td></tr>
+        <tr><td>Two User globs, same name referenced</td><td><span class="badge badge-red">T0011 error</span></td></tr>
+        <tr><td>Two explicit imports, same local name</td><td><span class="badge badge-red">Error</span></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ── PASS 3 ── -->
+    <h2 id="pass3">Pass 3 — Path Normalization</h2>
+    <p><span class="badge badge-blue">path_normalizer.rs · 341 lines</span></p>
+
+    <p>
+      Rewrites every module-qualified expression path in the AST before the typechecker sees it. The typechecker only handles single-segment identifiers and <code>ResolvedPath</code> nodes — it must never receive a multi-segment path like <code>std::core::Perhaps::Some</code>.
+    </p>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>Expression paths</h3>
+        <p>Every <code>Expr::Path</code> with more than one segment is rewritten to <code>Expr::ResolvedPath { resolved, original, span }</code> where <code>resolved</code> is the local alias name.</p>
+      </div>
+      <div class="card">
+        <h3>Struct literal paths</h3>
+        <p><code>std::core::Perhaps::Some { value: x }</code> is rewritten to <code>["Perhaps", "Some"]</code> — the module prefix is stripped.</p>
+      </div>
+    </div>
+
+    <h3>The newtype guarantee</h3>
+    <pre><span class="kw">pub struct</span> <span class="ty">NormalizedModuleGraph</span>(<span class="kw">pub</span>(crate) <span class="ty">ModuleGraph</span>);
+
+<span class="cm">// check_graph only accepts NormalizedModuleGraph —
+// normalization cannot be skipped at compile time</span></pre>
+
+    <div class="callout warn">
+      <strong>Not validated:</strong> The normalizer does not check that referenced names are public. Paths it cannot resolve are left unchanged — the typechecker will emit T0003 or T0009.
+    </div>
+
+    <!-- ── PASS 4 ── -->
+    <h2 id="pass4">Pass 4 — Typechecking</h2>
+    <p><span class="badge badge-blue">typechecker/mod.rs · 512 lines</span> <span class="badge badge-blue" style="margin-left:4px">+ inference.rs · construction.rs · registry.rs</span></p>
+
+    <p>
+      <code>check_graph</code> processes modules in topological order, maintaining a <code>GlobalExports</code> accumulator that grows as each module is checked. This is how type information flows from dependency modules to importers.
+    </p>
+
+    <pre><span class="kw">struct</span> <span class="ty">GlobalExports</span> {
+    modules: <span class="ty">HashMap</span>&lt;<span class="ty">ModulePath</span>, <span class="ty">ModuleExports</span>&gt;,
+}
+<span class="kw">struct</span> <span class="ty">ModuleExports</span> {
+    pub_schemes: <span class="ty">SchemeEnv</span>,   <span class="cm">// name → TypeScheme for every pub name</span>
+}</pre>
+
+    <p><code>std::core</code> is pre-seeded into <code>GlobalExports</code> before any module is processed, providing all built-in types to the entire graph.</p>
+
+    <h3>Six steps per module</h3>
+
+    <div class="card" style="border-left:3px solid #ffb86c;">
+      <strong>Step 1 — check_pub_annotations</strong> (lines 111–155)
+      <p style="margin-top:8px;font-size:13px;">Every <code>pub fun</code> must have explicit return type and parameter type annotations. Fails with <strong>T0010</strong> if any annotation is missing. Runs before inference — unannotated pub functions cannot safely export a type scheme.</p>
+    </div>
+    <div class="card" style="border-left:3px solid #8aaeff;">
+      <strong>Step 2 — build_import_schemes</strong> (lines 252–346)
+      <p style="margin-top:8px;font-size:13px;">Builds a flat <code>SchemeEnv</code> of names this module is allowed to see. Processes globs in tier order (Std → User), then explicit imports. Fires T0009 (private name) or T0003 (absent name) on bad imports.</p>
+    </div>
+    <div class="card" style="border-left:3px solid #c07aff;">
+      <strong>Step 3 — check_impl</strong> (lines 442–512)
+      <p style="margin-top:8px;font-size:13px;">Runs Hindley–Milner inference and typed AST construction. Imported schemes must be seeded into <em>both</em> the inference pass and the construction pass — this is the most critical invariant in the module system.</p>
+      <div class="callout danger" style="margin-top:10px;">
+        <strong>Critical invariant:</strong> <code>ctx.bind_poly(name, scheme)</code> AND <code>scheme_env.entry(name).or_insert(scheme)</code> must both be called for each imported name. Missing either produces silently wrong typed AST.
+      </div>
+    </div>
+    <div class="card" style="border-left:3px solid #7affc0;">
+      <strong>Step 4 — filter_pub_schemes</strong> (lines 396–425)
+      <p style="margin-top:8px;font-size:13px;">Filters the module's full <code>scheme_env</code> to only publicly accessible names: declared <code>pub</code> names plus names re-exported via <code>export</code> declarations.</p>
+    </div>
+    <div class="card" style="border-left:3px solid #56d4f6;">
+      <strong>Step 5 — GlobalExports.insert</strong>
+      <p style="margin-top:8px;font-size:13px;">Adds filtered <code>pub_schemes</code> to the accumulator. From this point, subsequent modules in topological order can import from this module.</p>
+    </div>
+    <div class="card" style="border-left:3px solid #3dcf8e;">
+      <strong>Step 6 — imported_names population</strong> (lines 201–232)
+      <p style="margin-top:8px;font-size:13px;">Extracts the evaluator's cross-module seeding table. <code>std::core</code> glob entries are skipped — those come from <code>register_builtins</code> in the evaluator.</p>
+    </div>
+
+    <h3>TypedModule output structure</h3>
+    <pre><span class="kw">pub struct</span> <span class="ty">TypedModule</span> {
+    <span class="kw">pub</span> module_path:    <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;,
+    <span class="kw">pub</span> decls:          <span class="ty">Vec</span>&lt;<span class="ty">TypedDecl</span>&gt;,
+    <span class="kw">pub</span> import_aliases: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">String</span>&gt;,               <span class="cm">// alias → canonical</span>
+    <span class="kw">pub</span> imported_names: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, (<span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;, <span class="ty">String</span>)&gt;, <span class="cm">// local → (module, canonical)</span>
+}</pre>
+
+    <!-- ── PASS 5 ── -->
+    <h2 id="pass5">Pass 5 — Evaluation</h2>
+    <p><span class="badge badge-blue">evaluator/mod.rs · 900+ lines</span> · <code>evaluate_graph</code> at lines 231–266</p>
+
+    <p>
+      Processes modules in the same topological order as the typechecker. Builds one isolated <code>Environment</code> per module and stores them in an accumulator keyed by module path.
+    </p>
+
+    <h3>Per-module sequence</h3>
+    <div class="pipeline" style="gap:0;">
+      <div class="pipe-step" style="background:rgba(30,74,92,.2); cursor:default;">
+        <div class="num" style="background:#1e4a5c;color:#56d4f6;width:28px;height:28px;font-size:12px;">5a</div>
+        <div class="info"><div class="name" style="font-size:14px;">Create fresh Environment</div><div class="desc">Call <code>register_builtins</code> — seeds all std::core names</div></div>
+      </div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step" style="background:rgba(30,74,92,.2); cursor:default;">
+        <div class="num" style="background:#1e4a5c;color:#56d4f6;width:28px;height:28px;font-size:12px;">5b</div>
+        <div class="info"><div class="name" style="font-size:14px;">Seed imported names</div><div class="desc">Copy values from already-built dependency environments using <code>imported_names</code></div></div>
+      </div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step" style="background:rgba(30,74,92,.2); cursor:default;">
+        <div class="num" style="background:#1e4a5c;color:#56d4f6;width:28px;height:28px;font-size:12px;">5c</div>
+        <div class="info"><div class="name" style="font-size:14px;">run_passes (3 sub-passes)</div><div class="desc">Evaluate this module's declarations</div></div>
+      </div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step" style="background:rgba(30,74,92,.2); cursor:default;">
+        <div class="num" style="background:#1e4a5c;color:#56d4f6;width:28px;height:28px;font-size:12px;">5d</div>
+        <div class="info"><div class="name" style="font-size:14px;">Store environment</div><div class="desc">Add to <code>module_envs</code> keyed by <code>module_path</code></div></div>
+      </div>
+    </div>
+
+    <h3>The three sub-passes of run_passes</h3>
+    <table>
+      <thead><tr><th>Sub-pass</th><th>What it does</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Pass 1a</strong><br><span style="font-size:12px;color:var(--muted)">Placeholder bindings</span></td>
+          <td>Insert placeholder <code>Value::Closure</code> for every <code>fun</code> declaration</td>
+          <td>Makes function names visible so subsequent closures can capture them</td>
+        </tr>
+        <tr>
+          <td><strong>Pass 1b</strong><br><span style="font-size:12px;color:var(--muted)">Real closures</span></td>
+          <td>Replace placeholders with real <code>Value::Closure</code> values</td>
+          <td>Enables mutual recursion within one module — all names now in scope</td>
+        </tr>
+        <tr>
+          <td><strong>Pass 2</strong><br><span style="font-size:12px;color:var(--muted)">Top-level bindings</span></td>
+          <td>Evaluate top-level <code>let</code>, <code>mut</code>, and statement declarations in source order</td>
+          <td>Handles non-function top-level code</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── IMPLEMENTED ── -->
+    <h2 id="implemented">What Is Implemented</h2>
+
+    <div class="charts-row">
+      <div class="donut-wrap">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <!-- Background circle -->
+          <circle cx="80" cy="80" r="60" fill="none" stroke="#1a2030" stroke-width="24"/>
+          <!-- Green: 13 features = 65% -->
+          <circle cx="80" cy="80" r="60" fill="none" stroke="#3dcf8e" stroke-width="24"
+            stroke-dasharray="245.0 376.99" stroke-dashoffset="94.25" transform="rotate(-90 80 80)"/>
+          <!-- Yellow: 7 missing = 35% -->
+          <circle cx="80" cy="80" r="60" fill="none" stroke="#f0c060" stroke-width="24"
+            stroke-dasharray="132.0 376.99" stroke-dashoffset="-150.75" transform="rotate(-90 80 80)"/>
+          <text x="80" y="75" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="sans-serif">13</text>
+          <text x="80" y="95" text-anchor="middle" fill="#6b7a99" font-size="11" font-family="sans-serif">features</text>
+        </svg>
+        <div class="donut-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3dcf8e"></div>Implemented (13)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f0c060"></div>Missing (7)</div>
+        </div>
+      </div>
+
+      <div style="flex:1; min-width:300px;">
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label">Module Loading</div>
+            <div class="bar-track"><div class="bar-fill" style="width:100%;background:#3dcf8e;"></div></div>
+            <div class="bar-pct">100%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Name Resolution</div>
+            <div class="bar-track"><div class="bar-fill" style="width:100%;background:#3dcf8e;"></div></div>
+            <div class="bar-pct">100%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Path Normalization</div>
+            <div class="bar-track"><div class="bar-fill" style="width:90%;background:#3dcf8e;"></div></div>
+            <div class="bar-pct">90%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Typechecking</div>
+            <div class="bar-track"><div class="bar-fill" style="width:85%;background:#f0c060;"></div></div>
+            <div class="bar-pct">85%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Evaluation</div>
+            <div class="bar-track"><div class="bar-fill" style="width:90%;background:#3dcf8e;"></div></div>
+            <div class="bar-pct">90%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="feature-list">
+      <li>File loading with DFS traversal and cycle detection</li>
+      <li>Hierarchical module paths (<code>ADR-0023</code>)</li>
+      <li>Three-pass scope building: pub_surface → exports → imports</li>
+      <li>Glob import priority tiers: Std &lt; User &lt; Explicit (<code>ADR-0026</code>)</li>
+      <li>Re-export propagation via <code>export path::Name</code></li>
+      <li>Path normalization pre-pass with newtype guarantee (<code>ADR-0021</code>)</li>
+      <li>T0010 annotation enforcement on pub functions</li>
+      <li>T0009 / T0003 / T0011 error reporting in typechecker</li>
+      <li>GlobalExports accumulator for cross-module type flow (<code>ADR-0022</code>)</li>
+      <li>Per-module topological typechecking</li>
+      <li><code>std::core</code> virtual module (<code>ADR-0027</code>)</li>
+      <li>Per-module isolated runtime environments (<code>ADR-0029</code>, sprint 13)</li>
+      <li>Mutual recursion within a single module (Pass 1a/1b tie-the-knot)</li>
+    </ul>
+
+    <!-- ── MISSING ── -->
+    <h2 id="missing">What Is Missing</h2>
+
+    <ul class="feature-list missing" style="margin-bottom:24px;">
+      <li>Cross-module mutual recursion <span class="badge badge-yellow" style="margin-left:8px">#189</span></li>
+      <li><code>?</code> operator desugaring to match pre-pass <span class="badge badge-yellow" style="margin-left:8px">#214</span></li>
+      <li><code>Type::Perhaps</code> / <code>Type::Result</code> as <code>Named</code> variants <span class="badge badge-yellow" style="margin-left:8px">#150</span></li>
+      <li>Field-level visibility — RFC-0032 drafted, deferred post-v0.6.3 <span class="badge badge-yellow" style="margin-left:8px">#158</span> <span class="badge badge-blue" style="margin-left:4px">RFC-0032 #217</span></li>
+      <li>Field-level mutability — RFC-0033 drafted, deferred with RFC-0032 <span class="badge badge-blue" style="margin-left:8px">RFC-0033 #218</span></li>
+      <li><code>std::core</code> paths for primitive types <span class="badge badge-yellow" style="margin-left:8px">#150 partial</span></li>
+      <li>Single-file pipeline audit for pre-pass coverage <span class="badge badge-yellow" style="margin-left:8px">#216</span></li>
+    </ul>
+
+    <div class="card" style="border-left:3px solid var(--yellow);">
+      <h3 style="color:var(--yellow);">Cross-module mutual recursion (#189)</h3>
+      <p>
+        <code>run_passes</code> processes all three sub-passes for one module before moving to the next. This means if function <code>foo</code> in module A needs to call function <code>bar</code> in module B, and <code>bar</code> calls <code>foo</code> back, the pattern fails — when A is evaluated, B doesn't exist in <code>module_envs</code> yet.
+      </p>
+      <p style="margin-top:8px;"><strong>Fix:</strong> Run Pass 1a for all modules before running Pass 1b for any module.</p>
+    </div>
+
+    <div class="card" style="border-left:3px solid var(--yellow);">
+      <h3 style="color:var(--yellow);">? operator as dedicated AST node (#214)</h3>
+      <p>
+        <code>Expr::PropagateError</code> is a special AST node with a mid-inference <code>ctx.solve()</code> call — the only place in the entire codebase where a partial solve occurs before constraint collection is complete. Desugaring to a match expression is planned but blocked until the From coercion edge case is addressed.
+      </p>
+    </div>
+
+    <!-- ── DEBT ── -->
+    <h2 id="debt">Technical Debt</h2>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(224,92,106,.2)" stroke="#e05c6a" stroke-width="2"/>
+          <text x="20" y="26" text-anchor="middle" fill="#e05c6a" font-size="18" font-weight="700" font-family="sans-serif">!</text>
+        </svg>
+        <div class="sev-label" style="color:var(--red);">High</div>
+      </div>
+      <div class="debt-body">
+        <h4>Dual path computation (module_loader vs. name_resolver)</h4>
+        <p>Two independent functions implement the same "resolve PathRoot → absolute path" logic. If they diverge, GlobalExports lookups fail silently with T0009/T0003 errors on valid imports. No shared implementation, no test asserting agreement. <strong>Fix:</strong> extract into a single <code>resolve_path_root</code> in <code>src/module_paths.rs</code>.</p>
+      </div>
+    </div>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(224,92,106,.2)" stroke="#e05c6a" stroke-width="2"/>
+          <text x="20" y="26" text-anchor="middle" fill="#e05c6a" font-size="18" font-weight="700" font-family="sans-serif">!</text>
+        </svg>
+        <div class="sev-label" style="color:var(--red);">High</div>
+      </div>
+      <div class="debt-body">
+        <h4>Dual-registration invariant unenforced</h4>
+        <p>Imported schemes must be seeded into both the inference pass and the construction pass. This is documented in ADR-0022 but enforced only by code convention — there is no type-level guarantee and no test that exercises a missing-one-side case. <strong>Fix:</strong> make <code>InferContext::new</code> accept <code>&amp;SchemeEnv</code> as a required parameter.</p>
+      </div>
+    </div>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(224,92,106,.2)" stroke="#e05c6a" stroke-width="2"/>
+          <text x="20" y="26" text-anchor="middle" fill="#e05c6a" font-size="18" font-weight="700" font-family="sans-serif">!</text>
+        </svg>
+        <div class="sev-label" style="color:var(--red);">High</div>
+      </div>
+      <div class="debt-body">
+        <h4>evaluator.md Known Limitations are stale</h4>
+        <p>The Known Limitations section still documents two problems fixed in sprint 13 (flat module environment, declaration name collisions). Anyone reading it believes the module system is broken in ways it no longer is.</p>
+      </div>
+    </div>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(240,192,96,.15)" stroke="#f0c060" stroke-width="2"/>
+          <text x="20" y="25" text-anchor="middle" fill="#f0c060" font-size="14" font-weight="700" font-family="sans-serif">Med</text>
+        </svg>
+        <div class="sev-label" style="color:var(--yellow);">Medium</div>
+      </div>
+      <div class="debt-body">
+        <h4>StdPrelude / register_builtins can silently diverge</h4>
+        <p><code>StdPrelude::schemes()</code> (typechecker) and <code>register_builtins</code> (evaluator) are separately maintained. If someone adds a name to one but not the other, the mismatch either passes typechecking but fails at runtime, or is available at runtime but rejected by the typechecker. <strong>Fix:</strong> add a test asserting both key sets are equal.</p>
+      </div>
+    </div>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(240,192,96,.15)" stroke="#f0c060" stroke-width="2"/>
+          <text x="20" y="25" text-anchor="middle" fill="#f0c060" font-size="14" font-weight="700" font-family="sans-serif">Med</text>
+        </svg>
+        <div class="sev-label" style="color:var(--yellow);">Medium</div>
+      </div>
+      <div class="debt-body">
+        <h4>Mid-inference partial solve in PropagateError</h4>
+        <p><code>inference.rs:669–714</code> calls <code>ctx.solve()</code> mid-way through type inference — the only such site in the codebase. It can interact with constraints added after the <code>?</code> expression in non-obvious ways. The current implementation also silently ships partial From coercion support that was never explicitly planned.</p>
+      </div>
+    </div>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(91,141,238,.1)" stroke="#5b8dee" stroke-width="2"/>
+          <text x="20" y="25" text-anchor="middle" fill="#5b8dee" font-size="14" font-weight="700" font-family="sans-serif">Low</text>
+        </svg>
+        <div class="sev-label" style="color:var(--accent);">Low</div>
+      </div>
+      <div class="debt-body">
+        <h4>T0009 detection scans raw AST (quadratic + back-channel)</h4>
+        <p>When an explicit import is not found in GlobalExports, <code>build_import_schemes</code> scans the source module's entire raw <code>program.decls</code> to decide between T0009 (private) and T0003 (absent). This is O(n×m) and accesses pre-normalization AST while the typechecker is supposed to operate only on <code>NormalizedModuleGraph</code>.</p>
+      </div>
+    </div>
+
+    <div class="debt-item">
+      <div class="debt-sev">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="rgba(91,141,238,.1)" stroke="#5b8dee" stroke-width="2"/>
+          <text x="20" y="25" text-anchor="middle" fill="#5b8dee" font-size="14" font-weight="700" font-family="sans-serif">Low</text>
+        </svg>
+        <div class="sev-label" style="color:var(--accent);">Low</div>
+      </div>
+      <div class="debt-body">
+        <h4>type_context accumulator is approximate</h4>
+        <p>Struct/enum/aspect declarations from already-checked modules are accumulated as raw untyped AST and re-processed from scratch for each module. If a struct in module A references a type from module C, and module B hasn't imported C, building B's type registry may fail. Currently untriggered by tests, but latent for complex multi-module programs.</p>
+      </div>
+    </div>
+
+    <!-- ── SUMMARY ── -->
+    <h2 id="summary">Summary</h2>
+
+    <h3>Implemented and working</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>File</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>File loading + cycle detection</td><td><code>module_loader.rs</code></td><td>DFS with visited set + call stack</td></tr>
+        <tr><td>Hierarchical module paths</td><td><code>module_loader.rs</code></td><td>ADR-0023</td></tr>
+        <tr><td>Three-pass scope building</td><td><code>name_resolver.rs</code></td><td>pub_surface + explicit + globs</td></tr>
+        <tr><td>Glob import tier priority</td><td><code>name_resolver.rs</code></td><td>ADR-0026; Std &lt; User &lt; Explicit</td></tr>
+        <tr><td>Re-export propagation</td><td><code>name_resolver.rs</code></td><td><code>export path::Name</code></td></tr>
+        <tr><td>Path normalization pre-pass</td><td><code>path_normalizer.rs</code></td><td>ADR-0021; newtype guarantee</td></tr>
+        <tr><td>T0010 pub annotation enforcement</td><td><code>typechecker/mod.rs</code></td><td>Before inference</td></tr>
+        <tr><td>T0009 / T0003 / T0011 errors</td><td><code>typechecker/mod.rs</code></td><td>In build_import_schemes</td></tr>
+        <tr><td>GlobalExports accumulator</td><td><code>typechecker/mod.rs</code></td><td>ADR-0022</td></tr>
+        <tr><td>Per-module typechecking</td><td><code>typechecker/mod.rs</code></td><td>Topological order</td></tr>
+        <tr><td>std::core virtual module</td><td><code>name_resolver.rs</code>, <code>registry.rs</code></td><td>ADR-0027</td></tr>
+        <tr><td>Per-module runtime environments</td><td><code>evaluator/mod.rs</code></td><td>ADR-0029; sprint 13</td></tr>
+        <tr><td>Cross-module imported_names seeding</td><td><code>check_graph + evaluate_graph</code></td><td>Sprint 13 (#210)</td></tr>
+        <tr><td>Mutual recursion within a module</td><td><code>evaluator/mod.rs</code></td><td>Pass 1a/1b tie-the-knot</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Missing</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>Issue</th><th>Blocker</th></tr></thead>
+      <tbody>
+        <tr><td>Cross-module mutual recursion</td><td><code>#189</code></td><td>Needs global 1a-before-1b pass ordering</td></tr>
+        <tr><td>? desugaring to match pre-pass</td><td><code>#214</code></td><td>—</td></tr>
+        <tr><td>Type::Perhaps/Result as Named</td><td><code>#150</code></td><td>Needs #214 first</td></tr>
+        <tr><td>Field-level visibility</td><td><code>#158</code> · <code>RFC-0032 #217</code></td><td>Deferred post-v0.6.3; breaking change for <code>pub struct</code></td></tr>
+        <tr><td>Field-level mutability</td><td><code>RFC-0033 #218</code></td><td>Deferred with RFC-0032; non-breaking</td></tr>
+        <tr><td>std::core paths for primitives</td><td><code>#150 partial</code></td><td>Requires type system changes</td></tr>
+        <tr><td>Single-file pipeline audit</td><td><code>#216 Gap 3</code></td><td>Before #214 implementation</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Technical debt severity</h3>
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label"><span class="badge badge-red">High</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:43%;background:#e05c6a;"></div></div>
+        <div class="bar-pct">3 items</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span class="badge badge-yellow">Medium</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:28%;background:#f0c060;"></div></div>
+        <div class="bar-pct">2 items</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span class="badge badge-blue">Low</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:28%;background:#5b8dee;"></div></div>
+        <div class="bar-pct">2 items</div>
+      </div>
+    </div>
+
+    <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;">
+      Generated from <code>module-system-report.md</code> · Metel v0.5.0–v0.6.2 · Sprints 9–13
+    </div>
+  </main>
+</div>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('h2[id]');
+  const navLinks = document.querySelectorAll('nav a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
