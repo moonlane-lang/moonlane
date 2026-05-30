@@ -394,10 +394,11 @@ fn non_pub_fun_without_annotation_is_accepted() {
 // ── Collision detection ───────────────────────────────────────────────────────
 
 #[test]
-fn duplicate_top_level_name_across_modules_runs_with_warning() {
+fn private_names_in_different_modules_do_not_collide() {
     // Two modules each declare a private function with the same name.
-    // Neither is exported (so no T0011 import conflict); the collision appears
-    // only in the flat runtime environment and is detected as a warning.
+    // Neither is exported (so no T0011 import conflict). With per-module
+    // isolated environments each `helper` lives only in its own module's env —
+    // no collision, no warning.
     let dir = fixture_dir("collision");
     let main = dir.join("main.mtl");
     write(
@@ -407,7 +408,6 @@ fn duplicate_top_level_name_across_modules_runs_with_warning() {
     write(&dir.join("a.mtl"), "pub fun pub_a() -> Int { return 1; }\nfun helper() -> Int { return 10; }\n");
     write(&dir.join("b.mtl"), "pub fun pub_b() -> Int { return 2; }\nfun helper() -> Int { return 20; }\n");
 
-    // The program typechecks and evaluates — runtime collision of `helper` is a warning.
     run_graph(&main).unwrap_or_else(|e| panic!("{e}"));
 }
 
@@ -652,6 +652,85 @@ fn explicit_std_core_import_and_auto_glob_coexist() {
          \n        Perhaps::Some { value } => assert(value == 42),\
          \n        None => assert(false),\
          \n    };\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+// ── #189: cross-module closure capture and pass-ordering correctness ──────────
+
+#[test]
+fn cross_module_closure_captures_imported_function() {
+    // Module builder returns a higher-order closure that captures `add` from math.
+    // Verifies that a closure created in builder's pass-1b correctly holds a
+    // real value for the imported function (not a Unit placeholder).
+    let dir = fixture_dir("closure_capture_import");
+    let main = dir.join("main.mtl");
+    write(&dir.join("math.mtl"), "pub fun add(x: Int, y: Int) -> Int { return x + y; }\n");
+    write(
+        &dir.join("builder.mtl"),
+        "import math::add;\
+         \npub fun make_adder(n: Int) -> fun(Int) -> Int {\
+         \n    return fun(x: Int) -> Int { return add(x, n); };\
+         \n}\n",
+    );
+    write(
+        &main,
+        "import builder::make_adder;\
+         \nfun main() {\
+         \n    let add5 = make_adder(5);\
+         \n    assert(add5(3) == 8);\
+         \n    assert(add5(10) == 15);\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn intra_module_recursion_visible_after_cross_module_import() {
+    // Module recur has a recursive function count_down.
+    // main imports and calls it, verifying that recur's pass-1b correctly
+    // set up the self-referencing closure before main seeded it.
+    let dir = fixture_dir("mutual_rec_cross");
+    let main = dir.join("main.mtl");
+    write(
+        &dir.join("recur.mtl"),
+        "pub fun count_down(n: Int) -> Int {\
+         \n    if (n <= 0) { return 0; }\
+         \n    return 1 + count_down(n - 1);\
+         \n}\n",
+    );
+    write(
+        &main,
+        "import recur::count_down;\
+         \nfun main() {\
+         \n    assert(count_down(0) == 0);\
+         \n    assert(count_down(5) == 5);\
+         \n    assert(count_down(10) == 10);\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn two_same_tier_imports_both_captured_in_closure() {
+    // main imports from two independent modules (left and right) at the same tier.
+    // A closure in main's pass-1b must capture real values from both — not Unit
+    // placeholders — even though left and right are initialized in arbitrary order.
+    let dir = fixture_dir("same_tier_closure");
+    let main = dir.join("main.mtl");
+    write(&dir.join("left.mtl"), "pub fun left_val() -> Int { return 6; }\n");
+    write(&dir.join("right.mtl"), "pub fun right_val() -> Int { return 10; }\n");
+    write(
+        &main,
+        "import left::left_val;\
+         \nimport right::right_val;\
+         \nfun make_combiner() -> fun() -> Int {\
+         \n    return fun() -> Int { return left_val() + right_val(); };\
+         \n}\
+         \nfun main() {\
+         \n    let f = make_combiner();\
+         \n    assert(f() == 16);\
          \n}\n",
     );
     run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
