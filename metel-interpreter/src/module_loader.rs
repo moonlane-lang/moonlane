@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -19,6 +19,10 @@ pub struct LoadedModule {
 pub struct ModuleGraph {
     pub root: PathBuf,
     pub modules: Vec<LoadedModule>,
+    /// Maps alias module paths to their canonical module path.
+    /// Populated when the same physical file is reachable via multiple logical paths
+    /// (diamond dependency). e.g. `["right", "base"] -> ["left", "base"]`.
+    pub path_aliases: HashMap<Vec<String>, Vec<String>>,
 }
 
 pub fn load_root(path: impl AsRef<Path>) -> Result<ModuleGraph, MetelError> {
@@ -26,7 +30,7 @@ pub fn load_root(path: impl AsRef<Path>) -> Result<ModuleGraph, MetelError> {
     let root_dir = root.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
     let mut loader = Loader::new(root_dir);
     loader.load_module(root.clone(), Vec::new())?;
-    Ok(ModuleGraph { root, modules: loader.modules })
+    Ok(ModuleGraph { root, modules: loader.modules, path_aliases: loader.path_aliases })
 }
 
 /// Parse a single `.mtl` file and return its `Program`.
@@ -42,13 +46,24 @@ pub fn load_program(path: impl AsRef<Path>) -> Result<Program, MetelError> {
 struct Loader {
     modules: Vec<LoadedModule>,
     visited: HashSet<PathBuf>,
+    /// Maps each file's canonical path to the module path assigned on first visit.
+    file_to_path: HashMap<PathBuf, Vec<String>>,
+    /// Alias map: alternative module path → canonical module path.
+    path_aliases: HashMap<Vec<String>, Vec<String>>,
     stack: Vec<PathBuf>,
     root_dir: PathBuf,
 }
 
 impl Loader {
     fn new(root_dir: PathBuf) -> Self {
-        Self { modules: Vec::new(), visited: HashSet::new(), stack: Vec::new(), root_dir }
+        Self {
+            modules: Vec::new(),
+            visited: HashSet::new(),
+            file_to_path: HashMap::new(),
+            path_aliases: HashMap::new(),
+            stack: Vec::new(),
+            root_dir,
+        }
     }
 }
 
@@ -68,6 +83,13 @@ impl Loader {
         }
 
         if self.visited.contains(&file_path) {
+            // Same physical file reachable via a different logical path (diamond dependency).
+            // Record the alias so the name resolver can dereference it.
+            if let Some(canonical) = self.file_to_path.get(&file_path) {
+                if *canonical != module_path {
+                    self.path_aliases.insert(module_path, canonical.clone());
+                }
+            }
             return Ok(());
         }
 
@@ -93,6 +115,7 @@ impl Loader {
         self.stack.pop();
 
         self.visited.insert(file_path.clone());
+        self.file_to_path.insert(file_path.clone(), module_path.clone());
         self.modules.push(LoadedModule { module_path, file_path, program });
         Ok(())
     }

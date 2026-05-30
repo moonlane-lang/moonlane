@@ -60,9 +60,26 @@ pub struct ResolvedNames {
     pub pub_surface: HashMap<Vec<String>, HashSet<String>>,
 }
 
+// ── Path alias dereferencing ──────────────────────────────────────────────────
+
+/// Resolve a module path to its canonical form by dereferencing any alias.
+/// Handles prefix aliases: if `["a", "b"]` → `["x", "y"]`, then
+/// `["a", "b", "c"]` → `["x", "y", "c"]`.
+fn canonical_path(path: &[String], aliases: &HashMap<Vec<String>, Vec<String>>) -> Vec<String> {
+    for len in (1..=path.len()).rev() {
+        if let Some(prefix_canon) = aliases.get(&path[..len]) {
+            let mut result = prefix_canon.clone();
+            result.extend_from_slice(&path[len..]);
+            return result;
+        }
+    }
+    path.to_vec()
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
+    let path_aliases = &graph.path_aliases;
     let known_modules: HashSet<Vec<String>> = graph.modules.iter()
         .map(|m| m.module_path.clone())
         .collect();
@@ -80,7 +97,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     // Second pass: process re-exports and extend pub_surface.
     // Simple single-pass (no support for transitive re-export chains; that's future work).
     for loaded in &graph.modules {
-        let re_exported = collect_re_exports(loaded, &known_modules, &pub_surface)?;
+        let re_exported = collect_re_exports(loaded, &known_modules, &pub_surface, path_aliases)?;
         pub_surface.entry(loaded.module_path.clone())
             .or_default()
             .extend(re_exported.keys().cloned());
@@ -89,7 +106,7 @@ pub fn resolve(graph: &ModuleGraph) -> Result<ResolvedNames, MetelError> {
     // Third pass: resolve imports using the final pub_surface.
     let mut scopes = HashMap::new();
     for loaded in &graph.modules {
-        let scope = resolve_module(loaded, &known_modules, &pub_surface)?;
+        let scope = resolve_module(loaded, &known_modules, &pub_surface, path_aliases)?;
         scopes.insert(loaded.module_path.clone(), scope);
     }
 
@@ -122,8 +139,9 @@ fn resolve_module(
     loaded: &LoadedModule,
     known_modules: &HashSet<Vec<String>>,
     pub_surface: &HashMap<Vec<String>, HashSet<String>>,
+    path_aliases: &HashMap<Vec<String>, Vec<String>>,
 ) -> Result<ModuleScope, MetelError> {
-    let re_exports = collect_re_exports(loaded, known_modules, pub_surface)?;
+    let re_exports = collect_re_exports(loaded, known_modules, pub_surface, path_aliases)?;
     let mut scope = ModuleScope {
         module_path: loaded.module_path.clone(),
         explicit: HashMap::new(),
@@ -133,7 +151,7 @@ fn resolve_module(
 
     for import in &loaded.program.imports {
         let base = absolute_base(&import.path.root, &loaded.module_path);
-        process_tree(&base, &import.path.tree, known_modules, pub_surface, &mut scope, &import.span)?;
+        process_tree(&base, &import.path.tree, known_modules, pub_surface, path_aliases, &mut scope, &import.span)?;
     }
 
     // Auto-import std::core at lowest (Std) priority — RFC-0030. See ADR-0026 (glob tiers)
@@ -149,12 +167,13 @@ fn collect_re_exports(
     loaded: &LoadedModule,
     known_modules: &HashSet<Vec<String>>,
     pub_surface: &HashMap<Vec<String>, HashSet<String>>,
+    path_aliases: &HashMap<Vec<String>, Vec<String>>,
 ) -> Result<HashMap<String, ImportBinding>, MetelError> {
     let mut re_exports: HashMap<String, ImportBinding> = HashMap::new();
 
     for export in &loaded.program.exports {
         let base = absolute_base(&export.path.root, &loaded.module_path);
-        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, &mut re_exports, &export.span)?;
+        process_export_tree(&base, &export.path.tree, known_modules, pub_surface, path_aliases, &mut re_exports, &export.span)?;
     }
 
     Ok(re_exports)
@@ -166,9 +185,13 @@ fn process_export_tree(
     tree: &ImportTree,
     known_modules: &HashSet<Vec<String>>,
     pub_surface: &HashMap<Vec<String>, HashSet<String>>,
+    path_aliases: &HashMap<Vec<String>, Vec<String>>,
     re_exports: &mut HashMap<String, ImportBinding>,
     export_span: &Span,
 ) -> Result<(), MetelError> {
+    let canon_base = canonical_path(base, path_aliases);
+    let base = canon_base.as_slice();
+
     match tree {
         ImportTree::Glob => {
             // Re-export all public names from the base module.
@@ -220,12 +243,12 @@ fn process_export_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_export_tree(&new_base, tree, known_modules, pub_surface, re_exports, export_span)?;
+            process_export_tree(&new_base, tree, known_modules, pub_surface, path_aliases, re_exports, export_span)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_export_tree(base, item, known_modules, pub_surface, re_exports, export_span)?;
+                process_export_tree(base, item, known_modules, pub_surface, path_aliases, re_exports, export_span)?;
             }
         }
     }
@@ -261,9 +284,13 @@ fn process_tree(
     tree: &ImportTree,
     known_modules: &HashSet<Vec<String>>,
     pub_items: &HashMap<Vec<String>, HashSet<String>>,
+    path_aliases: &HashMap<Vec<String>, Vec<String>>,
     scope: &mut ModuleScope,
     import_span: &Span,
 ) -> Result<(), MetelError> {
+    let canon_base = canonical_path(base, path_aliases);
+    let base = canon_base.as_slice();
+
     match tree {
         ImportTree::Glob => {
             scope.globs.push((GlobTier::User, base.to_vec()));
@@ -296,12 +323,12 @@ fn process_tree(
         ImportTree::Path { name, tree } => {
             let mut new_base = base.to_vec();
             new_base.push(name.clone());
-            process_tree(&new_base, tree, known_modules, pub_items, scope, import_span)?;
+            process_tree(&new_base, tree, known_modules, pub_items, path_aliases, scope, import_span)?;
         }
 
         ImportTree::Group(items) => {
             for item in items {
-                process_tree(base, item, known_modules, pub_items, scope, import_span)?;
+                process_tree(base, item, known_modules, pub_items, path_aliases, scope, import_span)?;
             }
         }
     }
@@ -394,7 +421,7 @@ mod tests {
             file_path: PathBuf::from("test.mtl"),
             program,
         }).collect();
-        ModuleGraph { root, modules }
+        ModuleGraph { root, modules, path_aliases: std::collections::HashMap::new() }
     }
 
     #[test]

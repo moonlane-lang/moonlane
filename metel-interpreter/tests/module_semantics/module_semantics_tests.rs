@@ -735,3 +735,36 @@ fn two_same_tier_imports_both_captured_in_closure() {
     );
     run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
 }
+
+// ── #228: diamond dependency (same physical file via multiple paths) ───────────
+
+#[test]
+fn diamond_dependency_shared_base_accessible_in_both_importers() {
+    // base.mtl is reachable from both left.mtl and right.mtl via their imports.
+    // Without the path-alias fix, the name resolver would assign base a path that
+    // doesn't exist in the registry when loaded via the second importer, causing T0003.
+    let dir = fixture_dir("diamond_dep");
+    let main = dir.join("main.mtl");
+    write(
+        &dir.join("base.mtl"),
+        "pub fun shared() -> Int { return 42; }\n",
+    );
+    write(
+        &dir.join("left.mtl"),
+        "import base::shared;\npub fun left_answer() -> Int { return shared(); }\n",
+    );
+    write(
+        &dir.join("right.mtl"),
+        "import base::shared;\npub fun right_answer() -> Int { return shared() + 1; }\n",
+    );
+    write(
+        &main,
+        "import left::left_answer;\
+         \nimport right::right_answer;\
+         \nfun main() {\
+         \n    assert(left_answer() == 42);\
+         \n    assert(right_answer() == 43);\
+         \n}\n",
+    );
+    run_graph_std(&main).unwrap_or_else(|e| panic!("{e}"));
+}
